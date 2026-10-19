@@ -4,142 +4,443 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Tela ao Vivo</title>
+<meta name="description" content="Compartilhe a tela inteira ou uma janela, com ou sem áudio, e deixe a voz da call de fora. Direto do Chrome, P2P.">
+<meta name="theme-color" content="#0d0e10">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23141518'/%3E%3Ccircle cx='16' cy='16' r='6' fill='%23ff5b37'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#0c0e13;--painel:#151922;--painel2:#1b2030;--borda:#272e3d;--texto:#e9ecf2;--sub:#8d95a8;
-  --acento:#7c5cff;--acento-h:#9277ff;--ok:#2fd27a;--aviso:#ffb547;--erro:#ff5d6c;
+  --bg:#0d0e10;--bg-2:#111215;--sup:#16171b;--sup-2:#1c1e23;--sup-3:#23252b;
+  --linha:#25272e;--linha-2:#31343c;--texto:#ecedf0;--sub:#9296a1;--fraco:#62666f;
+  --acento:#ff5b37;--acento-h:#ff7656;--acento-tinta:#170804;--acento-suave:rgba(255,91,55,.12);
+  --ok:#3fd884;--aviso:#f4b53f;--erro:#ff6b78;
+  --r-s:8px;--r-m:12px;--r-l:18px;
+  --sombra:0 1px 0 rgba(255,255,255,.04) inset,0 18px 40px -18px rgba(0,0,0,.7);
+  --fonte:"Geist",ui-sans-serif,system-ui,"Segoe UI",sans-serif;
+  --mono:"Geist Mono",ui-monospace,Consolas,monospace;
+  --ease:cubic-bezier(.2,.8,.2,1);
 }
 *{box-sizing:border-box}
-html,body{margin:0;height:100%;background:var(--bg);color:var(--texto);font:15px/1.5 "Segoe UI",system-ui,sans-serif}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--texto);font:15px/1.55 var(--fonte);-webkit-font-smoothing:antialiased}
+body{min-height:100dvh;display:flex;flex-direction:column;
+  background:radial-gradient(1100px 520px at 85% -10%,rgba(255,91,55,.07),transparent 60%),radial-gradient(800px 500px at -10% 110%,rgba(120,130,160,.06),transparent 60%),var(--bg)}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.035;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
 .hidden{display:none!important}
 button,input,select{font:inherit;color:inherit}
-button{cursor:pointer;border:0;border-radius:10px;padding:10px 16px;background:var(--painel2);transition:background .15s,transform .05s}
-button:active{transform:translateY(1px)}
-button:disabled{opacity:.45;cursor:default}
-select,input[type=text]{width:100%;background:var(--bg);border:1px solid var(--borda);border-radius:10px;padding:10px 12px;outline:none}
-select:focus,input[type=text]:focus{border-color:var(--acento)}
-label{display:block;font-size:13px;color:var(--sub);margin:16px 0 6px;font-weight:600;letter-spacing:.02em}
-.primario{background:var(--acento);color:#fff;font-weight:600;width:100%;padding:13px;margin-top:20px}
-.primario:hover{background:var(--acento-h)}
-.perigo{background:#3a1d24;color:#ff8c97;font-weight:600;width:100%;padding:13px;margin-top:20px}
-.perigo:hover{background:#4a222b}
-.secundario{background:var(--painel2);border:1px solid var(--borda)}
-.secundario:hover{background:#232a3c}
-.dica{font-size:12.5px;color:var(--sub);margin:8px 0 0}
-.tela{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px}
+button{cursor:pointer;border:0;background:none;padding:0}
+svg.i{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+:focus-visible{outline:2px solid var(--acento);outline-offset:2px;border-radius:6px}
+::selection{background:var(--acento);color:var(--acento-tinta)}
 
-/* home */
-.marca{font-size:34px;font-weight:800;letter-spacing:-.02em;margin:0}
-.marca span{color:var(--acento)}
-.sub{color:var(--sub);margin:6px 0 32px;text-align:center}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;width:100%;max-width:620px}
-.card{background:var(--painel);border:1px solid var(--borda);border-radius:16px;padding:26px 22px;text-align:left}
-.card:hover{border-color:var(--acento);background:#181d2a}
-.card .emoji{font-size:30px;display:block;margin-bottom:10px}
-.card b{display:block;font-size:18px}
-.card small{color:var(--sub);font-size:13px}
-.erro-banner{margin-top:24px;background:#3a1d24;color:#ffb3ba;border-radius:10px;padding:12px 16px;max-width:620px}
+/* ---------- botões ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;border-radius:var(--r-m);
+  background:var(--sup-2);border:1px solid var(--linha-2);font-weight:500;font-size:14px;white-space:nowrap;
+  transition:background .2s var(--ease),border-color .2s var(--ease),transform .12s var(--ease),color .2s}
+.btn:hover{background:var(--sup-3);border-color:#3c4049}
+.btn:active{transform:scale(.98)}
+.btn:disabled{opacity:.4;cursor:default;transform:none}
+.btn.primario{background:var(--acento);border-color:transparent;color:var(--acento-tinta);font-weight:650}
+.btn.primario:hover{background:var(--acento-h)}
+.btn.perigo{background:transparent;border-color:rgba(255,107,120,.35);color:var(--erro)}
+.btn.perigo:hover{background:rgba(255,107,120,.08)}
+.btn.grande{height:52px;width:100%;font-size:15px;border-radius:14px}
+.btn.icone{width:40px;padding:0}
+.btn.ok{color:var(--ok);border-color:rgba(63,216,132,.35)}
 
-/* painéis */
-.painel{background:var(--painel);border:1px solid var(--borda);border-radius:18px;padding:24px;width:100%;max-width:440px}
-.painel.largo{max-width:900px}
-.topo{display:flex;align-items:center;gap:12px;margin-bottom:6px}
-.topo h2{margin:0;font-size:20px}
-.voltar{background:none;color:var(--sub);padding:6px 8px}
-.voltar:hover{color:var(--texto)}
-.grade{display:grid;grid-template-columns:1fr 1.25fr;gap:28px}
-@media (max-width:760px){.grade{grid-template-columns:1fr}}
+/* ---------- topo ---------- */
+.topo{position:relative;z-index:2;display:flex;align-items:center;justify-content:space-between;
+  max-width:1240px;width:100%;margin:0 auto;padding:22px 24px 0}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:-.01em;font-size:16px}
+.tally{width:10px;height:10px;border-radius:50%;background:var(--acento);box-shadow:0 0 0 4px var(--acento-suave)}
+.pill{display:inline-flex;align-items:center;gap:8px;height:30px;padding:0 12px;border-radius:999px;font:600 12px/1 var(--mono);
+  letter-spacing:.06em;background:var(--acento-suave);color:var(--acento);border:1px solid rgba(255,91,55,.25)}
+.pill .ponto{width:7px;height:7px;border-radius:50%;background:var(--acento);animation:pulsa 1.6s infinite}
+@keyframes pulsa{0%,100%{opacity:1}50%{opacity:.25}}
+main{position:relative;flex:1;display:flex;flex-direction:column}
+.tela{flex:1;width:100%;max-width:1240px;margin:0 auto;padding:24px}
+
+/* ---------- home ---------- */
+#home{display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center;padding-top:clamp(32px,8vh,96px);padding-bottom:64px}
+.sobretitulo{font:500 12.5px/1 var(--mono);color:var(--sub);letter-spacing:.04em;margin:0 0 22px;display:flex;align-items:center;gap:10px}
+.sobretitulo::before{content:"";width:22px;height:1px;background:var(--linha-2)}
+h1{font-size:clamp(40px,5.6vw,68px);line-height:.98;letter-spacing:-.045em;font-weight:700;margin:0;text-wrap:balance}
+h1 em{font-style:normal;color:var(--acento)}
+.lead{color:var(--sub);font-size:17px;max-width:46ch;margin:22px 0 0;text-wrap:pretty}
+.specs{list-style:none;padding:0;margin:40px 0 0;display:grid;grid-template-columns:repeat(4,auto);gap:0;justify-content:start;
+  border-top:1px solid var(--linha);max-width:560px}
+.specs li{padding:14px 22px 0 0;font-size:13px;color:var(--fraco)}
+.specs b{display:block;color:var(--texto);font:600 13.5px/1.3 var(--mono);letter-spacing:-.01em}
+
+.acoes{display:flex;flex-direction:column;gap:14px}
+.acao{position:relative;display:block;width:100%;text-align:left;background:linear-gradient(180deg,var(--sup-2),var(--sup));border:1px solid var(--linha);
+  border-radius:var(--r-l);padding:26px;box-shadow:var(--sombra);overflow:hidden;transition:border-color .25s var(--ease),transform .25s var(--ease)}
+.acao-tx{cursor:pointer}
+.acao-tx:hover{border-color:rgba(255,91,55,.45);transform:translateY(-2px)}
+.acao-tx:active{transform:translateY(0) scale(.995)}
+.acao-tx .topo-acao{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.acao-tx b{display:block;font-size:24px;letter-spacing:-.025em;font-weight:650}
+.acao-tx small{display:block;color:var(--sub);font-size:14px;margin-top:4px}
+.seta{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:var(--acento);color:var(--acento-tinta);flex:none;
+  transition:transform .3s var(--ease)}
+.acao-tx:hover .seta{transform:translateX(3px) rotate(-45deg)}
+.fontes-mini{display:flex;gap:8px;margin-top:24px;flex-wrap:wrap}
+.fontes-mini span{display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 11px;border-radius:8px;background:var(--bg-2);border:1px solid var(--linha);font-size:12.5px;color:var(--sub)}
+.fontes-mini svg.i{width:15px;height:15px}
+.acao-rx label{display:flex;align-items:center;gap:8px;font-weight:600;font-size:15px;margin:0 0 14px}
+.campo-codigo{display:flex;gap:8px}
+.campo-codigo input{flex:1;min-width:0;height:48px;border-radius:var(--r-m);background:var(--bg);border:1px solid var(--linha-2);padding:0 16px;
+  font:500 17px var(--mono);letter-spacing:.08em;outline:none;transition:border-color .2s,box-shadow .2s}
+.campo-codigo input::placeholder{color:var(--fraco);letter-spacing:.02em;font-size:15px}
+.campo-codigo input:focus{border-color:var(--acento);box-shadow:0 0 0 4px var(--acento-suave)}
+.campo-codigo .btn{height:48px;padding:0 22px}
+.erro-campo{color:var(--erro);font-size:13px;margin:10px 0 0}
+.banner{margin-top:16px;border-radius:var(--r-m);padding:12px 16px;font-size:14px}
+.banner.erro{background:rgba(255,107,120,.08);border:1px solid rgba(255,107,120,.25);color:#ffb0b8}
+
+/* ---------- estúdio (transmitir) ---------- */
+.cab-estudio{display:flex;align-items:center;gap:14px;margin:4px 0 26px}
+.cab-estudio h2{margin:0;font-size:28px;letter-spacing:-.03em;font-weight:650}
+.voltar{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px 0 8px;border-radius:10px;color:var(--sub);font-size:14px;transition:color .2s,background .2s}
+.voltar:hover{color:var(--texto);background:var(--sup-2)}
+.estudio{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.08fr);gap:28px;align-items:start}
+.config{display:flex;flex-direction:column;gap:14px}
+.bloco{margin:0;border:1px solid var(--linha);border-radius:var(--r-l);background:var(--sup);padding:20px;min-width:0}
+.bloco legend{float:left;width:100%;display:flex;align-items:center;gap:10px;padding:0;margin:0 0 16px;font-weight:600;font-size:15px}
+.bloco legend + *{clear:both}
+.num{width:22px;height:22px;border-radius:7px;display:grid;place-items:center;background:var(--sup-3);font:600 11.5px var(--mono);color:var(--sub)}
+.bloco[disabled] .op,.bloco [disabled]+.linha-op{cursor:not-allowed}
+
+.fontes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.op{position:relative;cursor:pointer}
+.op input,.op-l input,.seg input{position:absolute;opacity:0;pointer-events:none}
+.op-caixa{display:flex;flex-direction:column;gap:12px;height:100%;padding:14px;border-radius:var(--r-m);background:var(--bg-2);border:1px solid var(--linha);
+  transition:border-color .2s var(--ease),background .2s var(--ease)}
+.op-caixa svg.i{width:22px;height:22px;color:var(--sub);transition:color .2s}
+.op-caixa b{font-weight:600;font-size:14px;display:block}
+.op-caixa small{display:block;color:var(--fraco);font-size:12.5px;line-height:1.35;margin-top:2px}
+.op:hover .op-caixa{border-color:var(--linha-2)}
+.op input:checked+.op-caixa{border-color:var(--acento);background:linear-gradient(180deg,var(--acento-suave),transparent 70%),var(--bg-2)}
+.op input:checked+.op-caixa svg.i{color:var(--acento)}
+.op input:focus-visible+.op-caixa{outline:2px solid var(--acento);outline-offset:2px}
+.op input:disabled+.op-caixa{opacity:.5}
+
+.lista-audio{display:flex;flex-direction:column;border:1px solid var(--linha);border-radius:var(--r-m);overflow:hidden;background:var(--bg-2)}
+.op-l{position:relative;display:flex;gap:12px;padding:13px 14px;cursor:pointer;transition:background .2s}
+.op-l+.op-l{border-top:1px solid var(--linha)}
+.op-l:hover{background:var(--sup)}
+.radio{flex:none;width:18px;height:18px;margin-top:2px;border-radius:50%;border:1.5px solid var(--linha-2);display:grid;place-items:center;transition:border-color .2s}
+.radio::after{content:"";width:8px;height:8px;border-radius:50%;background:var(--acento);transform:scale(0);transition:transform .2s var(--ease)}
+.op-l input:checked~.radio{border-color:var(--acento)}
+.op-l input:checked~.radio::after{transform:scale(1)}
+.op-l input:focus-visible~.radio{outline:2px solid var(--acento);outline-offset:2px}
+.op-l input:disabled~*{opacity:.5}
+.op-l:has(input:disabled){cursor:not-allowed}
+.op-l b{font-weight:600;font-size:14px}
+.op-l small{display:block;color:var(--fraco);font-size:12.5px;line-height:1.4;margin-top:2px;text-wrap:pretty}
+.etq{display:inline-block;margin-left:6px;padding:2px 6px;border-radius:5px;font:600 10.5px/1.4 var(--mono);letter-spacing:.03em;vertical-align:1px}
+.etq.rec{background:var(--acento-suave);color:var(--acento)}
+.etq.alerta{background:rgba(244,181,63,.12);color:var(--aviso)}
+
+.sub-bloco{margin-top:14px}
+.rotulo-campo{display:block;font-size:12.5px;color:var(--sub);font-weight:500;margin:0 0 8px}
 .linha{display:flex;gap:8px}
-.icone{padding:0 14px;font-size:18px}
-.medidor{height:8px;background:var(--bg);border-radius:6px;margin-top:10px;overflow:hidden;border:1px solid var(--borda)}
-#nivel{height:100%;width:0;background:linear-gradient(90deg,var(--ok),var(--aviso) 80%,var(--erro));transition:width .06s}
-.codigo-box{background:var(--bg);border:1px dashed var(--borda);border-radius:14px;padding:16px;text-align:center}
-.rotulo{font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.08em;font-weight:700}
-.codigo{font:800 38px/1.2 Consolas,monospace;letter-spacing:.12em;margin:6px 0 12px;color:#fff}
-#preview{width:100%;aspect-ratio:16/9;background:#000;border-radius:12px;margin-top:16px;border:1px solid var(--borda);object-fit:contain}
-.status{margin-top:12px;font-size:14px}
-.status.ok{color:var(--ok)}.status.aviso{color:var(--aviso)}.status.erro{color:var(--erro)}
-.stats{font:12.5px/1.6 Consolas,monospace;color:var(--sub);margin-top:6px;min-height:20px}
-#viewers{font-weight:600}
+select{appearance:none;width:100%;min-width:0;height:40px;border-radius:var(--r-m);background:var(--bg-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%239296a1' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 4.5 6 7.5l3-3'/%3E%3C/svg%3E") no-repeat right 14px center;
+  border:1px solid var(--linha-2);padding:0 36px 0 13px;font-size:14px;outline:none;cursor:pointer;transition:border-color .2s}
+select:hover{border-color:#3c4049}
+select:focus-visible{border-color:var(--acento);outline:none;box-shadow:0 0 0 4px var(--acento-suave)}
+select option{background:var(--sup-2)}
+.medidor{position:relative;height:10px;margin-top:12px;border-radius:3px;background:var(--bg);overflow:hidden;
+  -webkit-mask:repeating-linear-gradient(90deg,#000 0 6px,transparent 6px 8px);mask:repeating-linear-gradient(90deg,#000 0 6px,transparent 6px 8px)}
+.medidor::before{content:"";position:absolute;inset:0;background:var(--sup-3)}
+#nivel{position:relative;height:100%;width:100%;transform-origin:left;transform:scaleX(0);
+  background:linear-gradient(90deg,var(--ok) 0 65%,var(--aviso) 80%,var(--erro));transition:transform .06s linear}
+.rodape-medidor{display:flex;justify-content:space-between;font:12px var(--mono);color:var(--fraco);margin-top:6px}
 
-/* player */
-#rx-player{padding:0}
-#player{position:fixed;inset:0;background:#000;overflow:hidden}
+.guia{margin-top:14px;border-radius:var(--r-m);background:var(--bg-2);border:1px solid var(--linha)}
+.guia summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:12px 14px;font-size:13.5px;font-weight:500;color:var(--texto)}
+.guia summary::-webkit-details-marker{display:none}
+.guia summary svg.i{color:var(--acento)}
+.guia summary .mais{margin-left:auto;color:var(--fraco);transition:transform .25s var(--ease)}
+.guia[open] summary .mais{transform:rotate(45deg)}
+.guia-corpo{padding:2px 14px 14px;font-size:13.5px;color:var(--sub)}
+.guia-corpo h4{margin:14px 0 8px;color:var(--texto);font-size:13.5px;font-weight:600}
+.guia-corpo h4:first-child{margin-top:4px}
+.guia-corpo ol{margin:0;padding-left:20px}
+.guia-corpo li{margin:5px 0;text-wrap:pretty}
+.guia-corpo li::marker{font:12px var(--mono);color:var(--fraco)}
+.guia-corpo b{color:var(--texto);font-weight:600}
+kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--linha-2);border-radius:5px;padding:1px 5px;color:var(--texto)}
+
+.seg{display:grid;grid-template-columns:1fr 1fr;padding:3px;border-radius:var(--r-m);background:var(--bg-2);border:1px solid var(--linha);margin-top:10px}
+.seg label{position:relative;cursor:pointer}
+.seg span{display:flex;flex-direction:column;align-items:center;padding:8px 6px;border-radius:9px;font-size:13.5px;font-weight:500;color:var(--sub);transition:background .2s,color .2s;text-align:center}
+.seg span small{font-size:11.5px;color:var(--fraco);font-weight:400}
+.seg input:checked+span{background:var(--sup-3);color:var(--texto);box-shadow:0 1px 0 rgba(255,255,255,.05) inset}
+.seg input:focus-visible+span{outline:2px solid var(--acento)}
+.dica{font-size:12.5px;color:var(--fraco);margin:10px 0 0;text-wrap:pretty}
+.dica.aviso{color:var(--aviso)}
+
+/* monitor (lado direito) */
+.monitor{position:sticky;top:20px;display:flex;flex-direction:column;gap:14px}
+.quadro{position:relative;aspect-ratio:16/9;border-radius:var(--r-l);overflow:hidden;background:#08090a;border:1px solid var(--linha);box-shadow:var(--sombra)}
+#preview{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000}
+.quadro-vazio{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--fraco);font-size:13.5px;
+  background:repeating-linear-gradient(135deg,transparent 0 14px,rgba(255,255,255,.015) 14px 15px)}
+.quadro-vazio svg.i{width:30px;height:30px;stroke-width:1.4}
+.cantos::before,.cantos::after{content:"";position:absolute;width:18px;height:18px;border:1.5px solid var(--linha-2)}
+.cantos::before{top:14px;left:14px;border-right:0;border-bottom:0}
+.cantos::after{bottom:14px;right:14px;border-left:0;border-top:0}
+.tag-vivo{position:absolute;top:12px;left:12px;display:inline-flex;align-items:center;gap:7px;height:26px;padding:0 10px;border-radius:7px;
+  background:var(--acento);color:var(--acento-tinta);font:700 11.5px/1 var(--mono);letter-spacing:.08em}
+.tag-vivo .ponto{width:6px;height:6px;border-radius:50%;background:var(--acento-tinta);animation:pulsa 1.4s infinite}
+.tag-res{position:absolute;top:12px;right:12px;height:26px;padding:0 9px;border-radius:7px;display:inline-flex;align-items:center;
+  background:rgba(0,0,0,.6);backdrop-filter:blur(8px);font:500 11.5px var(--mono);color:#d5d8de}
+
+.sala{display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center;padding:18px 20px;border-radius:var(--r-l);background:var(--sup);border:1px solid var(--linha)}
+.rotulo{font:500 11.5px var(--mono);color:var(--fraco);letter-spacing:.06em;text-transform:uppercase}
+.codigo{font:600 34px/1.15 var(--mono);letter-spacing:.14em;margin-top:4px;color:var(--texto);font-variant-numeric:tabular-nums}
+.codigo.vazio{color:var(--linha-2)}
+.sala-bt{display:flex;flex-direction:column;gap:8px}
+.status{display:flex;align-items:center;gap:9px;font-size:14px;color:var(--sub);min-height:22px}
+.status::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--fraco);flex:none}
+.status.ok{color:var(--texto)}.status.ok::before{background:var(--ok);box-shadow:0 0 0 4px rgba(63,216,132,.14)}
+.status.aviso{color:var(--aviso)}.status.aviso::before{background:var(--aviso)}
+.status.erro{color:var(--erro)}.status.erro::before{background:var(--erro)}
+.metricas{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:8px;background:var(--sup);border:1px solid var(--linha);
+  font:500 12px var(--mono);color:var(--sub);font-variant-numeric:tabular-nums}
+.chip.bom{color:var(--ok)}.chip.ruim{color:var(--aviso)}
+.chip svg.i{width:14px;height:14px}
+
+/* ---------- player ---------- */
+#rx-player{padding:0;max-width:none}
+#player{position:fixed;inset:0;z-index:10;background:#000;overflow:hidden}
 #player:not(.ativo){cursor:none}
 #video{width:100%;height:100%;object-fit:contain;background:#000;display:block}
-#espera{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:rgba(12,14,19,.92);text-align:center;padding:24px}
-#espera p{margin:0;color:var(--texto);max-width:460px}
-.spinner{width:42px;height:42px;border-radius:50%;border:4px solid var(--borda);border-top-color:var(--acento);animation:gira 1s linear infinite}
-@keyframes gira{to{transform:rotate(360deg)}}
-#aviso-som{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--acento);color:#fff;font-weight:700;padding:14px 22px;border-radius:12px;font-size:16px}
-#barra{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:10px;padding:28px 18px 14px;background:linear-gradient(transparent,rgba(0,0,0,.85));opacity:0;transition:opacity .25s}
-#player.ativo #barra,#player.ativo #stats-rx-box.fixo{opacity:1}
-#barra button{background:rgba(255,255,255,.1);padding:8px 13px;font-size:14px}
-#barra button:hover{background:rgba(255,255,255,.2)}
-#vol{width:110px;accent-color:var(--acento)}
-#info-rx{font:12.5px Consolas,monospace;color:#c9cfdb;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#espera{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;background:var(--bg);text-align:center;padding:24px}
+#espera p{margin:0;color:var(--sub);max-width:420px;font-size:15px;text-wrap:balance}
+.sinal{display:flex;align-items:flex-end;gap:5px;height:34px}
+.sinal i{width:6px;border-radius:2px;background:var(--acento);animation:barra 1.1s var(--ease) infinite}
+.sinal i:nth-child(1){height:30%;animation-delay:0s}.sinal i:nth-child(2){height:55%;animation-delay:.12s}
+.sinal i:nth-child(3){height:80%;animation-delay:.24s}.sinal i:nth-child(4){height:100%;animation-delay:.36s}
+@keyframes barra{0%,100%{opacity:.2}40%{opacity:1}}
+.espera-cod{font:600 13px var(--mono);color:var(--fraco);letter-spacing:.1em}
+#bt-espera-sair{margin-top:6px}
+#aviso-som{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);display:inline-flex;align-items:center;gap:10px;
+  background:var(--acento);color:var(--acento-tinta);font-weight:650;padding:15px 22px;border-radius:14px;font-size:15px;box-shadow:0 20px 50px rgba(0,0,0,.5)}
+#barra{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:6px;padding:40px 18px 16px;
+  background:linear-gradient(transparent,rgba(0,0,0,.88));opacity:0;transform:translateY(8px);transition:opacity .25s var(--ease),transform .25s var(--ease)}
+#player.ativo #barra{opacity:1;transform:none}
+.bt-p{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:38px;min-width:38px;padding:0 10px;border-radius:10px;color:#e8eaee;
+  font-size:13.5px;font-weight:500;transition:background .15s}
+.bt-p:hover{background:rgba(255,255,255,.12)}
+.bt-p:active{transform:scale(.96)}
+.bt-p svg.i{width:20px;height:20px}
+.bt-p.ativo{color:var(--acento)}
+#vol{width:100px;accent-color:var(--acento);margin-right:8px}
+#info-rx{font:500 12px var(--mono);color:#b9bdc6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.ao-vivo-rx{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 8px;border-radius:6px;background:var(--acento);color:var(--acento-tinta);font:700 10.5px/1 var(--mono);letter-spacing:.08em;margin:0 6px}
 .flex{flex:1}
-#stats-rx-box{position:absolute;top:14px;left:14px;background:rgba(0,0,0,.7);border-radius:10px;padding:10px 14px;font:12.5px/1.7 Consolas,monospace;color:#d6dbe6}
+#espera:not(.hidden)~#barra .ao-vivo-rx,#espera:not(.hidden)~#barra #info-rx{display:none}
+#stats-rx-box{position:absolute;top:16px;left:16px;min-width:230px;background:rgba(13,14,16,.78);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.08);
+  border-radius:12px;padding:12px 14px;font:12px/1.8 var(--mono);color:#d6dae2;white-space:pre}
+
+/* ---------- responsivo ---------- */
+@media (max-width:980px){
+  #home{grid-template-columns:1fr;gap:36px}
+  .estudio{grid-template-columns:1fr}
+  .monitor{position:static;order:-1}
+}
+@media (max-width:560px){
+  .tela{padding:16px}
+  .topo{padding:16px 16px 0}
+  .specs{grid-template-columns:repeat(2,auto)}
+  .fontes{grid-template-columns:1fr}
+  .op-caixa{flex-direction:row;align-items:center}
+  .sala{grid-template-columns:1fr}
+  .sala-bt{flex-direction:row}
+  .sala-bt .btn{flex:1}
+  .codigo{font-size:28px}
+  #vol,#info-rx,.bt-p .txt{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
 
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="2.5" y="3.5" width="19" height="13" rx="2"/><path d="M8 20.5h8M12 16.5v4"/></symbol>
+  <symbol id="i-janela" viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="16" rx="2"/><path d="M2.5 8.5h19M6 6.3h.01M8.5 6.3h.01"/></symbol>
+  <symbol id="i-aba" viewBox="0 0 24 24"><path d="M2.5 9V6a2 2 0 0 1 2-2h5l2 3h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-15a2 2 0 0 1-2-2Z"/></symbol>
+  <symbol id="i-seta" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-voltar" viewBox="0 0 24 24"><path d="M19 12H5M11 18l-6-6 6-6"/></symbol>
+  <symbol id="i-olho" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-copiar" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="12" height="12" rx="2"/><path d="M15.5 8.5V5.5a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h3"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3.2-3.2a4.5 4.5 0 0 0-6.4-6.4L12 5.6"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3.2 3.2a4.5 4.5 0 0 0 6.4 6.4l1.2-1.2"/></symbol>
+  <symbol id="i-ok" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-recarregar" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4.5V11h-6.5"/></symbol>
+  <symbol id="i-som" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></symbol>
+  <symbol id="i-som-baixo" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6"/></symbol>
+  <symbol id="i-mudo" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="m16 9.5 5 5M21 9.5l-5 5"/></symbol>
+  <symbol id="i-stats" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+  <symbol id="i-pip" viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="16" rx="2"/><rect x="12" y="12" width="7" height="5" rx="1"/></symbol>
+  <symbol id="i-cheia" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+  <symbol id="i-sair-cheia" viewBox="0 0 24 24"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-fone" viewBox="0 0 24 24"><path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="4.5" height="6.5" rx="1.5"/><rect x="16.5" y="14" width="4.5" height="6.5" rx="1.5"/></symbol>
+  <symbol id="i-mais" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-usuarios" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14.2A6.5 6.5 0 0 1 21.5 20"/></symbol>
+</svg>
+
+<header class="topo">
+  <div class="logo"><span class="tally"></span>Tela ao Vivo</div>
+  <span id="pill-vivo" class="pill hidden"><span class="ponto"></span>AO VIVO · <span id="pill-viewers">0</span></span>
+</header>
+
+<main>
 <!-- ============ HOME ============ -->
 <section id="home" class="tela">
-  <h1 class="marca">Tela <span>ao Vivo</span></h1>
-  <p class="sub">Compartilhe o jogo com áudio, direto pelo Chrome. Sem porta, sem firewall.</p>
-  <div class="cards">
-    <button id="bt-modo-tx" class="card"><span class="emoji">🎮</span><b>Compartilhar minha tela</b><small>Você transmite o jogo e o áudio dele</small></button>
-    <button id="bt-modo-rx" class="card"><span class="emoji">👀</span><b>Assistir</b><small>Digite o código do amigo e assista</small></button>
+  <div>
+    <p class="sobretitulo">compartilhamento de tela · P2P · sem instalar nada</p>
+    <h1>Sua tela, lisa<br>e com o <em>som certo</em>.</h1>
+    <p class="lead">Tela inteira ou só uma janela, com ou sem áudio. A voz da call fica de fora. Direto do Chrome, de você pros seus amigos.</p>
+    <ul class="specs">
+      <li><b>até 1440p</b>60 fps</li>
+      <li><b>Opus estéreo</b>160 kbps</li>
+      <li><b>H.264</b>pela placa</li>
+      <li><b>P2P</b>sem servidor no meio</li>
+    </ul>
   </div>
-  <div id="erro-peer" class="erro-banner hidden">Não consegui carregar o componente de conexão. Confira a internet e aperte F5.</div>
+
+  <div class="acoes">
+    <button id="bt-modo-tx" class="acao acao-tx">
+      <span class="topo-acao">
+        <span><b>Transmitir</b><small>Escolha o que mostrar e de onde vem o áudio.</small></span>
+        <span class="seta"><svg class="i"><use href="#i-seta"/></svg></span>
+      </span>
+      <span class="fontes-mini">
+        <span><svg class="i"><use href="#i-monitor"/></svg>Tela inteira</span>
+        <span><svg class="i"><use href="#i-janela"/></svg>Janela</span>
+        <span><svg class="i"><use href="#i-aba"/></svg>Aba</span>
+        <span><svg class="i"><use href="#i-fone"/></svg>Áudio sem o Discord</span>
+      </span>
+    </button>
+
+    <form id="form-rx" class="acao acao-rx" novalidate>
+      <label for="in-codigo"><svg class="i"><use href="#i-olho"/></svg>Assistir um amigo</label>
+      <div class="campo-codigo">
+        <input id="in-codigo" type="text" placeholder="código, ex: k7m2p" maxlength="40" autocomplete="off" spellcheck="false" autocapitalize="off">
+        <button id="bt-assistir" class="btn primario" type="submit">Entrar</button>
+      </div>
+      <p id="erro-codigo" class="erro-campo hidden">Digite o código que seu amigo mandou.</p>
+    </form>
+    <div id="erro-peer" class="banner erro hidden">O componente de conexão não carregou. Confira a internet e aperte F5.</div>
+  </div>
 </section>
 
 <!-- ============ TRANSMITIR ============ -->
 <section id="tx" class="tela hidden">
-  <div class="painel largo">
-    <div class="topo"><button class="voltar" data-voltar>← Voltar</button><h2>Compartilhar minha tela</h2></div>
-    <div class="grade">
-      <div>
-        <label for="sel-audio">Áudio do jogo</label>
-        <div class="linha">
-          <select id="sel-audio"><option>Carregando...</option></select>
-          <button id="bt-atualizar" class="icone secundario" title="Atualizar lista">↻</button>
-        </div>
-        <div class="medidor"><div id="nivel"></div></div>
-        <p class="dica">Escolha a saída que recebe <b>só o jogo</b> (ex: <i>Voicemeeter Out B3</i> ou <i>CABLE Output</i>). A barra verde tem que mexer com o som do jogo.</p>
-
-        <label for="sel-qual">Qualidade</label>
-        <select id="sel-qual"></select>
-        <p class="dica">Se travar, escolha uma mais leve. Dá pra trocar ao vivo.</p>
-
-        <button id="bt-comecar" class="primario">▶ Começar a compartilhar</button>
-        <button id="bt-parar" class="perigo hidden">■ Parar</button>
-        <p class="dica">No Chrome, escolha a aba <b>"Tela inteira"</b>. No Valorant, use <b>"Janela em tela cheia"</b> pra imagem não congelar.</p>
-      </div>
-      <div>
-        <div class="codigo-box">
-          <div class="rotulo">Código pro seu amigo</div>
-          <div id="codigo" class="codigo">— — —</div>
-          <button id="bt-copiar" class="secundario" disabled>Copiar código</button>
-        </div>
-        <video id="preview" muted autoplay playsinline></video>
-        <div id="status-tx" class="status">Clique em "Começar a compartilhar".</div>
-        <div class="stats"><span id="viewers"></span></div>
-        <div id="stats-tx" class="stats"></div>
-      </div>
-    </div>
+  <div class="cab-estudio">
+    <button class="voltar" data-voltar><svg class="i"><use href="#i-voltar"/></svg>Início</button>
+    <h2>Transmitir</h2>
   </div>
-</section>
 
-<!-- ============ ASSISTIR: ENTRAR ============ -->
-<section id="rx-entrar" class="tela hidden">
-  <div class="painel">
-    <div class="topo"><button class="voltar" data-voltar>← Voltar</button><h2>Assistir</h2></div>
-    <label for="in-codigo">Código do amigo</label>
-    <input id="in-codigo" type="text" placeholder="ex: k7m2p" maxlength="40" autocomplete="off" spellcheck="false">
-    <button id="bt-assistir" class="primario">▶ Assistir</button>
-    <p class="dica">No vídeo: <b>F</b> ou duplo clique = tela cheia · <b>M</b> = mudo · <b>↑↓</b> = volume · <b>S</b> = estatísticas · <b>P</b> = janelinha flutuante</p>
+  <div class="estudio">
+    <div class="config">
+      <fieldset class="bloco" id="bloco-fonte">
+        <legend><span class="num">1</span>O que mostrar</legend>
+        <div class="fontes" role="radiogroup" aria-label="O que mostrar">
+          <label class="op"><input type="radio" name="fonte" value="monitor"><span class="op-caixa"><svg class="i"><use href="#i-monitor"/></svg><span><b>Tela inteira</b><small>O monitor todo</small></span></span></label>
+          <label class="op"><input type="radio" name="fonte" value="window"><span class="op-caixa"><svg class="i"><use href="#i-janela"/></svg><span><b>Janela</b><small>Só um jogo ou app</small></span></span></label>
+          <label class="op"><input type="radio" name="fonte" value="browser"><span class="op-caixa"><svg class="i"><use href="#i-aba"/></svg><span><b>Aba</b><small>Uma aba do Chrome</small></span></span></label>
+        </div>
+        <p id="dica-fonte" class="dica"></p>
+      </fieldset>
+
+      <fieldset class="bloco" id="bloco-audio">
+        <legend><span class="num">2</span>Áudio</legend>
+        <div class="lista-audio" role="radiogroup" aria-label="Áudio">
+          <label class="op-l"><input type="radio" name="audio" value="device"><span class="radio"></span>
+            <span><b>Cabo virtual, sem o Discord</b><span class="etq rec">RECOMENDADO</span>
+            <small>Você decide o que entra: o PC todo menos a call, ou só o jogo. Funciona com tela inteira e com janela.</small></span></label>
+          <label class="op-l"><input type="radio" name="audio" value="captura"><span class="radio"></span>
+            <span><b id="cap-titulo">Som do Windows inteiro</b><span id="cap-etq" class="etq alerta">INCLUI A CALL</span>
+            <small id="cap-desc">Pega tudo, inclusive a voz dos seus amigos. Bom só quando você não está em call.</small></span></label>
+          <label class="op-l"><input type="radio" name="audio" value="none"><span class="radio"></span>
+            <span><b>Sem áudio</b><small>Só a imagem.</small></span></label>
+        </div>
+
+        <div id="painel-disp" class="sub-bloco">
+          <label class="rotulo-campo" for="sel-audio">De onde vem o som</label>
+          <div class="linha">
+            <select id="sel-audio"><option>Carregando...</option></select>
+            <button id="bt-atualizar" class="btn icone" title="Atualizar lista" aria-label="Atualizar lista"><svg class="i"><use href="#i-recarregar"/></svg></button>
+          </div>
+          <div class="medidor" aria-hidden="true"><div id="nivel"></div></div>
+          <div class="rodape-medidor"><span>nível</span><span id="nivel-txt">sem sinal</span></div>
+
+          <details class="guia" id="guia">
+            <summary><svg class="i"><use href="#i-fone"/></svg>Como deixar a voz do Discord de fora<svg class="i mais"><use href="#i-mais"/></svg></summary>
+            <div class="guia-corpo">
+              <h4>Tela inteira, tudo menos a call (Voicemeeter)</h4>
+              <ol>
+                <li>Windows › Configurações › Som: saída padrão = <b>Voicemeeter Input</b>.</li>
+                <li>No Voicemeeter, na faixa <b>Voicemeeter Input</b>, ligue <kbd>A1</kbd> (seu fone) e <kbd>B3</kbd>.</li>
+                <li>Discord › Voz e vídeo › Dispositivo de saída = <b>Voicemeeter AUX Input</b>. Nessa faixa deixe só <kbd>A1</kbd> ligado (<kbd>B</kbd> desligado).</li>
+                <li>Aqui em cima escolha <b>Voicemeeter Out B3</b>. Você ouve tudo; seu amigo ouve tudo menos a call.</li>
+              </ol>
+              <h4>Só o som de um jogo ou app (VB-Cable)</h4>
+              <ol>
+                <li>Windows › Configurações › Sistema › Som › <b>Volume do app e preferências de dispositivo</b>: no jogo, saída = <b>CABLE Input</b>.</li>
+                <li>Pra continuar ouvindo: Painel de som › Gravação › <b>CABLE Output</b> › Propriedades › Escutar › marque <b>Escutar este dispositivo</b> no seu fone.</li>
+                <li>Aqui em cima escolha <b>CABLE Output</b>.</li>
+              </ol>
+              <p class="dica">A barra de nível tem que mexer com o som do jogo e ficar parada quando seus amigos falam.</p>
+            </div>
+          </details>
+        </div>
+        <p id="nota-audio" class="dica aviso hidden"></p>
+      </fieldset>
+
+      <fieldset class="bloco">
+        <legend><span class="num">3</span>Qualidade</legend>
+        <select id="sel-qual" aria-label="Qualidade"></select>
+        <div class="seg" role="radiogroup" aria-label="Otimizar para">
+          <label><input type="radio" name="dica" value="motion"><span>Movimento<small>jogos, vídeo</small></span></label>
+          <label><input type="radio" name="dica" value="detail"><span>Nitidez<small>texto, código</small></span></label>
+        </div>
+        <p class="dica">Se travar, escolha uma mais leve. Dá pra trocar com a transmissão rolando.</p>
+      </fieldset>
+    </div>
+
+    <aside class="monitor">
+      <div class="quadro">
+        <video id="preview" muted autoplay playsinline></video>
+        <div id="quadro-vazio" class="quadro-vazio cantos"><svg class="i"><use href="#i-monitor"/></svg>A prévia aparece aqui</div>
+        <span id="tag-vivo" class="tag-vivo hidden"><span class="ponto"></span>AO VIVO</span>
+        <span id="tag-res" class="tag-res hidden"></span>
+      </div>
+
+      <div class="sala">
+        <div>
+          <div class="rotulo">Código da sala</div>
+          <div id="codigo" class="codigo vazio">—————</div>
+        </div>
+        <div class="sala-bt">
+          <button id="bt-copiar" class="btn" disabled><svg class="i"><use href="#i-copiar"/></svg><span>Copiar código</span></button>
+          <button id="bt-link" class="btn" disabled><svg class="i"><use href="#i-link"/></svg><span>Copiar link</span></button>
+        </div>
+      </div>
+
+      <div id="status-tx" class="status">Escolha a tela e o áudio, depois comece.</div>
+      <div class="metricas" id="metricas"></div>
+
+      <button id="bt-comecar" class="btn primario grande">Começar a transmitir</button>
+      <button id="bt-parar" class="btn perigo grande hidden">Parar transmissão</button>
+    </aside>
   </div>
 </section>
 
@@ -148,20 +449,27 @@ label{display:block;font-size:13px;color:var(--sub);margin:16px 0 6px;font-weigh
   <div id="player" class="ativo">
     <video id="video" autoplay playsinline></video>
     <div id="stats-rx-box" class="hidden"></div>
-    <div id="espera"><div class="spinner"></div><p id="msg-espera">Conectando...</p></div>
-    <button id="aviso-som" class="hidden">🔇 Clique para ativar o som</button>
+    <div id="espera">
+      <div class="sinal"><i></i><i></i><i></i><i></i></div>
+      <p id="msg-espera">Conectando...</p>
+      <span id="espera-cod" class="espera-cod"></span>
+      <button id="bt-espera-sair" class="btn">Voltar</button>
+    </div>
+    <button id="aviso-som" class="hidden"><svg class="i"><use href="#i-mudo"/></svg>Clique para ativar o som</button>
     <div id="barra">
-      <button id="bt-som" title="Mudo (M)">🔊</button>
-      <input id="vol" type="range" min="0" max="1" step="0.02" title="Volume (↑↓)">
+      <button id="bt-som" class="bt-p" title="Mudo (M)" aria-label="Mudo"><svg class="i"><use id="ico-som" href="#i-som"/></svg></button>
+      <input id="vol" type="range" min="0" max="1" step="0.02" title="Volume (↑↓)" aria-label="Volume">
+      <span class="ao-vivo-rx">AO VIVO</span>
       <span id="info-rx"></span>
       <span class="flex"></span>
-      <button id="bt-stats" title="Estatísticas (S)">📊</button>
-      <button id="bt-pip" title="Janelinha flutuante (P)">⧉</button>
-      <button id="bt-full" title="Tela cheia (F)">⛶ Tela cheia</button>
-      <button id="bt-sair">✕ Sair</button>
+      <button id="bt-stats" class="bt-p" title="Estatísticas (S)" aria-label="Estatísticas"><svg class="i"><use href="#i-stats"/></svg></button>
+      <button id="bt-pip" class="bt-p" title="Janela flutuante (P)" aria-label="Janela flutuante"><svg class="i"><use href="#i-pip"/></svg></button>
+      <button id="bt-full" class="bt-p" title="Tela cheia (F)"><svg class="i"><use id="ico-full" href="#i-cheia"/></svg><span class="txt" id="txt-full">Tela cheia</span></button>
+      <button id="bt-sair" class="bt-p" title="Sair"><svg class="i"><use href="#i-x"/></svg><span class="txt">Sair</span></button>
     </div>
   </div>
 </section>
+</main>
 
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>
@@ -175,6 +483,20 @@ const QUALIDADES = {
   hd60:  { nome: '720p · 60 fps · recomendado',           w: 1280, h: 720,  fps: 60, kbps: 4500 },
   fhd60: { nome: '1080p · 60 fps',                        w: 1920, h: 1080, fps: 60, kbps: 8000 },
   max:   { nome: '1080p · 60 fps · máxima',               w: 1920, h: 1080, fps: 60, kbps: 14000 },
+  qhd:   { nome: '1440p · 60 fps · internet forte',       w: 2560, h: 1440, fps: 60, kbps: 20000 },
+};
+const TEXTO_CAPTURA = {
+  monitor: { titulo: 'Som do Windows inteiro', etq: 'INCLUI A CALL',
+             desc: 'Pega tudo, inclusive a voz dos seus amigos. Bom só quando você não está em call.' },
+  window:  { titulo: 'Som só da janela, pelo Chrome', etq: 'DEPENDE DO CHROME',
+             desc: 'Pega só o som do app escolhido, sem a call. Se o seu Chrome ainda não suportar, a transmissão sai sem som: aí use o cabo virtual.' },
+  browser: { titulo: 'Som da aba', etq: '',
+             desc: 'Pega só o som da aba escolhida. Deixe marcado "Compartilhar áudio da aba" no seletor do Chrome.' },
+};
+const DICA_FONTE = {
+  monitor: 'No seletor do Chrome, vá na aba "Tela inteira". Em jogos como Valorant, use "Janela em tela cheia" pra imagem não congelar.',
+  window:  'No seletor do Chrome, vá na aba "Janela" e escolha o jogo ou app. Ele precisa estar aberto e não minimizado.',
+  browser: 'No seletor do Chrome, vá na aba "Guia do Chrome" e escolha a aba (YouTube, por exemplo).',
 };
 
 // ------------------------------------------------------------ util
@@ -186,11 +508,24 @@ const guardar = {
 function mostrar(id) {
   document.querySelectorAll('.tela').forEach(e => e.classList.add('hidden'));
   $('#' + id).classList.remove('hidden');
+  window.scrollTo(0, 0);
 }
 function novoCodigo() {
   const c = 'abcdefghjkmnpqrstuvwxyz23456789';
   let s = '';
   for (let i = 0; i < 5; i++) s += c[Math.floor(Math.random() * c.length)];
+  return s;
+}
+const radio = nome => (document.querySelector(`input[name="${nome}"]:checked`) || {}).value;
+function marcar(nome, valor) {
+  const r = document.querySelector(`input[name="${nome}"][value="${valor}"]`);
+  if (r) r.checked = true;
+}
+function chip(txt, cls = '', ico = '') {
+  const s = document.createElement('span');
+  s.className = 'chip ' + cls;
+  s.innerHTML = (ico ? `<svg class="i"><use href="#${ico}"/></svg>` : '') + '<span></span>';
+  s.lastChild.textContent = txt;
   return s;
 }
 
@@ -251,13 +586,13 @@ function resumoStats(st) {
   const p = [];
   if (st.w) p.push(`${st.w}×${st.h}`);
   p.push(`${st.fps} fps`, `${st.mbps.toFixed(1)} Mbps`);
-  if (st.ping != null) p.push(`ping ${st.ping} ms`);
+  if (st.ping != null) p.push(`${st.ping} ms`);
   if (st.rota) p.push(st.rota);
   return p.join(' · ');
 }
 
 // ============================================================ TRANSMITIR
-let peerTx = null, streamTx = null, trilhaAudio = null, qualAtual = null;
+let peerTx = null, streamTx = null, trilhaAudio = null, audioDaCaptura = false, qualAtual = null;
 const chamadas = new Map();
 let ctxAudio = null, rafNivel = 0, fonteNivel = null;
 
@@ -270,7 +605,7 @@ function trilhaSilenciosa() {
   return contexto().createMediaStreamDestination().stream.getAudioTracks()[0];
 }
 async function pegarAudio(dev) {
-  if (dev === 'none') return trilhaSilenciosa();
+  if (!dev || dev === 'none') return trilhaSilenciosa();
   const s = await navigator.mediaDevices.getUserMedia({ audio: {
     deviceId: { exact: dev }, echoCancellation: false, noiseSuppression: false, autoGainControl: false,
     channelCount: { ideal: 2 }, sampleRate: { ideal: 48000 },
@@ -283,8 +618,9 @@ function medir(track) {
   cancelAnimationFrame(rafNivel);
   try { fonteNivel && fonteNivel.disconnect(); } catch {}
   fonteNivel = null;
-  const barra = $('#nivel');
-  barra.style.width = '0';
+  const barra = $('#nivel'), txt = $('#nivel-txt');
+  barra.style.transform = 'scaleX(0)';
+  txt.textContent = 'sem sinal';
   if (!track) return;
   const c = contexto();
   fonteNivel = c.createMediaStreamSource(new MediaStream([track]));
@@ -292,11 +628,13 @@ function medir(track) {
   an.fftSize = 512;
   fonteNivel.connect(an);
   const buf = new Float32Array(an.fftSize);
+  let quadro = 0;
   const loop = () => {
     an.getFloatTimeDomainData(buf);
     let pico = 0;
     for (const x of buf) { const a = Math.abs(x); if (a > pico) pico = a; }
-    barra.style.width = Math.min(100, pico * 140) + '%';
+    barra.style.transform = `scaleX(${Math.min(1, pico * 1.4)})`;
+    if (++quadro % 8 === 0) txt.textContent = pico < 0.002 ? 'sem sinal' : (20 * Math.log10(pico)).toFixed(0) + ' dB';
     rafNivel = requestAnimationFrame(loop);
   };
   loop();
@@ -309,22 +647,20 @@ async function listarAudio() {
   try { devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput'); } catch {}
   devs = devs.filter(d => d.deviceId !== 'default' && d.deviceId !== 'communications');
   sel.innerHTML = '';
-  sel.add(new Option('🔇 Sem áudio', 'none'));
+  if (!devs.length) sel.add(new Option('Nenhum dispositivo encontrado', ''));
   devs.forEach(d => sel.add(new Option(d.label || 'Dispositivo de áudio', d.deviceId)));
   const salvo = guardar.get('audioDev');
   const escolhido = devs.find(d => d.deviceId === salvo)
     || devs.find(d => /voicemeeter out b3/i.test(d.label))
     || devs.find(d => /^cable output/i.test(d.label));
-  sel.value = escolhido ? escolhido.deviceId : (salvo === 'none' ? 'none' : 'none');
+  if (escolhido) sel.value = escolhido.deviceId;
+  // sem cabo virtual instalado: abre o guia
+  if (!devs.some(d => /voicemeeter|cable|virtual/i.test(d.label))) $('#guia').open = true;
   await selecionarAudio();
 }
 
-async function selecionarAudio() {
-  const dev = $('#sel-audio').value;
-  guardar.set('audioDev', dev);
-  let nova;
-  try { nova = await pegarAudio(dev); }
-  catch (e) { statusTx('Não consegui abrir esse áudio (' + (e.name || e.message) + ').', 'erro'); nova = trilhaSilenciosa(); }
+// troca a trilha de áudio (no preview e em todo mundo que está assistindo)
+async function trocarTrilha(nova) {
   const velha = trilhaAudio;
   trilhaAudio = nova;
   if (streamTx) {
@@ -336,8 +672,39 @@ async function selecionarAudio() {
       if (s) try { await s.replaceTrack(nova); } catch {}
     }
   }
-  if (velha) velha.stop();
-  medir(dev === 'none' ? null : nova);
+  if (velha && velha !== nova) velha.stop();
+}
+
+async function selecionarAudio() {
+  if (radio('audio') !== 'device') return;
+  const dev = $('#sel-audio').value;
+  guardar.set('audioDev', dev);
+  let nova;
+  try { nova = await pegarAudio(dev); }
+  catch (e) { statusTx('Não consegui abrir esse áudio (' + (e.name || e.message) + ').', 'erro'); nova = trilhaSilenciosa(); }
+  audioDaCaptura = false;
+  await trocarTrilha(nova);
+  medir(dev ? nova : null);
+}
+
+function atualizarFonte() {
+  const fonte = radio('fonte');
+  guardar.set('fonte', fonte);
+  const t = TEXTO_CAPTURA[fonte];
+  $('#cap-titulo').textContent = t.titulo;
+  $('#cap-desc').textContent = t.desc;
+  $('#cap-etq').textContent = t.etq;
+  $('#cap-etq').classList.toggle('hidden', !t.etq);
+  $('#dica-fonte').textContent = DICA_FONTE[fonte];
+}
+
+async function atualizarModoAudio() {
+  const modo = radio('audio');
+  guardar.set('modoAudio', modo);
+  $('#painel-disp').classList.toggle('hidden', modo !== 'device');
+  if (modo === 'device') { await listarAudio(); return; }
+  if (!streamTx && trilhaAudio) { trilhaAudio.stop(); trilhaAudio = null; }
+  medir(null);
 }
 
 function statusTx(msg, tipo = '') {
@@ -345,50 +712,95 @@ function statusTx(msg, tipo = '') {
   e.textContent = msg;
   e.className = 'status ' + tipo;
 }
+function notaAudio(msg) {
+  const e = $('#nota-audio');
+  e.textContent = msg || '';
+  e.classList.toggle('hidden', !msg);
+}
+
+function travarConfig(travar) {
+  document.querySelectorAll('input[name="fonte"], input[name="audio"]').forEach(i => i.disabled = travar);
+}
 
 async function comecar() {
-  if (typeof Peer === 'undefined') { statusTx('Componente de conexão não carregou. Confira a internet e aperte F5.', 'erro'); return; }
+  if (typeof Peer === 'undefined') { statusTx('O componente de conexão não carregou. Confira a internet e aperte F5.', 'erro'); return; }
   qualAtual = QUALIDADES[$('#sel-qual').value];
+  const fonte = radio('fonte'), modo = radio('audio'), dica = radio('dica');
+  const pedeAudio = modo === 'captura';
+  const opcoes = {
+    video: { displaySurface: fonte, frameRate: { ideal: qualAtual.fps, max: qualAtual.fps },
+             width: { max: qualAtual.w }, height: { max: qualAtual.h } },
+    audio: pedeAudio ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false, suppressLocalAudioPlayback: false } : false,
+    selfBrowserSurface: 'exclude', surfaceSwitching: 'include', monitorTypeSurfaces: 'include',
+  };
+  if (pedeAudio) {
+    // janela: pede só o áudio da janela e esconde o "áudio do sistema" (que traria a call junto)
+    opcoes.systemAudio = fonte === 'window' ? 'exclude' : 'include';
+    opcoes.windowAudio = fonte === 'window' ? 'window' : 'system';
+    opcoes.restrictOwnAudio = true;
+  }
+  notaAudio('');
   let tela;
-  try {
-    tela = await navigator.mediaDevices.getDisplayMedia({
-      video: { displaySurface: 'monitor', frameRate: { ideal: qualAtual.fps, max: qualAtual.fps },
-               width: { max: qualAtual.w }, height: { max: qualAtual.h } },
-      audio: false, selfBrowserSurface: 'exclude', surfaceSwitching: 'include', monitorTypeSurfaces: 'include',
-    });
-  } catch (e) {
-    statusTx('Você cancelou a escolha da tela.', 'aviso');
+  try { tela = await navigator.mediaDevices.getDisplayMedia(opcoes); }
+  catch (e) {
+    statusTx(e.name === 'NotAllowedError' ? 'Você cancelou a escolha da tela.' : 'Não deu pra capturar a tela (' + e.name + ').', 'aviso');
     return;
   }
   const vt = tela.getVideoTracks()[0];
-  try { vt.contentHint = 'motion'; } catch {}
+  try { vt.contentHint = dica; } catch {}
   vt.addEventListener('ended', pararTx);
-  if (!trilhaAudio) await selecionarAudio();
+
+  if (modo === 'captura') {
+    const at = tela.getAudioTracks()[0];
+    if (at) {
+      try { at.contentHint = 'music'; } catch {}
+      if (trilhaAudio) trilhaAudio.stop();
+      trilhaAudio = at; audioDaCaptura = true;
+      medir(at);
+    } else {
+      trilhaAudio = trilhaSilenciosa(); audioDaCaptura = false;
+      notaAudio(fonte === 'window'
+        ? 'O Chrome não entregou o som dessa janela, então está indo sem áudio. Pra ter som sem a call, use "Cabo virtual".'
+        : 'Está indo sem áudio: no seletor do Chrome, deixe marcada a opção de compartilhar o áudio.');
+    }
+  } else if (modo === 'none') {
+    if (trilhaAudio) trilhaAudio.stop();
+    trilhaAudio = trilhaSilenciosa(); audioDaCaptura = false;
+  } else if (!trilhaAudio) {
+    await selecionarAudio();
+    if (!trilhaAudio) trilhaAudio = trilhaSilenciosa();
+  }
+
   streamTx = new MediaStream([vt, trilhaAudio]);
   const pv = $('#preview');
   pv.muted = true;
   pv.srcObject = streamTx;
+  $('#quadro-vazio').classList.add('hidden');
   $('#bt-comecar').classList.add('hidden');
   $('#bt-parar').classList.remove('hidden');
+  travarConfig(true);
   statusTx('Abrindo sala...');
   abrirSala(false);
 }
 
 function abrirSala(novo) {
-  let codigo = (!novo && guardar.get('codigo')) || novoCodigo();
+  const codigo = (!novo && guardar.get('codigo')) || novoCodigo();
   const p = new Peer(PREFIXO + codigo, OPCOES_PEER);
   peerTx = p;
   p.on('open', () => {
     guardar.set('codigo', codigo);
     $('#codigo').textContent = codigo;
-    $('#bt-copiar').disabled = false;
-    statusTx('🔴 Ao vivo! Mande o código pro seu amigo.', 'ok');
+    $('#codigo').classList.remove('vazio');
+    $('#bt-copiar').disabled = $('#bt-link').disabled = false;
+    $('#tag-vivo').classList.remove('hidden');
+    $('#pill-vivo').classList.remove('hidden');
+    statusTx('Ao vivo. Mande o código ou o link pro seu amigo.', 'ok');
   });
   p.on('error', e => {
     if (peerTx !== p) return;
     if (e.type === 'unavailable-id') { p.destroy(); if (streamTx) abrirSala(true); return; }
     if (['network', 'server-error', 'socket-error', 'socket-closed', 'disconnected'].includes(e.type)) {
-      statusTx('Sem conexão com o servidor de pareamento, tentando de novo...', 'aviso');
+      statusTx('Sem conexão com o servidor de pareamento. Tentando de novo...', 'aviso');
     } else if (e.type !== 'peer-unavailable') {
       statusTx('Erro: ' + e.type, 'erro');
     }
@@ -424,6 +836,7 @@ function ligarPara(id) {
 
 async function aplicarParametros(pc) {
   if (!qualAtual) return;
+  const dica = radio('dica');
   for (const s of pc.getSenders()) {
     if (!s.track) continue;
     const p = s.getParameters();
@@ -431,7 +844,7 @@ async function aplicarParametros(pc) {
     if (s.track.kind === 'video') {
       p.encodings[0].maxBitrate = qualAtual.kbps * 1000;
       p.encodings[0].maxFramerate = qualAtual.fps;
-      p.degradationPreference = 'maintain-framerate';
+      p.degradationPreference = dica === 'detail' ? 'maintain-resolution' : 'maintain-framerate';
     } else {
       p.encodings[0].maxBitrate = 160000;
     }
@@ -441,9 +854,11 @@ async function aplicarParametros(pc) {
 
 async function trocarQualidade() {
   guardar.set('qualidade', $('#sel-qual').value);
+  guardar.set('dica', radio('dica'));
   qualAtual = QUALIDADES[$('#sel-qual').value];
   if (!streamTx) return;
   const vt = streamTx.getVideoTracks()[0];
+  try { vt.contentHint = radio('dica'); } catch {}
   try { await vt.applyConstraints({ frameRate: { ideal: qualAtual.fps, max: qualAtual.fps }, width: { max: qualAtual.w }, height: { max: qualAtual.h } }); } catch {}
   for (const c of chamadas.values()) if (c.peerConnection) aplicarParametros(c.peerConnection);
 }
@@ -452,23 +867,47 @@ function pararTx() {
   for (const c of chamadas.values()) try { c.close(); } catch {}
   chamadas.clear();
   if (peerTx) { const p = peerTx; peerTx = null; try { p.destroy(); } catch {} }
-  if (streamTx) { streamTx.getVideoTracks().forEach(t => t.stop()); streamTx = null; }
+  if (streamTx) {
+    streamTx.getVideoTracks().forEach(t => t.stop());
+    // o áudio do cabo virtual continua aberto (pro medidor); o da captura morre junto com a tela
+    if (audioDaCaptura || radio('audio') !== 'device') {
+      if (trilhaAudio) trilhaAudio.stop();
+      trilhaAudio = null; audioDaCaptura = false;
+      medir(null);
+    }
+    streamTx = null;
+  }
   $('#preview').srcObject = null;
+  $('#quadro-vazio').classList.remove('hidden');
+  $('#tag-vivo').classList.add('hidden');
+  $('#tag-res').classList.add('hidden');
+  $('#pill-vivo').classList.add('hidden');
   $('#bt-comecar').classList.remove('hidden');
   $('#bt-parar').classList.add('hidden');
-  $('#bt-copiar').disabled = true;
-  $('#codigo').textContent = '— — —';
-  $('#viewers').textContent = '';
-  $('#stats-tx').textContent = '';
-  statusTx('Parado. Clique em "Começar a compartilhar".');
+  $('#bt-copiar').disabled = $('#bt-link').disabled = true;
+  $('#codigo').textContent = '—————';
+  $('#codigo').classList.add('vazio');
+  $('#metricas').innerHTML = '';
+  travarConfig(false);
+  statusTx('Parado. Escolha a tela e o áudio, depois comece.');
 }
 
 function tipoEncoder(nome) {
-  if (!nome) return '';
-  if (/openh264|libvpx|libaom|software/i.test(nome)) return '⚠ encoder por software (usa CPU)';
-  if (/mediafoundation|accelerator|external|nvenc|amf|qsv|hardware|d3d/i.test(nome)) return '✓ usando a placa de vídeo';
-  return nome;
+  if (!nome) return null;
+  if (/openh264|libvpx|libaom|software/i.test(nome)) return ['encoder por software (CPU)', 'ruim'];
+  if (/mediafoundation|accelerator|external|nvenc|amf|qsv|hardware|d3d/i.test(nome)) return ['placa de vídeo', 'bom'];
+  return [nome, ''];
 }
+
+async function copiar(txt, bt, rotulo) {
+  try { await navigator.clipboard.writeText(txt); } catch {
+    const t = document.createElement('textarea'); t.value = txt; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove();
+  }
+  const span = bt.querySelector('span'), use = bt.querySelector('use'), ico = use.getAttribute('href');
+  span.textContent = 'Copiado'; use.setAttribute('href', '#i-ok'); bt.classList.add('ok');
+  setTimeout(() => { span.textContent = rotulo; use.setAttribute('href', ico); bt.classList.remove('ok'); }, 1500);
+}
+function linkSala(c) { return location.origin + location.pathname + '?c=' + encodeURIComponent(c); }
 
 // ============================================================ ASSISTIR
 let peerRx = null, conRx = null, callRx = null, codigoRx = '', rxAtivo = false, reconTimer = null;
@@ -478,14 +917,18 @@ function esperar(msg) { $('#msg-espera').textContent = msg; $('#espera').classLi
 function esconderEspera() { $('#espera').classList.add('hidden'); }
 
 function iniciarAssistir() {
-  if (typeof Peer === 'undefined') { alert('O componente de conexão não carregou. Confira a internet e aperte F5.'); return; }
   let c = $('#in-codigo').value.trim().toLowerCase().replace(/\s+/g, '');
+  const m = c.match(/[?&]c=([^&#]+)/);
+  if (m) c = decodeURIComponent(m[1]);
   if (c.startsWith(PREFIXO)) c = c.slice(PREFIXO.length);
-  if (!c) { $('#in-codigo').focus(); return; }
+  if (!c) { $('#erro-codigo').classList.remove('hidden'); $('#in-codigo').focus(); return; }
+  $('#erro-codigo').classList.add('hidden');
+  if (typeof Peer === 'undefined') { $('#erro-peer').classList.remove('hidden'); return; }
   codigoRx = c;
   guardar.set('ultimoCodigo', c);
   rxAtivo = true;
   mostrar('rx-player');
+  $('#espera-cod').textContent = 'SALA ' + c.toUpperCase();
   esperar('Conectando...');
   vol.value = guardar.get('volume') || '1';
   video.volume = +vol.value;
@@ -507,9 +950,9 @@ function garantirPeerRx() {
   p.on('call', receberChamada);
   p.on('error', e => {
     if (!rxAtivo || peerRx !== p) return;
-    if (e.type === 'peer-unavailable') agendarReconexao(4000, 'Código não encontrado. O amigo já clicou em "Começar a compartilhar"? Tentando de novo...');
-    else if (['network', 'server-error', 'socket-error', 'socket-closed', 'disconnected'].includes(e.type)) agendarReconexao(4000, 'Sem conexão com o servidor de pareamento, tentando de novo...');
-    else agendarReconexao(4000, 'Erro (' + e.type + '), tentando de novo...');
+    if (e.type === 'peer-unavailable') agendarReconexao(4000, 'Sala não encontrada. Seu amigo já clicou em "Começar a transmitir"? Tentando de novo...');
+    else if (['network', 'server-error', 'socket-error', 'socket-closed', 'disconnected'].includes(e.type)) agendarReconexao(4000, 'Sem conexão com o servidor de pareamento. Tentando de novo...');
+    else agendarReconexao(4000, 'Erro (' + e.type + '). Tentando de novo...');
   });
   p.on('disconnected', () => {
     setTimeout(() => { if (rxAtivo && peerRx === p && !p.destroyed && p.disconnected) try { p.reconnect(); } catch {} }, 2000);
@@ -522,8 +965,8 @@ function abrirCanal() {
   if (conRx) try { conRx.close(); } catch {}
   const con = peerRx.connect(PREFIXO + codigoRx, { reliable: true });
   conRx = con;
-  con.on('open', () => { if (!callRx) esperar('Conectado! Recebendo a imagem...'); });
-  con.on('close', () => { if (conRx === con && rxAtivo) agendarReconexao(2500, 'O amigo parou de compartilhar. Esperando voltar...'); });
+  con.on('open', () => { if (!callRx) esperar('Conectado. Recebendo a imagem...'); });
+  con.on('close', () => { if (conRx === con && rxAtivo) agendarReconexao(2500, 'Seu amigo parou de transmitir. Esperando voltar...'); });
   con.on('error', () => {});
 }
 
@@ -584,7 +1027,7 @@ function tocar(s) {
 video.addEventListener('playing', esconderEspera);
 
 function atualizarIconeSom() {
-  $('#bt-som').textContent = video.muted || video.volume === 0 ? '🔇' : video.volume < .5 ? '🔉' : '🔊';
+  $('#ico-som').setAttribute('href', video.muted || video.volume === 0 ? '#i-mudo' : video.volume < .5 ? '#i-som-baixo' : '#i-som');
 }
 function alternarMudo() {
   video.muted = !video.muted;
@@ -611,7 +1054,10 @@ async function alternarPip() {
     else if (video.srcObject) await video.requestPictureInPicture();
   } catch {}
 }
-function alternarStats() { $('#stats-rx-box').classList.toggle('hidden'); }
+function alternarStats() {
+  $('#stats-rx-box').classList.toggle('hidden');
+  $('#bt-stats').classList.toggle('ativo', !$('#stats-rx-box').classList.contains('hidden'));
+}
 
 let timerUI;
 function mexeu() {
@@ -629,6 +1075,8 @@ function sairRx() {
   video.srcObject = null;
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   if (document.pictureInPictureElement) document.exitPictureInPicture().catch(() => {});
+  if (location.search) history.replaceState(null, '', location.pathname);
+  mostrar('home');
 }
 
 // ============================================================ estatísticas (1x por segundo)
@@ -636,29 +1084,33 @@ setInterval(async () => {
   try {
     if (streamTx) {
       const ativos = [...chamadas.values()].filter(c => c.peerConnection && c.peerConnection.connectionState === 'connected');
-      $('#viewers').textContent = ativos.length ? `👀 ${ativos.length} assistindo` : 'Ninguém assistindo ainda';
+      $('#pill-viewers').textContent = ativos.length;
+      const m = $('#metricas');
+      m.innerHTML = '';
+      m.append(chip(ativos.length ? `${ativos.length} assistindo` : 'ninguém assistindo ainda', '', 'i-usuarios'));
+      const vs = streamTx.getVideoTracks()[0] && streamTx.getVideoTracks()[0].getSettings();
+      if (vs && vs.width) { $('#tag-res').textContent = `${vs.width}×${vs.height}`; $('#tag-res').classList.remove('hidden'); }
       if (ativos[0]) {
         const st = await lerStats(ativos[0].peerConnection, 'outbound-rtp');
         if (st) {
-          let txt = resumoStats(st);
+          m.append(chip(`${st.fps} fps`), chip(`${st.mbps.toFixed(1)} Mbps`));
+          if (st.ping != null) m.append(chip(`${st.ping} ms`, st.ping > 120 ? 'ruim' : ''));
+          if (st.rota) m.append(chip(st.rota));
           const enc = tipoEncoder(st.encoder);
-          if (enc) txt += '\n' + enc;
-          if (st.limite === 'bandwidth') txt += '\n⚠ qualidade reduzida pela internet (upload)';
-          if (st.limite === 'cpu') txt += '\n⚠ qualidade reduzida pelo processador';
-          $('#stats-tx').innerText = txt;
+          if (enc) m.append(chip(enc[0], enc[1]));
+          if (st.limite === 'bandwidth') m.append(chip('limitado pelo upload', 'ruim'));
+          if (st.limite === 'cpu') m.append(chip('limitado pelo processador', 'ruim'));
         }
-      } else {
-        $('#stats-tx').textContent = '';
       }
     }
     if (rxAtivo && callRx && callRx.peerConnection) {
       const st = await lerStats(callRx.peerConnection, 'inbound-rtp');
       if (st) {
         $('#info-rx').textContent = resumoStats(st);
-        $('#stats-rx-box').innerText =
-          `Resolução: ${st.w}×${st.h}\nFPS: ${st.fps}\nTaxa: ${st.mbps.toFixed(2)} Mbps\n` +
-          `Ping: ${st.ping != null ? st.ping + ' ms' : '?'} (${st.rota || '?'})\n` +
-          `Pacotes perdidos: ${st.perdidos}\nQuadros descartados: ${st.descartados}\nDecoder: ${st.decoder || '?'}`;
+        $('#stats-rx-box').textContent =
+          `Resolução   ${st.w}×${st.h}\nFPS         ${st.fps}\nTaxa        ${st.mbps.toFixed(2)} Mbps\n` +
+          `Ping        ${st.ping != null ? st.ping + ' ms' : '?'} (${st.rota || '?'})\n` +
+          `Perdidos    ${st.perdidos} pacotes\nDescartados ${st.descartados} quadros\nDecoder     ${st.decoder || '?'}`;
       }
     }
   } catch (e) { console.warn(e); }
@@ -670,8 +1122,15 @@ Object.entries(QUALIDADES).forEach(([k, q]) => selQual.add(new Option(q.nome, k)
 selQual.value = QUALIDADES[guardar.get('qualidade')] ? guardar.get('qualidade') : 'hd60';
 selQual.onchange = trocarQualidade;
 
-$('#bt-modo-tx').onclick = () => { mostrar('tx'); listarAudio(); };
-$('#bt-modo-rx').onclick = () => { mostrar('rx-entrar'); $('#in-codigo').value = guardar.get('ultimoCodigo') || ''; $('#in-codigo').focus(); };
+marcar('fonte', ['monitor', 'window', 'browser'].includes(guardar.get('fonte')) ? guardar.get('fonte') : 'monitor');
+marcar('audio', ['device', 'captura', 'none'].includes(guardar.get('modoAudio')) ? guardar.get('modoAudio') : 'device');
+marcar('dica', guardar.get('dica') === 'detail' ? 'detail' : 'motion');
+atualizarFonte();
+document.querySelectorAll('input[name="fonte"]').forEach(i => i.onchange = atualizarFonte);
+document.querySelectorAll('input[name="audio"]').forEach(i => i.onchange = atualizarModoAudio);
+document.querySelectorAll('input[name="dica"]').forEach(i => i.onchange = trocarQualidade);
+
+$('#bt-modo-tx').onclick = () => { mostrar('tx'); atualizarModoAudio(); };
 document.querySelectorAll('[data-voltar]').forEach(b => b.onclick = () => {
   pararTx();
   if (trilhaAudio) { trilhaAudio.stop(); trilhaAudio = null; }
@@ -683,17 +1142,12 @@ $('#sel-audio').onchange = selecionarAudio;
 $('#bt-atualizar').onclick = listarAudio;
 $('#bt-comecar').onclick = comecar;
 $('#bt-parar').onclick = pararTx;
-$('#bt-copiar').onclick = async () => {
-  const c = $('#codigo').textContent;
-  try { await navigator.clipboard.writeText(c); } catch {
-    const t = document.createElement('textarea'); t.value = c; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove();
-  }
-  $('#bt-copiar').textContent = 'Copiado ✓';
-  setTimeout(() => $('#bt-copiar').textContent = 'Copiar código', 1500);
-};
+$('#bt-copiar').onclick = () => copiar($('#codigo').textContent, $('#bt-copiar'), 'Copiar código');
+$('#bt-link').onclick = () => copiar(linkSala($('#codigo').textContent), $('#bt-link'), 'Copiar link');
 
-$('#bt-assistir').onclick = iniciarAssistir;
-$('#in-codigo').addEventListener('keydown', e => { if (e.key === 'Enter') iniciarAssistir(); });
+$('#form-rx').onsubmit = e => { e.preventDefault(); iniciarAssistir(); };
+$('#in-codigo').value = guardar.get('ultimoCodigo') || '';
+$('#in-codigo').addEventListener('input', () => $('#erro-codigo').classList.add('hidden'));
 
 $('#bt-som').onclick = alternarMudo;
 $('#aviso-som').onclick = () => { video.muted = false; guardar.set('mudo', '0'); $('#aviso-som').classList.add('hidden'); video.play().catch(() => {}); atualizarIconeSom(); };
@@ -701,12 +1155,15 @@ vol.oninput = () => mudarVolume(+vol.value);
 $('#bt-full').onclick = alternarTelaCheia;
 $('#bt-pip').onclick = alternarPip;
 $('#bt-stats').onclick = alternarStats;
-$('#bt-sair').onclick = () => { sairRx(); mostrar('rx-entrar'); };
+$('#bt-sair').onclick = sairRx;
+$('#bt-espera-sair').onclick = sairRx;
 video.addEventListener('dblclick', alternarTelaCheia);
 player.addEventListener('mousemove', mexeu);
 player.addEventListener('click', mexeu);
 document.addEventListener('fullscreenchange', () => {
-  $('#bt-full').textContent = document.fullscreenElement ? '⤡ Sair da tela cheia' : '⛶ Tela cheia';
+  const cheia = !!document.fullscreenElement;
+  $('#ico-full').setAttribute('href', cheia ? '#i-sair-cheia' : '#i-cheia');
+  $('#txt-full').textContent = cheia ? 'Sair da tela cheia' : 'Tela cheia';
 });
 document.addEventListener('keydown', e => {
   if ($('#rx-player').classList.contains('hidden')) return;
@@ -729,6 +1186,10 @@ window.addEventListener('beforeunload', () => {
 });
 
 if (typeof Peer === 'undefined') $('#erro-peer').classList.remove('hidden');
+
+// link de convite: ?c=codigo entra direto pra assistir
+const convite = new URLSearchParams(location.search).get('c');
+if (convite) { $('#in-codigo').value = convite; iniciarAssistir(); }
 </script>
 </body>
 </html>
