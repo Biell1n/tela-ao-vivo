@@ -483,6 +483,24 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
 // ------------------------------------------------------------ config
 const PREFIXO = 'telaaovivo-v1-';
 const OPCOES_PEER = { host: '0.peerjs.com', port: 443, path: '/', secure: true, debug: 1 };
+// servidores de retransmissão (TURN) pra quando as duas redes não conseguem se ligar direto
+// (operadora com CGNAT, Wi-Fi de faculdade etc.). Vêm da função /api/turn (Cloudflare);
+// se ela não responder, fica o padrão do PeerJS.
+let iceCache = null, iceHora = 0;
+async function opcoesPeer() {
+  if (!iceCache || Date.now() - iceHora > 3600e3) {
+    try {
+      const ctl = new AbortController();
+      const t = setTimeout(() => ctl.abort(), 4000);
+      const r = await fetch('/api/turn', { signal: ctl.signal, cache: 'no-store' });
+      clearTimeout(t);
+      const j = r.status === 200 ? await r.json() : null;
+      if (j && j.iceServers && j.iceServers.length) { iceCache = j.iceServers; iceHora = Date.now(); }
+    } catch {}
+  }
+  if (!iceCache) return OPCOES_PEER;
+  return { ...OPCOES_PEER, config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, ...iceCache] } };
+}
 const QUALIDADES = {
   leve:  { nome: '720p · 30 fps · leve (internet fraca)', w: 1280, h: 720,  fps: 30, kbps: 2500 },
   hd60:  { nome: '720p · 60 fps · recomendado',           w: 1280, h: 720,  fps: 60, kbps: 4500 },
@@ -788,9 +806,11 @@ async function comecar() {
   abrirSala(false);
 }
 
-function abrirSala(novo) {
+async function abrirSala(novo) {
   const codigo = (!novo && guardar.get('codigo')) || novoCodigo();
-  const p = new Peer(PREFIXO + codigo, OPCOES_PEER);
+  const opcoes = await opcoesPeer();
+  if (!streamTx || (peerTx && !peerTx.destroyed)) return;
+  const p = new Peer(PREFIXO + codigo, opcoes);
   peerTx = p;
   p.on('open', () => {
     guardar.set('codigo', codigo);
@@ -944,13 +964,19 @@ function iniciarAssistir() {
   garantirPeerRx();
 }
 
-function garantirPeerRx() {
+let criandoRx = false;
+async function garantirPeerRx() {
   if (peerRx && !peerRx.destroyed) {
     if (peerRx.open) abrirCanal();
     else if (peerRx.disconnected) try { peerRx.reconnect(); } catch {}
     return;
   }
-  const p = new Peer(OPCOES_PEER);
+  if (criandoRx) return;
+  criandoRx = true;
+  const opcoes = await opcoesPeer();
+  criandoRx = false;
+  if (!rxAtivo || (peerRx && !peerRx.destroyed)) return;
+  const p = new Peer(opcoes);
   peerRx = p;
   p.on('open', () => abrirCanal());
   p.on('call', receberChamada);
@@ -1004,7 +1030,10 @@ function receberChamada(call) {
       const st = pc.connectionState;
       if (st === 'connected' && video.srcObject) esconderEspera();
       if (st === 'disconnected') esperar('Conexão instável, aguardando...');
-      if (st === 'failed') { try { call.close(); } catch {} }
+      if (st === 'failed') {
+        try { call.close(); } catch {}
+        agendarReconexao(3000, 'Não deu pra ligar a sua rede com a do seu amigo. Tentando de novo...');
+      }
     });
   }
   call.on('stream', s => {
