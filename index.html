@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Tela ao Vivo</title>
 <meta name="description" content="Compartilhe a tela inteira ou uma janela, com ou sem áudio, e deixe a voz da call de fora. Direto do Chrome, P2P.">
 <meta name="theme-color" content="#0d0e10">
@@ -219,7 +219,7 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
 #rx-player{padding:0;max-width:none}
 #player{position:fixed;inset:0;z-index:10;background:#000;overflow:hidden}
 #player:not(.ativo){cursor:none}
-#video{width:100%;height:100%;object-fit:contain;background:#000;display:block}
+#video{width:100%;height:100%;object-fit:contain;background:#000;display:block;touch-action:manipulation}
 #espera{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;background:var(--bg);text-align:center;padding:24px}
 #espera p{margin:0;color:var(--sub);max-width:420px;font-size:15px;text-wrap:balance}
 .sinal{display:flex;align-items:flex-end;gap:5px;height:34px}
@@ -233,7 +233,8 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
   background:var(--acento);color:var(--acento-tinta);font-weight:650;padding:15px 22px;border-radius:14px;font-size:15px;box-shadow:0 20px 50px rgba(0,0,0,.5)}
 #barra{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:6px;padding:40px 18px 16px;
   background:linear-gradient(transparent,rgba(0,0,0,.88));opacity:0;transform:translateY(8px);transition:opacity .25s var(--ease),transform .25s var(--ease)}
-#player.ativo #barra{opacity:1;transform:none}
+#player.ativo #barra{opacity:1;transform:none;pointer-events:auto}
+#barra{pointer-events:none;padding-left:max(18px,env(safe-area-inset-left));padding-right:max(18px,env(safe-area-inset-right));padding-bottom:max(16px,env(safe-area-inset-bottom))}
 .bt-p{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:38px;min-width:38px;padding:0 10px;border-radius:10px;color:#e8eaee;
   font-size:13.5px;font-weight:500;transition:background .15s}
 .bt-p:hover{background:rgba(255,255,255,.12)}
@@ -250,7 +251,8 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
 
 /* ---------- responsivo ---------- */
 @media (max-width:980px){
-  #home{grid-template-columns:1fr;gap:36px}
+  #home{grid-template-columns:minmax(0,1fr);gap:36px}
+  .acao-rx{order:-1}
   .estudio{grid-template-columns:1fr}
   .monitor{position:static;order:-1}
 }
@@ -265,6 +267,9 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
   .sala-bt .btn{flex:1}
   .codigo{font-size:28px}
   #vol,#info-rx,.bt-p .txt{display:none}
+  .bt-p{height:44px;min-width:44px}
+  .bt-p svg.i{width:22px;height:22px}
+  #barra{gap:2px;padding-top:56px}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
@@ -935,6 +940,7 @@ function iniciarAssistir() {
   video.muted = guardar.get('mudo') === '1';
   atualizarIconeSom();
   mexeu();
+  manterAcesa(true);
   garantirPeerRx();
 }
 
@@ -1044,16 +1050,47 @@ function mudarVolume(v) {
   guardar.set('volume', String(v));
   atualizarIconeSom();
 }
-function alternarTelaCheia() {
-  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-  else player.requestFullscreen().catch(() => {});
+const elementoCheio = () => document.fullscreenElement || document.webkitFullscreenElement;
+const TOQUE = matchMedia('(pointer: coarse)').matches;
+async function alternarTelaCheia() {
+  if (elementoCheio()) {
+    try { screen.orientation.unlock(); } catch {}
+    (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    return;
+  }
+  // iPhone não deixa um <div> ficar em tela cheia: vai direto pro <video>, ainda dentro do toque
+  const podeDiv = document.fullscreenEnabled || document.webkitFullscreenEnabled;
+  if (!podeDiv && video.webkitEnterFullscreen) { try { video.webkitEnterFullscreen(); } catch {} return; }
+  let pedir = player.requestFullscreen || player.webkitRequestFullscreen;
+  if (pedir) {
+    try {
+      await pedir.call(player, { navigationUI: 'hide' });
+    } catch { pedir = null; }
+  }
+  if (pedir) {
+    // celular: vira de lado sozinho quando o vídeo é deitado
+    if (TOQUE && video.videoWidth >= video.videoHeight) try { await screen.orientation.lock('landscape'); } catch {}
+    return;
+  }
+  // iPhone: só o próprio <video> entra em tela cheia (com os controles do sistema)
+  if (video.webkitEnterFullscreen) try { video.webkitEnterFullscreen(); } catch {}
 }
 async function alternarPip() {
   try {
     if (document.pictureInPictureElement) await document.exitPictureInPicture();
-    else if (video.srcObject) await video.requestPictureInPicture();
+    else if (video.srcObject && video.requestPictureInPicture) await video.requestPictureInPicture();
+    else if (video.webkitSetPresentationMode) video.webkitSetPresentationMode(video.webkitPresentationMode === 'picture-in-picture' ? 'inline' : 'picture-in-picture');
   } catch {}
 }
+// tela do celular apagando no meio da transmissão
+let travaTela = null;
+async function manterAcesa(ligar) {
+  try {
+    if (ligar && 'wakeLock' in navigator && document.visibilityState === 'visible') travaTela = await navigator.wakeLock.request('screen');
+    else if (!ligar && travaTela) { await travaTela.release(); travaTela = null; }
+  } catch {}
+}
+document.addEventListener('visibilitychange', () => { if (rxAtivo && document.visibilityState === 'visible') manterAcesa(true); });
 function alternarStats() {
   $('#stats-rx-box').classList.toggle('hidden');
   $('#bt-stats').classList.toggle('ativo', !$('#stats-rx-box').classList.contains('hidden'));
@@ -1063,7 +1100,17 @@ let timerUI;
 function mexeu() {
   player.classList.add('ativo');
   clearTimeout(timerUI);
-  timerUI = setTimeout(() => { if (!$('#barra').matches(':hover')) player.classList.remove('ativo'); }, 2500);
+  timerUI = setTimeout(() => { if (TOQUE || !$('#barra').matches(':hover')) player.classList.remove('ativo'); }, TOQUE ? 3500 : 2500);
+}
+// celular: um toque mostra/esconde a barra, dois toques = tela cheia
+let ultimoToque = 0;
+function tocouVideo(e) {
+  if (e.target.closest('#barra, #aviso-som, #espera')) { mexeu(); return; }
+  const agora = Date.now();
+  if (agora - ultimoToque < 300) { ultimoToque = 0; alternarTelaCheia(); return; }
+  ultimoToque = agora;
+  if (player.classList.contains('ativo') && TOQUE) { clearTimeout(timerUI); player.classList.remove('ativo'); }
+  else mexeu();
 }
 
 function sairRx() {
@@ -1073,8 +1120,9 @@ function sairRx() {
   if (conRx) { const c = conRx; conRx = null; try { c.close(); } catch {} }
   if (peerRx) { const p = peerRx; peerRx = null; try { p.destroy(); } catch {} }
   video.srcObject = null;
-  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  if (elementoCheio()) try { (document.exitFullscreen || document.webkitExitFullscreen).call(document); } catch {}
   if (document.pictureInPictureElement) document.exitPictureInPicture().catch(() => {});
+  manterAcesa(false);
   if (location.search) history.replaceState(null, '', location.pathname);
   mostrar('home');
 }
@@ -1154,17 +1202,23 @@ $('#aviso-som').onclick = () => { video.muted = false; guardar.set('mudo', '0');
 vol.oninput = () => mudarVolume(+vol.value);
 $('#bt-full').onclick = alternarTelaCheia;
 $('#bt-pip').onclick = alternarPip;
+if (!video.requestPictureInPicture && !video.webkitSetPresentationMode) $('#bt-pip').classList.add('hidden');
 $('#bt-stats').onclick = alternarStats;
 $('#bt-sair').onclick = sairRx;
 $('#bt-espera-sair').onclick = sairRx;
-video.addEventListener('dblclick', alternarTelaCheia);
-player.addEventListener('mousemove', mexeu);
-player.addEventListener('click', mexeu);
-document.addEventListener('fullscreenchange', () => {
-  const cheia = !!document.fullscreenElement;
+if (TOQUE) player.addEventListener('click', tocouVideo);
+else {
+  video.addEventListener('dblclick', alternarTelaCheia);
+  player.addEventListener('mousemove', mexeu);
+  player.addEventListener('click', mexeu);
+}
+function mudouTelaCheia() {
+  const cheia = !!elementoCheio();
   $('#ico-full').setAttribute('href', cheia ? '#i-sair-cheia' : '#i-cheia');
   $('#txt-full').textContent = cheia ? 'Sair da tela cheia' : 'Tela cheia';
-});
+}
+document.addEventListener('fullscreenchange', mudouTelaCheia);
+document.addEventListener('webkitfullscreenchange', mudouTelaCheia);
 document.addEventListener('keydown', e => {
   if ($('#rx-player').classList.contains('hidden')) return;
   if (e.target.tagName === 'INPUT' && e.target.type === 'text') return;
