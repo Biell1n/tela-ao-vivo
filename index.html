@@ -693,6 +693,8 @@ async function lerStats(pc, tipo) {
     encoder: v.encoderImplementation || '', decoder: v.decoderImplementation || '',
     limite: v.qualityLimitationReason || 'none',
     perdidos: v.packetsLost || 0, descartados: v.framesDropped || 0,
+    travadas: v.freezeCount || 0, jitter: v.jitter != null ? Math.round(v.jitter * 1000) : null,
+    recebidos: v.packetsReceived || 0,
     codec: (((v.codecId && r.get(v.codecId)) || {}).mimeType || '').replace(/^video\//i, ''),
   };
 }
@@ -1286,9 +1288,27 @@ function agendarReconexao(ms, msg) {
   }, ms);
 }
 
-function baixaLatencia(r) {
-  try { r.jitterBufferTarget = 0; } catch {}
-  try { r.playoutDelayHint = 0; } catch {}
+// Folga (buffer) da imagem de quem assiste. Começa no automático do navegador (já é pouca, ~50 ms).
+// Se a imagem travar, aumenta a folga: atrasa um pouquinho, mas para de congelar.
+const FOLGAS = [null, 150, 300, 500]; // ms; null = automático
+let folgaNivel = 0, travadasAntes = 0, travadasTempo = 0, folgaCalma = 0;
+function aplicarFolga(r) {
+  if (!r || !r.track) return;
+  const ms = FOLGAS[folgaNivel];
+  try { r.jitterBufferTarget = ms; } catch {}
+}
+function ajustarFolga(st) {
+  if (!callRx || !callRx.peerConnection) return;
+  const novas = st.travadas - travadasAntes;
+  travadasAntes = st.travadas;
+  if (novas > 0 && folgaNivel < FOLGAS.length - 1 && Date.now() - travadasTempo > 4000) {
+    folgaNivel++; travadasTempo = Date.now(); folgaCalma = 0;
+    callRx.peerConnection.getReceivers().forEach(aplicarFolga);
+  } else if (novas === 0 && folgaNivel > 0 && ++folgaCalma > 120) {
+    // 2 minutos sem travar: tenta diminuir o atraso de novo
+    folgaNivel--; folgaCalma = 0;
+    callRx.peerConnection.getReceivers().forEach(aplicarFolga);
+  }
 }
 
 function receberChamada(call) {
@@ -1298,7 +1318,8 @@ function receberChamada(call) {
   call.answer(undefined, { sdpTransform: ajustarSDP });
   const pc = call.peerConnection;
   if (pc) {
-    pc.addEventListener('track', e => baixaLatencia(e.receiver));
+    pc.addEventListener('track', e => aplicarFolga(e.receiver));
+    travadasAntes = 0;
     pc.addEventListener('connectionstatechange', () => {
       if (callRx !== call) return;
       const st = pc.connectionState;
@@ -1312,7 +1333,7 @@ function receberChamada(call) {
   }
   call.on('stream', s => {
     if (callRx !== call) return;
-    if (pc) pc.getReceivers().forEach(baixaLatencia);
+    if (pc) pc.getReceivers().forEach(aplicarFolga);
     tocar(s);
   });
   call.on('close', () => {
@@ -1480,6 +1501,7 @@ setInterval(async () => {
                  : it.limite === 'cpu' ? 'reduzido: o PC de quem transmite não deu conta'
                  : 'reduzido pelo Chrome de quem transmite';
         }
+        ajustarFolga(st);
         $('#info-rx').textContent = resumoStats(st) + (it && it.capW ? ` · tela dele ${it.capW}×${it.capH}` : '') + (porque ? ` · ${porque}` : '');
         $('#stats-rx-box').textContent =
           `Resolução   ${st.w}×${st.h}\n` +
@@ -1489,7 +1511,10 @@ setInterval(async () => {
           (st.codec ? `Formato     ${st.codec}${/h264/i.test(st.codec) ? '' : ' (sem placa de vídeo: pesa no PC dele)'}\n` : '') +
           `FPS         ${st.fps}\nTaxa        ${st.mbps.toFixed(2)} Mbps\n` +
           `Ping        ${st.ping != null ? st.ping + ' ms' : '?'} (${st.rota || '?'})\n` +
-          `Perdidos    ${st.perdidos} pacotes\nDescartados ${st.descartados} quadros\nDecoder     ${st.decoder || '?'}` +
+          `Perdidos    ${st.perdidos} pacotes${st.recebidos ? ` (${(100 * st.perdidos / (st.perdidos + st.recebidos)).toFixed(1)}%)` : ''}\n` +
+          `Travadas    ${st.travadas}${st.jitter != null ? ` · variação ${st.jitter} ms` : ''}\n` +
+          `Folga       ${FOLGAS[folgaNivel] == null ? 'automática' : FOLGAS[folgaNivel] + ' ms (aumentou porque travou)'}\n` +
+          `Descartados ${st.descartados} quadros\nDecoder     ${st.decoder || '?'}` +
           (it && it.encoder ? `\nEncoder dele ${it.encoder}` : '');
       }
     }
