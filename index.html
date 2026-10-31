@@ -491,6 +491,20 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
         </div>
         <label class="turbo"><input type="checkbox" id="turbo"><span><b>Turbo</b><span class="etq rec">+60% DE INTERNET</span>
           <small>Libera mais dados pro vídeo. Fica mais nítido em jogo com muito movimento (tiro, corrida). Só use se sua internet de upload for boa.</small></span></label>
+        <details class="guia" id="guia-fps">
+          <summary><svg class="i"><use href="#i-stats"/></svg>Como não cair fps sem perder qualidade<svg class="i mais"><use href="#i-mais"/></svg></summary>
+          <div class="guia-corpo">
+            <ol>
+              <li><b>Limite o fps do jogo</b> uns 10% abaixo do que ele roda (ex.: 60 ou 120). Com a placa de vídeo no 100%, o Windows não consegue capturar a tela a tempo. No próprio jogo ou em NVIDIA App › Gráficos › <b>Taxa de quadros máxima</b>.</li>
+              <li>Jogo em <b>"Janela sem bordas"</b> (ou "Tela cheia em janela"), não em "Tela cheia exclusiva".</li>
+              <li><b>Opera GX:</b> desligue os limitadores de CPU e RAM no GX Control. <b>Chrome:</b> Configurações › Desempenho › desligue a <b>Economia de energia</b>.</li>
+              <li>No navegador: Configurações › Sistema › <b>Usar aceleração gráfica</b> ligado.</li>
+              <li>No Windows: Configurações › Sistema › Vídeo › Configurações de gráficos › <b>Agendamento de GPU acelerado por hardware</b> ligado (reinicia o PC).</li>
+              <li><b>Cabo de rede</b> no lugar do Wi-Fi: o upload fica estável e não oscila.</li>
+            </ol>
+            <p class="dica">Pra saber de onde vem a queda, olhe as etiquetas embaixo da prévia: <b>"captura X fps"</b> = o PC/jogo; <b>"limitado pelo upload"</b> = internet; <b>"limitado pelo processador"</b> = o PC comprimindo o vídeo. Tela parada (menu, área de trabalho) manda menos quadros de propósito: é normal.</p>
+          </div>
+        </details>
         <p class="dica" id="dica-qual">Se travar, escolha uma mais leve. Dá pra trocar com a transmissão rolando.</p>
       </fieldset>
     </div>
@@ -673,9 +687,10 @@ function ajustarSDP(sdp) {
 const statsAnteriores = new WeakMap();
 async function lerStats(pc, tipo) {
   const r = await pc.getStats();
-  let v = null, par = null;
+  let v = null, par = null, fonte = null;
   r.forEach(s => {
     if (s.type === tipo && (s.kind === 'video' || s.mediaType === 'video')) v = s;
+    if (s.type === 'media-source' && s.kind === 'video') fonte = s;
     if (s.type === 'transport' && s.selectedCandidatePairId) par = r.get(s.selectedCandidatePairId) || par;
   });
   if (!par) r.forEach(s => { if (s.type === 'candidate-pair' && s.state === 'succeeded' && s.nominated) par = s; });
@@ -694,6 +709,7 @@ async function lerStats(pc, tipo) {
     limite: v.qualityLimitationReason || 'none',
     perdidos: v.packetsLost || 0, descartados: v.framesDropped || 0,
     travadas: v.freezeCount || 0, jitter: v.jitter != null ? Math.round(v.jitter * 1000) : null,
+    fpsCaptura: fonte && fonte.framesPerSecond != null ? Math.round(fonte.framesPerSecond) : null,
     recebidos: v.packetsReceived || 0,
     codec: (((v.codecId && r.get(v.codecId)) || {}).mimeType || '').replace(/^video\//i, ''),
   };
@@ -1142,10 +1158,14 @@ async function aplicarParametros(pc) {
     if (!p.encodings || !p.encodings.length) continue;
     if (s.track.kind === 'video') {
       p.encodings[0].maxBitrate = kbpsDe(qualAtual) * 1000;
+      p.encodings[0].priority = 'high';
+      p.encodings[0].networkPriority = 'high';
       p.encodings[0].maxFramerate = qualAtual.fps;
       p.degradationPreference = dica === 'detail' ? 'maintain-resolution' : qualAtual.h > 1080 ? 'balanced' : 'maintain-framerate';
     } else {
       p.encodings[0].maxBitrate = 160000;
+      p.encodings[0].priority = 'high';
+      p.encodings[0].networkPriority = 'high';
     }
     try { await s.setParameters(p); } catch (e) { console.warn('setParameters', e); }
   }
@@ -1472,14 +1492,22 @@ setInterval(async () => {
         const conn = conexoes.get(id);
         if (conn && conn.open) try {
           conn.send({ tipo: 'info', capW: vs ? vs.width : 0, capH: vs ? vs.height : 0, w: s.w, h: s.h, limite: s.limite,
-                      qualidade: qualAtual ? qualAtual.nome : '', encoder: (tipoEncoder(s.encoder) || [''])[0], codec: s.codec });
+                      qualidade: qualAtual ? qualAtual.nome : '', encoder: (tipoEncoder(s.encoder) || [''])[0], codec: s.codec,
+                      fps: s.fps, fpsCaptura: s.fpsCaptura, fpsAlvo: qualAtual ? qualAtual.fps : 0 });
         } catch {}
       }
       if (todas[0]) {
         const st = todas[0];
         {
           if (vs && st.w && st.w < vs.width) m.append(chip(`enviando ${st.w}×${st.h}`, 'ruim'));
-          m.append(chip(`${st.fps} fps`), chip(`${st.mbps.toFixed(1)} Mbps`));
+          const alvo = qualAtual ? qualAtual.fps : 60;
+          m.append(chip(`${st.fps} fps`, st.fps < alvo * 0.8 ? 'ruim' : ''), chip(`${st.mbps.toFixed(1)} Mbps`));
+          // captura baixa = o PC/jogo não deixou o Windows pegar a tela a tempo (tela parada também manda menos, é normal)
+          if (st.fpsCaptura != null && st.fpsCaptura < alvo * 0.8) {
+            const c = chip(`captura ${st.fpsCaptura} fps`, 'ruim');
+            c.title = 'O Windows entregou menos quadros da tela. Se for tela parada é normal; em jogo, veja as dicas de fps.';
+            m.append(c);
+          }
           if (st.ping != null) m.append(chip(`${st.ping} ms`, st.ping > 120 ? 'ruim' : ''));
           if (st.rota) m.append(chip(st.rota));
           const enc = tipoEncoder(st.encoder);
@@ -1502,6 +1530,13 @@ setInterval(async () => {
                  : 'reduzido pelo Chrome de quem transmite';
         }
         ajustarFolga(st);
+        function causaFps(i) {
+          if (i.limite === 'bandwidth') return 'internet (upload) de quem transmite';
+          if (i.limite === 'cpu') return 'processador de quem transmite';
+          if (i.fpsCaptura != null && i.fpsCaptura < i.fpsAlvo * 0.8) return 'captura da tela dele (jogo pesando ou tela parada)';
+          if (i.fps >= i.fpsAlvo * 0.8) return 'no caminho até você (sua internet/Wi-Fi)';
+          return 'PC de quem transmite';
+        }
         $('#info-rx').textContent = resumoStats(st) + (it && it.capW ? ` · tela dele ${it.capW}×${it.capH}` : '') + (porque ? ` · ${porque}` : '');
         $('#stats-rx-box').textContent =
           `Resolução   ${st.w}×${st.h}\n` +
@@ -1509,7 +1544,9 @@ setInterval(async () => {
           (porque ? `Por quê      ${porque.replace('reduzido: ', '')}\n` : '') +
           (it && it.qualidade ? `Qualidade   ${it.qualidade}\n` : '') +
           (st.codec ? `Formato     ${st.codec}${/h264/i.test(st.codec) ? '' : ' (sem placa de vídeo: pesa no PC dele)'}\n` : '') +
-          `FPS         ${st.fps}\nTaxa        ${st.mbps.toFixed(2)} Mbps\n` +
+          `FPS         ${st.fps}${it && it.fpsAlvo ? ` de ${it.fpsAlvo}` : ''}${it && it.fpsCaptura != null ? ` (captura dele: ${it.fpsCaptura})` : ''}\n` +
+          (it && it.fpsAlvo && st.fps < it.fpsAlvo * 0.8 ? `FPS caindo  ${causaFps(it)}\n` : '') +
+          `Taxa        ${st.mbps.toFixed(2)} Mbps\n` +
           `Ping        ${st.ping != null ? st.ping + ' ms' : '?'} (${st.rota || '?'})\n` +
           `Perdidos    ${st.perdidos} pacotes${st.recebidos ? ` (${(100 * st.perdidos / (st.perdidos + st.recebidos)).toFixed(1)}%)` : ''}\n` +
           `Travadas    ${st.travadas}${st.jitter != null ? ` · variação ${st.jitter} ms` : ''}\n` +
