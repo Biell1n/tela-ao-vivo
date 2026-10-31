@@ -344,7 +344,7 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
     <h1>Sua tela, lisa<br>e com o <em>som certo</em>.</h1>
     <p class="lead">Tela inteira ou só uma janela, com ou sem áudio. A voz da call fica de fora. Direto do Chrome, de você pros seus amigos.</p>
     <ul class="specs">
-      <li><b>até 1440p</b>60 fps</li>
+      <li><b>até 4K</b>60 fps</li>
       <li><b>Opus estéreo</b>160 kbps</li>
       <li><b>H.264</b>pela placa</li>
       <li><b>P2P</b>sem servidor no meio</li>
@@ -483,7 +483,7 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
           <label><input type="radio" name="dica" value="motion"><span>Movimento<small>jogos, vídeo</small></span></label>
           <label><input type="radio" name="dica" value="detail"><span>Nitidez<small>texto, código</small></span></label>
         </div>
-        <p class="dica">Se travar, escolha uma mais leve. Dá pra trocar com a transmissão rolando.</p>
+        <p class="dica" id="dica-qual">Se travar, escolha uma mais leve. Dá pra trocar com a transmissão rolando.</p>
       </fieldset>
     </div>
 
@@ -572,8 +572,20 @@ const QUALIDADES = {
   hd60:  { nome: '720p · 60 fps · recomendado',           w: 1280, h: 720,  fps: 60, kbps: 4500 },
   fhd60: { nome: '1080p · 60 fps',                        w: 1920, h: 1080, fps: 60, kbps: 8000 },
   max:   { nome: '1080p · 60 fps · máxima',               w: 1920, h: 1080, fps: 60, kbps: 14000 },
-  qhd:   { nome: '1440p · 60 fps · internet forte',       w: 2560, h: 1440, fps: 60, kbps: 20000 },
+  qhd:   { nome: '1440p (2K) · 60 fps · internet forte',  w: 2560, h: 1440, fps: 60, kbps: 20000 },
+  uhd30: { nome: '4K · 30 fps',                           w: 3840, h: 2160, fps: 30, kbps: 25000 },
+  uhd60: { nome: '4K · 60 fps · máxima',                  w: 3840, h: 2160, fps: 60, kbps: 40000 },
 };
+// o vídeo vai direto do seu PC pra cada pessoa: a internet de upload precisa aguentar isso vezes quem assiste
+function dicaQualidade() {
+  const q = QUALIDADES[$('#sel-qual').value];
+  const mbps = Math.round(q.kbps / 1000);
+  let t = `Precisa de uns ${mbps} Mbps de upload por pessoa assistindo.`;
+  if (q.w > 1920) t += ` Sua tela tem que ter ${q.h === 2160 ? '4K' : '1440p ou mais'} pra sair nessa resolução; se for menor, sai na resolução da tela.`;
+  if (q.w === 3840) t += ' Se travar, use 1440p: a diferença quase não aparece e fica bem mais leve.';
+  else t += ' Se travar, escolha uma mais leve. Dá pra trocar com a transmissão rolando.';
+  $('#dica-qual').textContent = t;
+}
 const TEXTO_CAPTURA = {
   monitor: { titulo: 'Som do Windows inteiro', etq: 'INCLUI A CALL',
              desc: 'Pega tudo, inclusive a voz dos seus amigos. Bom só quando você não está em call.' },
@@ -634,7 +646,8 @@ function ajustarSDP(sdp) {
     }
     const fm = l.match(/^a=fmtp:(\d+) /);
     if (fm && preferidos.includes(fm[1]) && !/x-google-start-bitrate/.test(l)) {
-      return l + ';x-google-start-bitrate=2500';
+      // começa mais perto da qualidade escolhida (sem isso o 4K demora pra "acordar")
+      return l + ';x-google-start-bitrate=' + (qualAtual ? Math.max(2500, Math.min(10000, qualAtual.kbps / 2)) : 2500);
     }
     if (l.startsWith('m=video ') && preferidos.length) {
       const p = l.split(' ');
@@ -1124,6 +1137,7 @@ async function aplicarParametros(pc) {
 
 async function trocarQualidade() {
   guardar.set('qualidade', $('#sel-qual').value);
+  dicaQualidade();
   guardar.set('dica', radio('dica'));
   qualAtual = QUALIDADES[$('#sel-qual').value];
   if (!streamTx) return;
@@ -1442,7 +1456,8 @@ setInterval(async () => {
 const selQual = $('#sel-qual');
 Object.entries(QUALIDADES).forEach(([k, q]) => selQual.add(new Option(q.nome, k)));
 selQual.value = QUALIDADES[guardar.get('qualidade')] ? guardar.get('qualidade') : 'hd60';
-selQual.onchange = trocarQualidade;
+selQual.onchange = () => { dicaQualidade(); trocarQualidade(); };
+dicaQualidade();
 
 marcar('fonte', ['monitor', 'window', 'browser'].includes(guardar.get('fonte')) ? guardar.get('fonte') : 'monitor');
 marcar('audio', ['app', 'device', 'captura', 'none'].includes(guardar.get('modoAudio')) ? guardar.get('modoAudio') : 'app');
