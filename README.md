@@ -9,7 +9,8 @@ Compartilhe a tela com áudio direto pelo navegador, sem configurar porta nem fi
 
 | Opção | O que vai junto |
 |---|---|
-| **Cabo virtual, sem o Discord** (recomendado) | Você escolhe app por app o que entra (no Windows, em "Volume do app e preferências de dispositivo"), passando pelo Voicemeeter ou VB-Cable. O passo a passo está na própria página. |
+| **Pelo programa Tela ao Vivo Áudio** (recomendado) | Programinha de Windows (`TelaAoVivoAudio.exe`, baixado no próprio site): manda tudo menos o Discord, ou só os apps marcados numa lista. Código em `app-audio/`. |
+| **Cabo virtual** | Você escolhe app por app o que entra (no Windows, em "Volume do app e preferências de dispositivo"), passando pelo Voicemeeter ou VB-Cable. O passo a passo está na própria página. |
 | **Som do Windows inteiro** (tela inteira) | Tudo, inclusive a voz da call. |
 | **Som só da janela** (janela) | Só o app escolhido, nas versões do Chrome que suportam áudio de janela. Se não vier som, use o cabo virtual. |
 | **Som da aba** (aba) | Só o som da aba do Chrome. |

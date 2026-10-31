@@ -159,6 +159,36 @@ select option{background:var(--sup-2)}
   background:linear-gradient(90deg,var(--ok) 0 65%,var(--aviso) 80%,var(--erro));transition:transform .06s linear}
 .rodape-medidor{display:flex;justify-content:space-between;font:12px var(--mono);color:var(--fraco);margin-top:6px}
 
+.prog-card{display:flex;flex-direction:column;gap:14px;padding:16px;border-radius:var(--r-m);background:var(--bg-2);border:1px solid var(--linha)}
+.prog-cab{display:flex;gap:12px;align-items:center}
+.prog-cab img{border-radius:10px;flex:none}
+.prog-cab b{display:block;font-size:14.5px;font-weight:600}
+.prog-cab small{display:block;color:var(--fraco);font-size:12.5px;line-height:1.4}
+.prog-card .btn{align-self:flex-start;text-decoration:none}
+.prog-passos{margin:0;padding-left:20px;font-size:13px;color:var(--sub)}
+.prog-passos li{margin:4px 0;text-wrap:pretty}
+.prog-passos b{color:var(--texto);font-weight:600}
+.prog-procurando{display:flex;align-items:center;gap:9px;margin:0;font-size:12.5px;color:var(--fraco)}
+.ponto-pulsa{width:7px;height:7px;border-radius:50%;background:var(--aviso);animation:pulsa 1.4s infinite}
+.prog-lista{list-style:none;margin:10px 0 0;padding:0;border:1px solid var(--linha);border-radius:var(--r-m);background:var(--bg-2);overflow:hidden}
+.prog-lista:empty::before{content:"Nenhum app tocando som agora. Toque uma música ou abra o jogo que ele aparece aqui.";display:block;padding:14px;font-size:13px;color:var(--fraco)}
+.prog-app+.prog-app{border-top:1px solid var(--linha)}
+.prog-app label{display:grid;grid-template-columns:18px 28px minmax(0,1fr) 64px;align-items:center;gap:12px;padding:10px 14px;cursor:pointer;transition:background .2s}
+.prog-app label:hover{background:var(--sup)}
+.prog-app input{width:18px;height:18px;margin:0;accent-color:var(--acento);cursor:pointer}
+.prog-lista.excluir .prog-app input{display:none}
+.prog-lista.excluir .prog-app label{grid-template-columns:28px minmax(0,1fr) 64px;cursor:default}
+.prog-lista.excluir .prog-app label:hover{background:none}
+.prog-app img,.prog-app .sem-icone{width:28px;height:28px;border-radius:7px;background:var(--sup-3)}
+.prog-app .nome{min-width:0;font-size:13.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prog-app .nome small{display:block;font-size:11.5px;font-weight:400;color:var(--fraco)}
+.prog-app.vai .nome small{color:var(--ok)}
+.prog-app.fora .nome>span{color:var(--fraco)}
+.prog-lista.excluir .prog-app.fora .nome small{color:var(--erro)}
+.mini-nivel{height:6px;border-radius:3px;background:var(--sup-3);overflow:hidden}
+.mini-nivel i{display:block;height:100%;background:var(--ok);transform-origin:left;transform:scaleX(0);transition:transform .25s linear}
+.prog-app.fora .mini-nivel i{background:var(--fraco)}
+#bloco-nivel{margin-top:14px}
 .guia{margin-top:14px;border-radius:var(--r-m);background:var(--bg-2);border:1px solid var(--linha)}
 .guia summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:12px 14px;font-size:13.5px;font-weight:500;color:var(--texto)}
 .guia summary::-webkit-details-marker{display:none}
@@ -297,6 +327,7 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
   <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
   <symbol id="i-fone" viewBox="0 0 24 24"><path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="4.5" height="6.5" rx="1.5"/><rect x="16.5" y="14" width="4.5" height="6.5" rx="1.5"/></symbol>
   <symbol id="i-mais" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-baixar" viewBox="0 0 24 24"><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/></symbol>
   <symbol id="i-usuarios" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14.2A6.5 6.5 0 0 1 21.5 20"/></symbol>
 </svg>
 
@@ -368,14 +399,41 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
       <fieldset class="bloco" id="bloco-audio">
         <legend><span class="num">2</span>Áudio</legend>
         <div class="lista-audio" role="radiogroup" aria-label="Áudio">
-          <label class="op-l"><input type="radio" name="audio" value="device"><span class="radio"></span>
-            <span><b>Cabo virtual, sem o Discord</b><span class="etq rec">RECOMENDADO</span>
-            <small>Você escolhe app por app o que entra (o jogo e o Spotify sim, o Discord não). Funciona com tela inteira e com janela.</small></span></label>
+          <label class="op-l"><input type="radio" name="audio" value="app"><span class="radio"></span>
+            <span><b>Pelo programa Tela ao Vivo Áudio</b><span class="etq rec">RECOMENDADO</span>
+            <small>Tira o Discord sozinho, ou manda só os apps que você marcar. Sem configurar nada no Windows.</small></span></label>
           <label class="op-l"><input type="radio" name="audio" value="captura"><span class="radio"></span>
             <span><b id="cap-titulo">Som do Windows inteiro</b><span id="cap-etq" class="etq alerta">INCLUI A CALL</span>
             <small id="cap-desc">Pega tudo, inclusive a voz dos seus amigos. Bom só quando você não está em call.</small></span></label>
+          <label class="op-l"><input type="radio" name="audio" value="device"><span class="radio"></span>
+            <span><b>Cabo virtual (Voicemeeter ou VB-Cable)</b>
+            <small>Pra quem já tem cabo de áudio virtual configurado.</small></span></label>
           <label class="op-l"><input type="radio" name="audio" value="none"><span class="radio"></span>
             <span><b>Sem áudio</b><small>Só a imagem.</small></span></label>
+        </div>
+
+        <div id="painel-prog" class="sub-bloco hidden">
+          <div id="prog-fora" class="prog-card">
+            <div class="prog-cab">
+              <img src="app-audio/icone.png" alt="" width="40" height="40">
+              <div><b>Tela ao Vivo Áudio</b><small>Programinha de 73 KB pra Windows 10 e 11. Não precisa instalar nada além dele.</small></div>
+            </div>
+            <a class="btn primario" href="TelaAoVivoAudio.exe" download><svg class="i"><use href="#i-baixar"/></svg>Baixar o programa</a>
+            <ol class="prog-passos">
+              <li>Abra o arquivo baixado. Se aparecer <b>"O Windows protegeu o computador"</b>, clique em <b>Mais informações › Executar assim mesmo</b>.</li>
+              <li>Se o Chrome perguntar se o site pode acessar a rede local, clique em <b>Permitir</b>.</li>
+              <li>Pronto: esta parte muda sozinha quando o programa abrir.</li>
+            </ol>
+            <p class="prog-procurando"><span class="ponto-pulsa"></span>Procurando o programa no seu PC...</p>
+          </div>
+          <div id="prog-dentro" class="hidden">
+            <div class="seg" role="radiogroup" aria-label="O que vai no som">
+              <label><input type="radio" name="progmodo" value="excluir"><span>Tudo menos o Discord<small>o que tocar no PC</small></span></label>
+              <label><input type="radio" name="progmodo" value="incluir"><span>Só os apps que eu marcar<small>escolha na lista</small></span></label>
+            </div>
+            <ul id="prog-lista" class="prog-lista" aria-label="Apps com som"></ul>
+            <p id="prog-nota" class="dica"></p>
+          </div>
         </div>
 
         <div id="painel-disp" class="sub-bloco">
@@ -384,8 +442,6 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
             <select id="sel-audio"><option>Carregando...</option></select>
             <button id="bt-atualizar" class="btn icone" title="Atualizar lista" aria-label="Atualizar lista"><svg class="i"><use href="#i-recarregar"/></svg></button>
           </div>
-          <div class="medidor" aria-hidden="true"><div id="nivel"></div></div>
-          <div class="rodape-medidor"><span>nível</span><span id="nivel-txt">sem sinal</span></div>
 
           <details class="guia" id="guia">
             <summary><svg class="i"><use href="#i-fone"/></svg>Escolher quais apps vão no áudio (e tirar o Discord)<svg class="i mais"><use href="#i-mais"/></svg></summary>
@@ -412,6 +468,11 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
             </div>
           </details>
         </div>
+        <div id="bloco-nivel" class="hidden">
+          <div class="medidor" aria-hidden="true"><div id="nivel"></div></div>
+          <div class="rodape-medidor"><span>nível do que vai na transmissão</span><span id="nivel-txt">sem sinal</span></div>
+        </div>
+        <p id="aviso-disp" class="dica aviso hidden">Isso parece um microfone: vai a sua voz, não o som do PC. Escolha o cabo virtual.</p>
         <p id="nota-audio" class="dica aviso hidden"></p>
       </fieldset>
 
@@ -681,8 +742,9 @@ async function listarAudio() {
   const escolhido = devs.find(d => d.deviceId === salvo)
     || devs.find(d => /voicemeeter out b3/i.test(d.label))
     || devs.find(d => /^cable output/i.test(d.label));
-  if (escolhido) sel.value = escolhido.deviceId;
-  // sem cabo virtual instalado: abre o guia
+  // sem cabo virtual achado: não escolhe um microfone por conta própria
+  if (!escolhido) { sel.add(new Option('Escolha o cabo virtual...', ''), 0); sel.value = ''; }
+  else sel.value = escolhido.deviceId;
   if (!devs.some(d => /voicemeeter|cable|virtual/i.test(d.label))) $('#guia').open = true;
   await selecionarAudio();
 }
@@ -713,6 +775,8 @@ async function selecionarAudio() {
   audioDaCaptura = false;
   await trocarTrilha(nova);
   medir(dev ? nova : null);
+  const rot = $('#sel-audio').selectedOptions[0];
+  $('#aviso-disp').classList.toggle('hidden', !dev || !rot || /voicemeeter|cable|virtual|vb-audio|stereo mix|mixagem/i.test(rot.text));
 }
 
 function atualizarFonte() {
@@ -725,14 +789,186 @@ function atualizarFonte() {
   $('#cap-etq').classList.toggle('hidden', !t.etq);
   $('#dica-fonte').textContent = DICA_FONTE[fonte];
 }
+// escolheu "Aba": o natural é mandar o som da própria aba (o Chrome entrega certinho)
+function trocouFonte() {
+  atualizarFonte();
+  if (radio('fonte') === 'browser' && radio('audio') !== 'none' && radio('audio') !== 'captura') {
+    marcar('audio', 'captura');
+    atualizarModoAudio();
+  }
+}
 
 async function atualizarModoAudio() {
   const modo = radio('audio');
   guardar.set('modoAudio', modo);
   $('#painel-disp').classList.toggle('hidden', modo !== 'device');
+  $('#painel-prog').classList.toggle('hidden', modo !== 'app');
+  $('#bloco-nivel').classList.toggle('hidden', modo !== 'device' && modo !== 'app');
+  if (modo !== 'device') $('#aviso-disp').classList.add('hidden');
   if (modo === 'device') { await listarAudio(); return; }
+  if (modo === 'app') {
+    progDesenhar();
+    progProcurar();
+    if (prog.conectado) { await usarAudioPrograma(); return; }
+  }
   if (!streamTx && trilhaAudio) { trilhaAudio.stop(); trilhaAudio = null; }
   medir(null);
+}
+
+// ============================================================ programa Tela ao Vivo Áudio (Windows)
+// Roda no PC de quem transmite e entrega por ws://localhost:47800 o som "tudo menos o Discord"
+// ou "só os apps marcados" (PCM 48 kHz estéreo 16 bits, pacotes de 10 ms).
+const prog = {
+  ws: null, conectado: false, apps: [], icones: {}, discordAberto: false, erro: null,
+  modo: guardar.get('progModo') === 'incluir' ? 'incluir' : 'excluir',
+  marcados: new Set((() => { try { return JSON.parse(guardar.get('progApps') || '[]'); } catch { return []; } })()),
+  no: null, trilha: null, ctx: null,
+};
+const ESCONDER_APPS = /^(svchost|audiodg|explorer|shellexperiencehost|systemsettings)\.exe$/i;
+
+// só procura o programa quando a pessoa escolheu essa opção (o Chrome pode pedir permissão de rede local)
+function progProcurar() {
+  if (prog.ws || radio('audio') !== 'app' || $('#tx').classList.contains('hidden')) return;
+  let ws;
+  try { ws = new WebSocket('ws://localhost:47800/'); } catch { return; }
+  ws.binaryType = 'arraybuffer';
+  prog.ws = ws;
+  ws.onopen = async () => {
+    prog.conectado = true;
+    progConfig();
+    progDesenhar();
+    if (radio('audio') === 'app') {
+      await usarAudioPrograma();
+      if (streamTx) { notaAudio(''); statusTx('Ao vivo. O som do programa entrou na transmissão.', 'ok'); }
+    }
+  };
+  ws.onmessage = e => {
+    if (typeof e.data !== 'string') { if (prog.no) prog.no.port.postMessage(e.data, [e.data]); return; }
+    let m; try { m = JSON.parse(e.data); } catch { return; }
+    if (m.tipo !== 'apps') return;
+    for (const a of m.lista) if (a.icone) prog.icones[a.exe] = a.icone;
+    prog.apps = m.lista.filter(a => !ESCONDER_APPS.test(a.exe));
+    prog.discordAberto = m.discordAberto;
+    prog.erro = m.erro;
+    progDesenharLista();
+  };
+  ws.onclose = () => {
+    const era = prog.conectado;
+    prog.ws = null; prog.conectado = false;
+    progDesenhar();
+    if (era && streamTx && radio('audio') === 'app') statusTx('O Tela ao Vivo Áudio fechou: a transmissão ficou sem som até ele abrir de novo.', 'aviso');
+  };
+  ws.onerror = () => {};
+}
+setInterval(progProcurar, 2500);
+
+function progConfig() {
+  guardar.set('progModo', prog.modo);
+  guardar.set('progApps', JSON.stringify([...prog.marcados]));
+  if (prog.ws && prog.ws.readyState === 1) prog.ws.send(JSON.stringify({ tipo: 'config', modo: prog.modo, apps: [...prog.marcados] }));
+}
+
+function progDesenhar() {
+  $('#prog-fora').classList.toggle('hidden', prog.conectado);
+  $('#prog-dentro').classList.toggle('hidden', !prog.conectado);
+  marcar('progmodo', prog.modo);
+  progDesenharLista();
+}
+
+const linhasApp = new Map();
+function progDesenharLista() {
+  const ul = $('#prog-lista');
+  const excluir = prog.modo === 'excluir';
+  ul.classList.toggle('excluir', excluir);
+  const vistos = new Set();
+  prog.apps.forEach((a, i) => {
+    vistos.add(a.exe);
+    let li = linhasApp.get(a.exe);
+    if (!li) {
+      li = document.createElement('li');
+      li.className = 'prog-app';
+      li.innerHTML = '<label><input type="checkbox"><span class="sem-icone"></span><span class="nome"><span></span><small></small></span><span class="mini-nivel"><i></i></span></label>';
+      li.querySelector('input').onchange = ev => {
+        if (ev.target.checked) prog.marcados.add(a.exe); else prog.marcados.delete(a.exe);
+        progConfig(); progDesenharLista();
+      };
+      li.querySelector('.nome span').textContent = a.nome;
+      linhasApp.set(a.exe, li);
+    }
+    if (prog.icones[a.exe] && !li.querySelector('img')) {
+      const img = document.createElement('img'); img.src = prog.icones[a.exe]; img.alt = '';
+      li.querySelector('.sem-icone').replaceWith(img);
+    }
+    const vai = excluir ? !a.discord : prog.marcados.has(a.exe);
+    li.querySelector('input').checked = prog.marcados.has(a.exe);
+    li.classList.toggle('vai', vai);
+    li.classList.toggle('fora', !vai);
+    li.querySelector('small').textContent = excluir
+      ? (a.discord ? 'fica de fora' : 'vai junto')
+      : (vai ? 'vai na transmissão' : 'não vai');
+    li.querySelector('.mini-nivel i').style.transform = `scaleX(${Math.min(1, a.pico * 1.6)})`;
+    if (ul.children[i] !== li) ul.insertBefore(li, ul.children[i] || null);
+  });
+  for (const [exe, li] of linhasApp) if (!vistos.has(exe)) { li.remove(); linhasApp.delete(exe); }
+
+  let nota = '';
+  if (prog.erro) nota = 'O Windows recusou capturar um dos apps (' + prog.erro + '). Tente fechar e abrir o programa.';
+  else if (excluir && !prog.discordAberto) nota = 'O Discord está fechado agora. Quando abrir, ele já fica de fora sozinho.';
+  else if (excluir) nota = 'Vai tudo que tocar no PC, menos o Discord. Discord aberto pelo navegador (discord.com) não dá pra separar: use o app.';
+  else if (!prog.marcados.size) nota = 'Marque os apps que vão na transmissão.';
+  $('#prog-nota').textContent = nota;
+}
+
+// toca o PCM que chega do programa numa trilha de áudio (AudioWorklet com um colchão de ~30 ms)
+const CODIGO_RECEPTOR = `
+class Receptor extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this.b = new Float32Array(48000 * 2); this.ini = 0; this.qtd = 0; this.pronto = false;
+    this.port.onmessage = e => {
+      const s = new Int16Array(e.data), b = this.b, n = b.length;
+      if (this.qtd + s.length > n) { const f = this.qtd + s.length - n; this.ini = (this.ini + f) % n; this.qtd -= f; }
+      let fim = (this.ini + this.qtd) % n;
+      for (let i = 0; i < s.length; i++) { b[fim] = s[i] / 32768; if (++fim === n) fim = 0; }
+      this.qtd += s.length;
+      if (this.qtd > 14400) { const c = this.qtd - 4800; this.ini = (this.ini + c) % n; this.qtd -= c; } // passou de 150 ms: volta pra 50
+    };
+  }
+  process(_, saidas) {
+    const o = saidas[0], L = o[0], R = o[1] || o[0], q = L.length, b = this.b, n = b.length;
+    if (!this.pronto) { if (this.qtd >= 2880) this.pronto = true; else return true; }
+    if (this.qtd < q * 2) { this.pronto = false; return true; }
+    for (let i = 0; i < q; i++) { L[i] = b[this.ini]; R[i] = b[this.ini + 1]; this.ini = (this.ini + 2) % n; }
+    this.qtd -= q * 2;
+    return true;
+  }
+}
+registerProcessor('receptor-tva', Receptor);`;
+
+async function trilhaDoPrograma() {
+  if (prog.trilha && prog.trilha.readyState === 'live') return prog.trilha;
+  if (!prog.ctx) {
+    prog.ctx = new AudioContext({ sampleRate: 48000, latencyHint: 'interactive' });
+    await prog.ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([CODIGO_RECEPTOR], { type: 'text/javascript' })));
+  }
+  if (prog.ctx.state === 'suspended') try { await prog.ctx.resume(); } catch {}
+  const no = new AudioWorkletNode(prog.ctx, 'receptor-tva', { numberOfInputs: 0, outputChannelCount: [2] });
+  const dest = prog.ctx.createMediaStreamDestination();
+  dest.channelCount = 2;
+  no.connect(dest);
+  if (prog.no) try { prog.no.disconnect(); } catch {}
+  prog.no = no;
+  prog.trilha = dest.stream.getAudioTracks()[0];
+  try { prog.trilha.contentHint = 'music'; } catch {}
+  return prog.trilha;
+}
+
+async function usarAudioPrograma() {
+  let t;
+  try { t = await trilhaDoPrograma(); } catch (e) { statusTx('Não consegui tocar o som do programa (' + (e.name || e.message) + ').', 'erro'); return; }
+  audioDaCaptura = false;
+  await trocarTrilha(t);
+  medir(t);
 }
 
 function statusTx(msg, tipo = '') {
@@ -794,6 +1030,10 @@ async function comecar() {
   } else if (modo === 'none') {
     if (trilhaAudio) trilhaAudio.stop();
     trilhaAudio = trilhaSilenciosa(); audioDaCaptura = false;
+  } else if (modo === 'app') {
+    if (prog.conectado) await usarAudioPrograma();
+    else notaAudio('O Tela ao Vivo Áudio não está aberto: a transmissão começou sem som. Quando você abrir o programa, o som entra sozinho.');
+    if (!trilhaAudio) trilhaAudio = trilhaSilenciosa();
   } else if (!trilhaAudio) {
     await selecionarAudio();
     if (!trilhaAudio) trilhaAudio = trilhaSilenciosa();
@@ -900,7 +1140,7 @@ function pararTx() {
   if (streamTx) {
     streamTx.getVideoTracks().forEach(t => t.stop());
     // o áudio do cabo virtual continua aberto (pro medidor); o da captura morre junto com a tela
-    if (audioDaCaptura || radio('audio') !== 'device') {
+    if (audioDaCaptura || (radio('audio') !== 'device' && radio('audio') !== 'app')) {
       if (trilhaAudio) trilhaAudio.stop();
       trilhaAudio = null; audioDaCaptura = false;
       medir(null);
@@ -1205,10 +1445,11 @@ selQual.value = QUALIDADES[guardar.get('qualidade')] ? guardar.get('qualidade') 
 selQual.onchange = trocarQualidade;
 
 marcar('fonte', ['monitor', 'window', 'browser'].includes(guardar.get('fonte')) ? guardar.get('fonte') : 'monitor');
-marcar('audio', ['device', 'captura', 'none'].includes(guardar.get('modoAudio')) ? guardar.get('modoAudio') : 'device');
+marcar('audio', ['app', 'device', 'captura', 'none'].includes(guardar.get('modoAudio')) ? guardar.get('modoAudio') : 'app');
+document.querySelectorAll('input[name="progmodo"]').forEach(i => i.onchange = () => { prog.modo = radio('progmodo'); progConfig(); progDesenharLista(); });
 marcar('dica', guardar.get('dica') === 'detail' ? 'detail' : 'motion');
 atualizarFonte();
-document.querySelectorAll('input[name="fonte"]').forEach(i => i.onchange = atualizarFonte);
+document.querySelectorAll('input[name="fonte"]').forEach(i => i.onchange = trocouFonte);
 document.querySelectorAll('input[name="audio"]').forEach(i => i.onchange = atualizarModoAudio);
 document.querySelectorAll('input[name="dica"]').forEach(i => i.onchange = trocarQualidade);
 
