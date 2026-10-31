@@ -282,6 +282,9 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
 .ao-vivo-rx{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 8px;border-radius:6px;background:var(--acento);color:var(--acento-tinta);font:700 10.5px/1 var(--mono);letter-spacing:.08em;margin:0 6px}
 .flex{flex:1}
 #espera:not(.hidden)~#barra .ao-vivo-rx,#espera:not(.hidden)~#barra #info-rx{display:none}
+#toast-rx{position:absolute;left:50%;top:18px;transform:translateX(-50%);max-width:min(92%,420px);padding:12px 16px;border-radius:12px;
+  background:rgba(13,14,16,.88);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.1);color:#eceef2;font-size:14px;line-height:1.45;text-align:center;
+  padding-top:max(12px,env(safe-area-inset-top))}
 #stats-rx-box{position:absolute;top:16px;left:16px;min-width:230px;background:rgba(13,14,16,.78);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.08);
   border-radius:12px;padding:12px 14px;font:12px/1.8 var(--mono);color:#d6dae2;white-space:pre}
 
@@ -542,6 +545,7 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
   <div id="player" class="ativo">
     <video id="video" autoplay playsinline></video>
     <div id="stats-rx-box" class="hidden"></div>
+    <div id="toast-rx" class="toast-rx hidden"></div>
     <div id="espera">
       <div class="sinal"><i></i><i></i><i></i><i></i></div>
       <p id="msg-espera">Conectando...</p>
@@ -555,6 +559,7 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
       <span class="ao-vivo-rx">AO VIVO</span>
       <span id="info-rx"></span>
       <span class="flex"></span>
+      <button id="bt-call" class="bt-p hidden" title="Ouvir junto da call" aria-label="Ouvir junto da call do Discord"><svg class="i"><use href="#i-fone"/></svg><span class="txt">Junto da call</span></button>
       <button id="bt-stats" class="bt-p" title="Estatísticas (S)" aria-label="Estatísticas"><svg class="i"><use href="#i-stats"/></svg></button>
       <button id="bt-pip" class="bt-p" title="Janela flutuante (P)" aria-label="Janela flutuante"><svg class="i"><use href="#i-pip"/></svg></button>
       <button id="bt-full" class="bt-p" title="Tela cheia (F)"><svg class="i"><use id="ico-full" href="#i-cheia"/></svg><span class="txt" id="txt-full">Tela cheia</span></button>
@@ -1433,6 +1438,37 @@ function mudarVolume(v) {
 }
 const elementoCheio = () => document.fullscreenElement || document.webkitFullscreenElement;
 const TOQUE = matchMedia('(pointer: coarse)').matches;
+// iPhone/iPad: em call no Discord o iOS corta o som de sites. No modo "ambiente" (o que jogos usam),
+// o som do site mistura com a call em vez de ser cortado (só toca com o iPhone fora do silencioso).
+const IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const PODE_CALL = IOS && 'audioSession' in navigator;
+let modoCall = PODE_CALL && guardar.get('modoCall') === '1';
+function aplicarModoCall() {
+  if (!PODE_CALL) return;
+  try { navigator.audioSession.type = modoCall ? 'ambient' : 'auto'; } catch {}
+  $('#bt-call').classList.toggle('ativo', modoCall);
+}
+function alternarModoCall() {
+  modoCall = !modoCall;
+  guardar.set('modoCall', modoCall ? '1' : '0');
+  aplicarModoCall();
+  // reativa o som pra valer o modo novo (estamos dentro do toque, então o iPhone deixa)
+  video.pause();
+  video.muted = false;
+  video.play().catch(() => { video.muted = true; pedirToqueSom(); });
+  atualizarIconeSom();
+  avisoRx(modoCall
+    ? 'Som junto da call ligado. Tire o iPhone do silencioso (chave na lateral) pra ouvir.'
+    : 'Som junto da call desligado. Em call, o iPhone volta a cortar o som do site.');
+}
+let timerToast;
+function avisoRx(msg) {
+  const t = $('#toast-rx');
+  t.textContent = msg;
+  t.classList.remove('hidden');
+  clearTimeout(timerToast);
+  timerToast = setTimeout(() => t.classList.add('hidden'), 5000);
+}
 async function alternarTelaCheia() {
   if (elementoCheio()) {
     try { screen.orientation.unlock(); } catch {}
@@ -1642,6 +1678,7 @@ $('#bt-full').onclick = alternarTelaCheia;
 $('#bt-pip').onclick = alternarPip;
 if (!video.requestPictureInPicture && !video.webkitSetPresentationMode) $('#bt-pip').classList.add('hidden');
 $('#bt-stats').onclick = alternarStats;
+if (PODE_CALL) { $('#bt-call').classList.remove('hidden'); $('#bt-call').onclick = e => { e.stopPropagation(); alternarModoCall(); }; aplicarModoCall(); }
 $('#bt-sair').onclick = sairRx;
 $('#bt-espera-sair').onclick = sairRx;
 if (TOQUE) $('#txt-aviso-som').textContent = 'Toque aqui pra ligar o som';
