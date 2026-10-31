@@ -12,8 +12,11 @@ module.exports = async (req, res) => {
 
   const env = process.env;
   if (env.TURN_URLS && env.TURN_USERNAME && env.TURN_CREDENTIAL) {
-    const urls = env.TURN_URLS.split(',').map(u => u.trim()).filter(Boolean)
+    const base = env.TURN_URLS.split(',').map(u => u.trim()).filter(Boolean)
       .map(u => /^(turns?|stun):/.test(u) ? u : 'turn:' + u);
+    // junto de cada turn: em UDP, oferece também por TCP (rede que bloqueia UDP)
+    const urls = [...new Set(base.flatMap(u =>
+      /^turn:/.test(u) && !/transport=/.test(u) ? [u, u + '?transport=tcp'] : [u]))];
     return res.status(200).json({ iceServers: [{ urls, username: env.TURN_USERNAME, credential: env.TURN_CREDENTIAL }] });
   }
 
