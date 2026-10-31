@@ -548,7 +548,7 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
       <span id="espera-cod" class="espera-cod"></span>
       <button id="bt-espera-sair" class="btn">Voltar</button>
     </div>
-    <button id="aviso-som" class="hidden"><svg class="i"><use href="#i-mudo"/></svg>Clique para ativar o som</button>
+    <button id="aviso-som" class="hidden"><svg class="i"><use href="#i-mudo"/></svg><span id="txt-aviso-som">Clique para ligar o som</span></button>
     <div id="barra">
       <button id="bt-som" class="bt-p" title="Mudo (M)" aria-label="Mudo"><svg class="i"><use id="ico-som" href="#i-som"/></svg></button>
       <input id="vol" type="range" min="0" max="1" step="0.02" title="Volume (↑↓)" aria-label="Volume">
@@ -1253,6 +1253,7 @@ function iniciarAssistir() {
   vol.value = guardar.get('volume') || '1';
   video.volume = +vol.value;
   video.muted = guardar.get('mudo') === '1';
+  if (TOQUE) { video.muted = false; if (+vol.value === 0) vol.value = 1; video.volume = 1; } // celular: sem barra de volume na tela
   atualizarIconeSom();
   mexeu();
   manterAcesa(true);
@@ -1308,6 +1309,20 @@ function agendarReconexao(ms, msg) {
   }, ms);
 }
 
+// Som de quem assiste: o áudio está chegando pela rede? (separa "não chega" de "o aparelho não toca")
+const somRx = { texto: '?', energia: 0 };
+async function medirSomRx(pc) {
+  let a = null;
+  (await pc.getStats()).forEach(x => { if (x.type === 'inbound-rtp' && (x.kind === 'audio' || x.mediaType === 'audio')) a = x; });
+  const temFaixa = video.srcObject && video.srcObject.getAudioTracks().length > 0;
+  if (!a) { somRx.texto = temFaixa ? 'faixa sem dados' : 'não veio faixa de som'; return; }
+  const e = a.totalAudioEnergy || 0, subiu = e > somRx.energia + 1e-6;
+  somRx.energia = e;
+  const nivel = a.audioLevel != null ? Math.round(a.audioLevel * 100) : null;
+  somRx.texto = !subiu && !(nivel > 0) ? 'chegando em silêncio (quem transmite está sem som?)'
+    : `chegando${nivel != null ? ` (nível ${nivel}%)` : ''}${video.muted ? ' · player MUDO: toque no vídeo' : ''}`;
+}
+
 // Folga (buffer) da imagem de quem assiste. Começa no automático do navegador (já é pouca, ~50 ms).
 // Se a imagem travar, aumenta a folga: atrasa um pouquinho, mas para de congelar.
 const FOLGAS = [null, 150, 300, 500]; // ms; null = automático
@@ -1360,19 +1375,41 @@ function receberChamada(call) {
     if (callRx !== call) return;
     callRx = null;
     video.srcObject = null;
+    faixasTocando = '';
     agendarReconexao(2500, 'A transmissão parou. Esperando voltar...');
   });
   call.on('error', () => {});
 }
 
+let faixasTocando = '';
 function tocar(s) {
-  if (video.srcObject !== s) video.srcObject = s;
+  const chave = s.getTracks().map(t => t.id).sort().join(',');
+  if (!s.__vigiado) {
+    s.__vigiado = true;
+    s.addEventListener('addtrack', () => { if (callRx && video.srcObject) tocar(s); });
+  }
+  if (chave !== faixasTocando || !video.srcObject) {
+    faixasTocando = chave;
+    video.srcObject = new MediaStream(s.getTracks());
+  }
   video.play().catch(() => {
+    // o celular/navegador bloqueou som automático: toca mudo e pede um toque
     video.muted = true;
     video.play().catch(() => {});
-    $('#aviso-som').classList.remove('hidden');
-    atualizarIconeSom();
+    pedirToqueSom();
   });
+}
+function pedirToqueSom() {
+  $('#aviso-som').classList.remove('hidden');
+  atualizarIconeSom();
+}
+function ligarSom() {
+  video.muted = false;
+  if (video.volume === 0) video.volume = vol.value = 1;
+  guardar.set('mudo', '0');
+  $('#aviso-som').classList.add('hidden');
+  video.play().catch(() => { video.muted = true; pedirToqueSom(); });
+  atualizarIconeSom();
 }
 video.addEventListener('playing', esconderEspera);
 
@@ -1449,6 +1486,7 @@ function mexeu() {
 // celular: um toque mostra/esconde a barra, dois toques = tela cheia
 let ultimoToque = 0;
 function tocouVideo(e) {
+  if (!$('#aviso-som').classList.contains('hidden') && !e.target.closest('#barra')) { ligarSom(); mexeu(); return; }
   if (e.target.closest('#barra, #aviso-som, #espera')) { mexeu(); return; }
   const agora = Date.now();
   if (agora - ultimoToque < 300) { ultimoToque = 0; alternarTelaCheia(); return; }
@@ -1530,6 +1568,7 @@ setInterval(async () => {
                  : 'reduzido pelo Chrome de quem transmite';
         }
         ajustarFolga(st);
+        await medirSomRx(callRx.peerConnection);
         function causaFps(i) {
           if (i.limite === 'bandwidth') return 'internet (upload) de quem transmite';
           if (i.limite === 'cpu') return 'processador de quem transmite';
@@ -1551,6 +1590,7 @@ setInterval(async () => {
           `Perdidos    ${st.perdidos} pacotes${st.recebidos ? ` (${(100 * st.perdidos / (st.perdidos + st.recebidos)).toFixed(1)}%)` : ''}\n` +
           `Travadas    ${st.travadas}${st.jitter != null ? ` · variação ${st.jitter} ms` : ''}\n` +
           `Folga       ${FOLGAS[folgaNivel] == null ? 'automática' : FOLGAS[folgaNivel] + ' ms (aumentou porque travou)'}\n` +
+          `Som         ${somRx.texto}\n` +
           `Descartados ${st.descartados} quadros\nDecoder     ${st.decoder || '?'}` +
           (it && it.encoder ? `\nEncoder dele ${it.encoder}` : '');
       }
@@ -1596,7 +1636,7 @@ $('#in-codigo').value = guardar.get('ultimoCodigo') || '';
 $('#in-codigo').addEventListener('input', () => $('#erro-codigo').classList.add('hidden'));
 
 $('#bt-som').onclick = alternarMudo;
-$('#aviso-som').onclick = () => { video.muted = false; guardar.set('mudo', '0'); $('#aviso-som').classList.add('hidden'); video.play().catch(() => {}); atualizarIconeSom(); };
+$('#aviso-som').onclick = e => { e.stopPropagation(); ligarSom(); };
 vol.oninput = () => mudarVolume(+vol.value);
 $('#bt-full').onclick = alternarTelaCheia;
 $('#bt-pip').onclick = alternarPip;
@@ -1604,6 +1644,7 @@ if (!video.requestPictureInPicture && !video.webkitSetPresentationMode) $('#bt-p
 $('#bt-stats').onclick = alternarStats;
 $('#bt-sair').onclick = sairRx;
 $('#bt-espera-sair').onclick = sairRx;
+if (TOQUE) $('#txt-aviso-som').textContent = 'Toque aqui pra ligar o som';
 if (TOQUE) player.addEventListener('click', tocouVideo);
 else {
   video.addEventListener('dblclick', alternarTelaCheia);
