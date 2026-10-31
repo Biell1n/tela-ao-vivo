@@ -157,7 +157,7 @@ select option{background:var(--sup-2)}
 .medidor::before{content:"";position:absolute;inset:0;background:var(--sup-3)}
 #nivel{position:relative;height:100%;width:100%;transform-origin:left;transform:scaleX(0);
   background:linear-gradient(90deg,var(--ok) 0 65%,var(--aviso) 80%,var(--erro));transition:transform .06s linear}
-.rodape-medidor{display:flex;justify-content:space-between;font:12px var(--mono);color:var(--fraco);margin-top:6px}
+.rodape-medidor{display:flex;justify-content:space-between;gap:12px;font:12px var(--mono);color:var(--fraco);margin-top:6px}
 
 .prog-card{display:flex;flex-direction:column;gap:14px;padding:16px;border-radius:var(--r-m);background:var(--bg-2);border:1px solid var(--linha)}
 .prog-cab{display:flex;gap:12px;align-items:center}
@@ -212,6 +212,12 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
 .seg input:focus-visible+span{outline:2px solid var(--acento)}
 .dica{font-size:12.5px;color:var(--fraco);margin:10px 0 0;text-wrap:pretty}
 .dica.aviso{color:var(--aviso)}
+.turbo{display:flex;gap:12px;align-items:flex-start;margin-top:10px;padding:12px 14px;border-radius:var(--r-m);background:var(--bg-2);border:1px solid var(--linha);cursor:pointer;transition:border-color .2s}
+.turbo:hover{border-color:var(--linha-2)}
+.turbo:has(input:checked){border-color:var(--acento);background:linear-gradient(180deg,var(--acento-suave),transparent 80%),var(--bg-2)}
+.turbo input{width:18px;height:18px;margin:2px 0 0;accent-color:var(--acento);flex:none;cursor:pointer}
+.turbo b{font-size:14px;font-weight:600}
+.turbo small{display:block;color:var(--fraco);font-size:12.5px;line-height:1.4;margin-top:2px}
 
 /* monitor (lado direito) */
 .monitor{position:sticky;top:20px;display:flex;flex-direction:column;gap:14px}
@@ -483,6 +489,8 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
           <label><input type="radio" name="dica" value="motion"><span>Movimento<small>jogos, vídeo</small></span></label>
           <label><input type="radio" name="dica" value="detail"><span>Nitidez<small>texto, código</small></span></label>
         </div>
+        <label class="turbo"><input type="checkbox" id="turbo"><span><b>Turbo</b><span class="etq rec">+60% DE INTERNET</span>
+          <small>Libera mais dados pro vídeo. Fica mais nítido em jogo com muito movimento (tiro, corrida). Só use se sua internet de upload for boa.</small></span></label>
         <p class="dica" id="dica-qual">Se travar, escolha uma mais leve. Dá pra trocar com a transmissão rolando.</p>
       </fieldset>
     </div>
@@ -576,10 +584,13 @@ const QUALIDADES = {
   uhd30: { nome: '4K · 30 fps',                           w: 3840, h: 2160, fps: 30, kbps: 25000 },
   uhd60: { nome: '4K · 60 fps · máxima',                  w: 3840, h: 2160, fps: 60, kbps: 40000 },
 };
+// Turbo: aumenta o teto de dados do vídeo (o WebRTC só usa se a internet aguentar)
+const turboLigado = () => { const t = document.getElementById('turbo'); return !!(t && t.checked); };
+const kbpsDe = q => Math.round(q.kbps * (turboLigado() ? 1.6 : 1));
 // o vídeo vai direto do seu PC pra cada pessoa: a internet de upload precisa aguentar isso vezes quem assiste
 function dicaQualidade() {
   const q = QUALIDADES[$('#sel-qual').value];
-  const mbps = Math.round(q.kbps / 1000);
+  const mbps = Math.round(kbpsDe(q) / 1000);
   let t = `Precisa de uns ${mbps} Mbps de upload por pessoa assistindo.`;
   if (q.w > 1920) t += ` Sua tela tem que ter ${q.h === 2160 ? '4K' : '1440p ou mais'} pra sair nessa resolução; se for menor, sai na resolução da tela.`;
   if (q.w === 3840) t += ' Se travar, use 1440p: a diferença quase não aparece e fica bem mais leve.';
@@ -647,7 +658,7 @@ function ajustarSDP(sdp) {
     const fm = l.match(/^a=fmtp:(\d+) /);
     if (fm && preferidos.includes(fm[1]) && !/x-google-start-bitrate/.test(l)) {
       // começa mais perto da qualidade escolhida (sem isso o 4K demora pra "acordar")
-      return l + ';x-google-start-bitrate=' + (qualAtual ? Math.max(2500, Math.min(10000, qualAtual.kbps / 2)) : 2500);
+      return l + ';x-google-start-bitrate=' + (qualAtual ? Math.max(2500, Math.min(15000, kbpsDe(qualAtual) / 2)) : 2500);
     }
     if (l.startsWith('m=video ') && preferidos.length) {
       const p = l.split(' ');
@@ -1125,7 +1136,7 @@ async function aplicarParametros(pc) {
     const p = s.getParameters();
     if (!p.encodings || !p.encodings.length) continue;
     if (s.track.kind === 'video') {
-      p.encodings[0].maxBitrate = qualAtual.kbps * 1000;
+      p.encodings[0].maxBitrate = kbpsDe(qualAtual) * 1000;
       p.encodings[0].maxFramerate = qualAtual.fps;
       p.degradationPreference = dica === 'detail' ? 'maintain-resolution' : 'maintain-framerate';
     } else {
@@ -1457,6 +1468,8 @@ const selQual = $('#sel-qual');
 Object.entries(QUALIDADES).forEach(([k, q]) => selQual.add(new Option(q.nome, k)));
 selQual.value = QUALIDADES[guardar.get('qualidade')] ? guardar.get('qualidade') : 'hd60';
 selQual.onchange = () => { dicaQualidade(); trocarQualidade(); };
+$('#turbo').checked = guardar.get('turbo') === '1';
+$('#turbo').onchange = () => { guardar.set('turbo', $('#turbo').checked ? '1' : '0'); dicaQualidade(); trocarQualidade(); };
 dicaQualidade();
 
 marcar('fonte', ['monitor', 'window', 'browser'].includes(guardar.get('fonte')) ? guardar.get('fonte') : 'monitor');
