@@ -693,6 +693,7 @@ async function lerStats(pc, tipo) {
     encoder: v.encoderImplementation || '', decoder: v.decoderImplementation || '',
     limite: v.qualityLimitationReason || 'none',
     perdidos: v.packetsLost || 0, descartados: v.framesDropped || 0,
+    codec: (((v.codecId && r.get(v.codecId)) || {}).mimeType || '').replace(/^video\//i, ''),
   };
 }
 function resumoStats(st) {
@@ -707,6 +708,7 @@ function resumoStats(st) {
 // ============================================================ TRANSMITIR
 let peerTx = null, streamTx = null, trilhaAudio = null, audioDaCaptura = false, qualAtual = null;
 const chamadas = new Map();
+const conexoes = new Map(); // canal de dados com cada pessoa: manda pra ela a resolução real e o motivo de cair
 let ctxAudio = null, rafNivel = 0, fonteNivel = null;
 
 function contexto() {
@@ -1103,8 +1105,9 @@ async function abrirSala(novo) {
     setTimeout(() => { if (peerTx === p && !p.destroyed && p.disconnected) try { p.reconnect(); } catch {} }, 2000);
   });
   p.on('connection', conn => {
-    conn.on('open', () => ligarPara(conn.peer));
+    conn.on('open', () => { conexoes.set(conn.peer, conn); ligarPara(conn.peer); });
     conn.on('close', () => {
+      if (conexoes.get(conn.peer) === conn) conexoes.delete(conn.peer);
       const c = chamadas.get(conn.peer);
       if (c) { try { c.close(); } catch {} chamadas.delete(conn.peer); }
     });
@@ -1138,7 +1141,7 @@ async function aplicarParametros(pc) {
     if (s.track.kind === 'video') {
       p.encodings[0].maxBitrate = kbpsDe(qualAtual) * 1000;
       p.encodings[0].maxFramerate = qualAtual.fps;
-      p.degradationPreference = dica === 'detail' ? 'maintain-resolution' : 'maintain-framerate';
+      p.degradationPreference = dica === 'detail' ? 'maintain-resolution' : qualAtual.h > 1080 ? 'balanced' : 'maintain-framerate';
     } else {
       p.encodings[0].maxBitrate = 160000;
     }
@@ -1205,7 +1208,7 @@ async function copiar(txt, bt, rotulo) {
 function linkSala(c) { return location.origin + location.pathname + '?c=' + encodeURIComponent(c); }
 
 // ============================================================ ASSISTIR
-let peerRx = null, conRx = null, callRx = null, codigoRx = '', rxAtivo = false, reconTimer = null;
+let peerRx = null, conRx = null, callRx = null, codigoRx = '', rxAtivo = false, reconTimer = null, infoTx = null;
 const video = $('#video'), player = $('#player'), vol = $('#vol');
 
 function esperar(msg) { $('#msg-espera').textContent = msg; $('#espera').classList.remove('hidden'); }
@@ -1268,6 +1271,7 @@ function abrirCanal() {
   const con = peerRx.connect(PREFIXO + codigoRx, { reliable: true });
   conRx = con;
   con.on('open', () => { if (!callRx) esperar('Conectado. Recebendo a imagem...'); });
+  con.on('data', d => { if (d && d.tipo === 'info') infoTx = { ...d, quando: Date.now() }; });
   con.on('close', () => { if (conRx === con && rxAtivo) agendarReconexao(2500, 'Seu amigo parou de transmitir. Esperando voltar...'); });
   con.on('error', () => {});
 }
@@ -1437,14 +1441,29 @@ setInterval(async () => {
       m.append(chip(ativos.length ? `${ativos.length} assistindo` : 'ninguém assistindo ainda', '', 'i-usuarios'));
       const vs = streamTx.getVideoTracks()[0] && streamTx.getVideoTracks()[0].getSettings();
       if (vs && vs.width) { $('#tag-res').textContent = `${vs.width}×${vs.height}`; $('#tag-res').classList.remove('hidden'); }
-      if (ativos[0]) {
-        const st = await lerStats(ativos[0].peerConnection, 'outbound-rtp');
-        if (st) {
+      // stats de cada pessoa; os chips mostram a primeira, e cada uma recebe as suas pelo canal de dados
+      const todas = [];
+      for (const [id, c] of chamadas) {
+        if (!c.peerConnection || c.peerConnection.connectionState !== 'connected') continue;
+        const s = await lerStats(c.peerConnection, 'outbound-rtp');
+        if (!s) continue;
+        todas.push(s);
+        const conn = conexoes.get(id);
+        if (conn && conn.open) try {
+          conn.send({ tipo: 'info', capW: vs ? vs.width : 0, capH: vs ? vs.height : 0, w: s.w, h: s.h, limite: s.limite,
+                      qualidade: qualAtual ? qualAtual.nome : '', encoder: (tipoEncoder(s.encoder) || [''])[0], codec: s.codec });
+        } catch {}
+      }
+      if (todas[0]) {
+        const st = todas[0];
+        {
+          if (vs && st.w && st.w < vs.width) m.append(chip(`enviando ${st.w}×${st.h}`, 'ruim'));
           m.append(chip(`${st.fps} fps`), chip(`${st.mbps.toFixed(1)} Mbps`));
           if (st.ping != null) m.append(chip(`${st.ping} ms`, st.ping > 120 ? 'ruim' : ''));
           if (st.rota) m.append(chip(st.rota));
           const enc = tipoEncoder(st.encoder);
           if (enc) m.append(chip(enc[0], enc[1]));
+          if (st.codec) m.append(chip(st.codec, /h264/i.test(st.codec) ? '' : 'ruim'));
           if (st.limite === 'bandwidth') m.append(chip('limitado pelo upload', 'ruim'));
           if (st.limite === 'cpu') m.append(chip('limitado pelo processador', 'ruim'));
         }
@@ -1453,11 +1472,25 @@ setInterval(async () => {
     if (rxAtivo && callRx && callRx.peerConnection) {
       const st = await lerStats(callRx.peerConnection, 'inbound-rtp');
       if (st) {
-        $('#info-rx').textContent = resumoStats(st);
+        // o que quem transmite contou: resolução da tela dele e por que caiu (se caiu)
+        const it = infoTx && Date.now() - infoTx.quando < 5000 ? infoTx : null;
+        let porque = '';
+        if (it && it.capW && st.w && st.w < it.capW) {
+          porque = it.limite === 'bandwidth' ? 'reduzido: a internet (upload) de quem transmite não deu conta'
+                 : it.limite === 'cpu' ? 'reduzido: o PC de quem transmite não deu conta'
+                 : 'reduzido pelo Chrome de quem transmite';
+        }
+        $('#info-rx').textContent = resumoStats(st) + (it && it.capW ? ` · tela dele ${it.capW}×${it.capH}` : '') + (porque ? ` · ${porque}` : '');
         $('#stats-rx-box').textContent =
-          `Resolução   ${st.w}×${st.h}\nFPS         ${st.fps}\nTaxa        ${st.mbps.toFixed(2)} Mbps\n` +
+          `Resolução   ${st.w}×${st.h}\n` +
+          (it && it.capW ? `Tela dele   ${it.capW}×${it.capH}\n` : '') +
+          (porque ? `Por quê      ${porque.replace('reduzido: ', '')}\n` : '') +
+          (it && it.qualidade ? `Qualidade   ${it.qualidade}\n` : '') +
+          (st.codec ? `Formato     ${st.codec}${/h264/i.test(st.codec) ? '' : ' (sem placa de vídeo: pesa no PC dele)'}\n` : '') +
+          `FPS         ${st.fps}\nTaxa        ${st.mbps.toFixed(2)} Mbps\n` +
           `Ping        ${st.ping != null ? st.ping + ' ms' : '?'} (${st.rota || '?'})\n` +
-          `Perdidos    ${st.perdidos} pacotes\nDescartados ${st.descartados} quadros\nDecoder     ${st.decoder || '?'}`;
+          `Perdidos    ${st.perdidos} pacotes\nDescartados ${st.descartados} quadros\nDecoder     ${st.decoder || '?'}` +
+          (it && it.encoder ? `\nEncoder dele ${it.encoder}` : '');
       }
     }
   } catch (e) { console.warn(e); }
