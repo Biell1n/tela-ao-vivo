@@ -1,15 +1,24 @@
-// Gera credenciais temporárias de TURN na Cloudflare (Realtime TURN, grátis até 1 TB/mês).
-// Variáveis na Vercel: CF_TURN_KEY_ID e CF_TURN_API_TOKEN (Cloudflare › Realtime › TURN Server).
-// Sem elas, responde 204 e o site segue com os servidores padrão do PeerJS.
+// Entrega os servidores de retransmissão (TURN) pro site. Duas formas, configuradas na Vercel:
+//  1) Usuário e senha fixos (ExpressTURN, Metered etc.):
+//     TURN_URLS (separadas por vírgula), TURN_USERNAME, TURN_CREDENTIAL
+//  2) Cloudflare Realtime TURN (credencial temporária): CF_TURN_KEY_ID e CF_TURN_API_TOKEN
+// Sem nada configurado, responde 204 e o site segue com os servidores padrão do PeerJS.
 module.exports = async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
-  const id = process.env.CF_TURN_KEY_ID, token = process.env.CF_TURN_API_TOKEN;
-  if (!id || !token) return res.status(204).end();
 
   // só entrega credencial pra páginas do próprio site
   const origem = req.headers.origin || req.headers.referer || '';
   if (origem && !origem.includes(req.headers.host)) return res.status(403).end();
 
+  const env = process.env;
+  if (env.TURN_URLS && env.TURN_USERNAME && env.TURN_CREDENTIAL) {
+    const urls = env.TURN_URLS.split(',').map(u => u.trim()).filter(Boolean)
+      .map(u => /^(turns?|stun):/.test(u) ? u : 'turn:' + u);
+    return res.status(200).json({ iceServers: [{ urls, username: env.TURN_USERNAME, credential: env.TURN_CREDENTIAL }] });
+  }
+
+  const id = env.CF_TURN_KEY_ID, token = env.CF_TURN_API_TOKEN;
+  if (!id || !token) return res.status(204).end();
   try {
     const r = await fetch(`https://rtc.live.cloudflare.com/v1/turn/keys/${id}/credentials/generate-ice-servers`, {
       method: 'POST',
