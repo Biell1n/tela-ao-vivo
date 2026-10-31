@@ -370,7 +370,7 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
         <div class="lista-audio" role="radiogroup" aria-label="Áudio">
           <label class="op-l"><input type="radio" name="audio" value="device"><span class="radio"></span>
             <span><b>Cabo virtual, sem o Discord</b><span class="etq rec">RECOMENDADO</span>
-            <small>Você decide o que entra: o PC todo menos a call, ou só o jogo. Funciona com tela inteira e com janela.</small></span></label>
+            <small>Você escolhe app por app o que entra (o jogo e o Spotify sim, o Discord não). Funciona com tela inteira e com janela.</small></span></label>
           <label class="op-l"><input type="radio" name="audio" value="captura"><span class="radio"></span>
             <span><b id="cap-titulo">Som do Windows inteiro</b><span id="cap-etq" class="etq alerta">INCLUI A CALL</span>
             <small id="cap-desc">Pega tudo, inclusive a voz dos seus amigos. Bom só quando você não está em call.</small></span></label>
@@ -388,21 +388,26 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
           <div class="rodape-medidor"><span>nível</span><span id="nivel-txt">sem sinal</span></div>
 
           <details class="guia" id="guia">
-            <summary><svg class="i"><use href="#i-fone"/></svg>Como deixar a voz do Discord de fora<svg class="i mais"><use href="#i-mais"/></svg></summary>
+            <summary><svg class="i"><use href="#i-fone"/></svg>Escolher quais apps vão no áudio (e tirar o Discord)<svg class="i mais"><use href="#i-mais"/></svg></summary>
             <div class="guia-corpo">
-              <h4>Tela inteira, tudo menos a call (Voicemeeter)</h4>
+              <h4>Escolher app por app (Voicemeeter)</h4>
+              <p class="dica">O navegador não enxerga os programas abertos; quem separa o som de cada app é o Windows. Você configura uma vez e ele lembra.</p>
               <ol>
-                <li>Windows › Configurações › Som: saída padrão = <b>Voicemeeter Input</b>.</li>
-                <li>No Voicemeeter, na faixa <b>Voicemeeter Input</b>, ligue <kbd>A1</kbd> (seu fone) e <kbd>B3</kbd>.</li>
-                <li>Discord › Voz e vídeo › Dispositivo de saída = <b>Voicemeeter AUX Input</b>. Nessa faixa deixe só <kbd>A1</kbd> ligado (<kbd>B</kbd> desligado).</li>
-                <li>Aqui em cima escolha <b>Voicemeeter Out B3</b>. Você ouve tudo; seu amigo ouve tudo menos a call.</li>
+                <li>No Voicemeeter: na faixa <b>Voicemeeter Input</b> ligue <kbd>A1</kbd> (seu fone) e <kbd>B3</kbd>. Na faixa <b>Voicemeeter AUX Input</b> deixe só <kbd>A1</kbd>.</li>
+                <li>Abra os apps e deixe tocando algum som. Depois: Windows › Configurações › Sistema › Som › <b>Volume do app e preferências de dispositivo</b> (no Windows 11: <b>Mixer de volume</b>).</li>
+                <li>Apps que <b>vão</b> pra transmissão (jogo, Spotify, YouTube): saída = <b>Voicemeeter Input</b>.</li>
+                <li>Apps que <b>não vão</b> (Discord, WhatsApp, avisos): saída = <b>Voicemeeter AUX Input</b>. Você continua ouvindo; seu amigo não.</li>
+                <li>Aqui em cima escolha <b>Voicemeeter Out B3</b>.</li>
               </ol>
-              <h4>Só o som de um jogo ou app (VB-Cable)</h4>
+              <p class="dica">App que não aparece na lista do Windows é porque não está tocando som agora. O que estiver na saída "Padrão" segue a saída padrão do Windows; deixe ela em <b>Voicemeeter Input</b> pra que todo app novo entre na transmissão, ou em <b>Voicemeeter AUX Input</b> pra que nenhum entre sem você escolher.</p>
+              <h4>Sem Voicemeeter: só um jogo ou app (VB-Cable)</h4>
               <ol>
-                <li>Windows › Configurações › Sistema › Som › <b>Volume do app e preferências de dispositivo</b>: no jogo, saída = <b>CABLE Input</b>.</li>
+                <li>Windows › Configurações › Sistema › Som › <b>Volume do app e preferências de dispositivo</b>: no app, saída = <b>CABLE Input</b>. Dá pra pôr mais de um app no CABLE.</li>
                 <li>Pra continuar ouvindo: Painel de som › Gravação › <b>CABLE Output</b> › Propriedades › Escutar › marque <b>Escutar este dispositivo</b> no seu fone.</li>
                 <li>Aqui em cima escolha <b>CABLE Output</b>.</li>
               </ol>
+              <h4>Só uma aba do Chrome</h4>
+              <p class="dica">Não precisa de nada disso: em "O que mostrar" escolha <b>Aba</b> e no áudio <b>Som da aba</b>.</p>
               <p class="dica">A barra de nível tem que mexer com o som do jogo e ficar parada quando seus amigos falam.</p>
             </div>
           </details>
