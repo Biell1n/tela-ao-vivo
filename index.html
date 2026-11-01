@@ -250,6 +250,11 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
 .status.aviso{color:var(--aviso)}.status.aviso::before{background:var(--aviso)}
 .status.erro{color:var(--erro)}.status.erro::before{background:var(--erro)}
 .metricas{display:flex;flex-wrap:wrap;gap:6px}
+.card-direta{display:flex;gap:14px;align-items:center;justify-content:space-between;padding:14px 16px;border-radius:var(--r-m);background:var(--sup);border:1px solid var(--linha)}
+.card-direta b{display:block;font-size:14px;font-weight:600}
+.card-direta small{display:block;color:var(--fraco);font-size:12.5px;line-height:1.4;margin-top:2px;text-wrap:pretty}
+.card-direta .btn{flex:none}
+@media (max-width:560px){.card-direta{flex-direction:column;align-items:stretch}}
 .chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:8px;background:var(--sup);border:1px solid var(--linha);
   font:500 12px var(--mono);color:var(--sub);font-variant-numeric:tabular-nums}
 .chip.bom{color:var(--ok)}.chip.ruim{color:var(--aviso)}
@@ -547,6 +552,11 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
 
       <div id="status-tx" class="status">Escolha a tela e o áudio, depois comece.</div>
       <div class="metricas" id="metricas"></div>
+      <div id="card-direta" class="card-direta hidden">
+        <div><b>Alguém vai assistir no mesmo Wi-Fi?</b>
+          <small>Libere a conexão direta: o Chrome pede o microfone uma vez só pra mostrar o endereço do PC na sua rede (regra de privacidade dele). O site não liga nem manda o seu microfone.</small></div>
+        <button id="bt-direta" class="btn">Liberar conexão direta</button>
+      </div>
 
       <button id="bt-comecar" class="btn primario grande">Começar a transmitir</button>
       <button id="bt-parar" class="btn perigo grande hidden">Parar transmissão</button>
@@ -721,11 +731,18 @@ async function lerStats(pc, tipo) {
   let mbps = 0;
   if (ant && v.timestamp > ant.ts) mbps = (bytes - ant.bytes) * 8 / ((v.timestamp - ant.ts) / 1000) / 1e6;
   statsAnteriores.set(pc, { bytes, ts: v.timestamp });
-  const local = par && r.get(par.localCandidateId);
+  const local = par && r.get(par.localCandidateId), remoto = par && r.get(par.remoteCandidateId);
+  const rel = [local, remoto].find(c => c && c.candidateType === 'relay');
+  const ehHost = c => c && c.candidateType === 'host';
+  let rota = '';
+  if (rel) {
+    const u = (rel.url || '') + ' ' + (local && local.url || '');
+    rota = 'servidor' + (/cloudflare/i.test(u) ? ' São Paulo' : /expressturn/i.test(u) ? ' Paris' : '') + (rel.relayProtocol === 'tcp' || rel.relayProtocol === 'tls' ? ' (TCP)' : '');
+  } else if (local) rota = ehHost(local) || ehHost(remoto) ? 'direto (mesma rede)' : 'direto (internet)';
   return {
     fps: Math.round(v.framesPerSecond || 0), w: v.frameWidth || 0, h: v.frameHeight || 0, mbps,
     ping: par && par.currentRoundTripTime != null ? Math.round(par.currentRoundTripTime * 1000) : null,
-    rota: local ? (local.candidateType === 'relay' ? 'via servidor' : 'direto') : '',
+    rota, relay: !!rel,
     encoder: v.encoderImplementation || '', decoder: v.decoderImplementation || '',
     limite: v.qualityLimitationReason || 'none',
     perdidos: v.packetsLost || 0, descartados: v.framesDropped || 0,
@@ -1050,6 +1067,27 @@ async function usarAudioPrograma() {
   audioDaCaptura = false;
   await trocarTrilha(t);
   medir(t);
+}
+
+// Conexão direta na mesma rede: sem permissão de microfone, o Chrome esconde o endereço local do PC
+// (aparece como "xxxx.local") e quem está no mesmo Wi-Fi pode acabar indo pelo servidor de retransmissão.
+async function verConexaoDireta() {
+  let estado = 'prompt';
+  try { estado = (await navigator.permissions.query({ name: 'microphone' })).state; } catch {}
+  $('#card-direta').classList.toggle('hidden', estado === 'granted' || !navigator.mediaDevices);
+}
+async function liberarConexaoDireta() {
+  try {
+    const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+    s.getTracks().forEach(t => t.stop()); // só a permissão importa; o microfone é desligado na hora
+  } catch {
+    statusTx('Sem a permissão, a conexão com quem está no mesmo Wi-Fi pode passar pelo servidor.', 'aviso');
+    return;
+  }
+  $('#card-direta').classList.add('hidden');
+  // quem já está assistindo reconecta sozinho, agora pelo caminho direto
+  for (const c of chamadas.values()) try { c.close(); } catch {}
+  if (streamTx) statusTx('Conexão direta liberada. Quem está assistindo reconecta sozinho em instantes.', 'ok');
 }
 
 function statusTx(msg, tipo = '') {
@@ -1423,7 +1461,8 @@ function ajustarQualidadeRx(st) {
   const ruim = h.trav >= 2 || perda > 0.03;
   const desdeTroca = Date.now() - qRx.ultimaTroca;
   // 1º remédio: a conexão nasceu ruim? reconecta (é o "reiniciar até ficar liso", só que sozinho)
-  if (ruim && qRx.conectouEm && Date.now() - qRx.conectouEm > 4000 && Date.now() - qRx.conectouEm < 30000 && qRx.reconexoes < 2) {
+  const longe = st.relay && st.ping != null && st.ping > 250 && qRx.reconexoes < 1;
+  if ((ruim || longe) && qRx.conectouEm && Date.now() - qRx.conectouEm > 4000 && Date.now() - qRx.conectouEm < 30000 && qRx.reconexoes < 2) {
     reconectarPorTravar();
     return;
   }
@@ -1851,7 +1890,7 @@ document.querySelectorAll('input[name="fonte"]').forEach(i => i.onchange = troco
 document.querySelectorAll('input[name="audio"]').forEach(i => i.onchange = atualizarModoAudio);
 document.querySelectorAll('input[name="dica"]').forEach(i => i.onchange = trocarQualidade);
 
-$('#bt-modo-tx').onclick = () => { mostrar('tx'); atualizarModoAudio(); };
+$('#bt-modo-tx').onclick = () => { mostrar('tx'); atualizarModoAudio(); verConexaoDireta(); };
 document.querySelectorAll('[data-voltar]').forEach(b => b.onclick = () => {
   pararTx();
   if (trilhaAudio) { trilhaAudio.stop(); trilhaAudio = null; }
@@ -1862,6 +1901,7 @@ document.querySelectorAll('[data-voltar]').forEach(b => b.onclick = () => {
 $('#sel-audio').onchange = selecionarAudio;
 $('#bt-atualizar').onclick = listarAudio;
 $('#bt-comecar').onclick = comecar;
+$('#bt-direta').onclick = liberarConexaoDireta;
 $('#bt-parar').onclick = pararTx;
 $('#bt-copiar').onclick = () => copiar($('#codigo').textContent, $('#bt-copiar'), 'Copiar código');
 $('#bt-link').onclick = () => copiar(linkSala($('#codigo').textContent), $('#bt-link'), 'Copiar link');
