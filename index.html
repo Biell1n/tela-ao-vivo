@@ -168,6 +168,10 @@ select option{background:var(--sup-2)}
 .prog-passos{margin:0;padding-left:20px;font-size:13px;color:var(--sub)}
 .prog-passos li{margin:4px 0;text-wrap:pretty}
 .prog-passos b{color:var(--texto);font-weight:600}
+.prog-ajuda{font-size:13px;color:var(--sub);padding:12px 14px;border-radius:var(--r-s);background:rgba(244,181,63,.07);border:1px solid rgba(244,181,63,.25)}
+.prog-ajuda b{color:var(--texto);font-weight:600}
+.prog-ajuda ul{margin:8px 0 0;padding-left:18px}
+.prog-ajuda li{margin:5px 0;text-wrap:pretty}
 .prog-procurando{display:flex;align-items:center;gap:9px;margin:0;font-size:12.5px;color:var(--fraco)}
 .ponto-pulsa{width:7px;height:7px;border-radius:50%;background:var(--aviso);animation:pulsa 1.4s infinite}
 .prog-lista{list-style:none;margin:10px 0 0;padding:0;border:1px solid var(--linha);border-radius:var(--r-m);background:var(--bg-2);overflow:hidden}
@@ -434,6 +438,14 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
               <li>Pronto: esta parte muda sozinha quando o programa abrir.</li>
             </ol>
             <p class="prog-procurando"><span class="ponto-pulsa"></span>Procurando o programa no seu PC...</p>
+            <div id="prog-ajuda" class="prog-ajuda hidden">
+              <b>O programa já está aberto e o site não acha?</b> O navegador está bloqueando o site de falar com programas do seu PC.
+              <ul>
+                <li id="ajuda-brave"><b>Brave:</b> clique no ícone à esquerda do endereço › <b>Configurações do site</b> › <b>Acesso ao localhost</b> › <b>Permitir</b>. Se não achar, clique no leão do Brave e desligue os <b>Shields</b> pra este site. Depois aperte F5.</li>
+                <li><b>Chrome / Edge / Opera:</b> clique no ícone à esquerda do endereço › procure <b>Rede local</b> (ou "Acesso à rede local") › <b>Permitir</b>. Depois aperte F5.</li>
+                <li>Antivírus ou firewall às vezes bloqueiam também: libere o <b>TelaAoVivoAudio.exe</b>.</li>
+              </ul>
+            </div>
           </div>
           <div id="prog-dentro" class="hidden">
             <div class="seg" role="radiogroup" aria-label="O que vai no som">
@@ -876,6 +888,21 @@ const prog = {
 const ESCONDER_APPS = /^(svchost|audiodg|explorer|shellexperiencehost|systemsettings)\.exe$/i;
 
 // só procura o programa quando a pessoa escolheu essa opção (o Chrome pode pedir permissão de rede local)
+// procurando há um tempo (ou é o Brave, que bloqueia por padrão): mostra como liberar
+const EH_BRAVE = !!navigator.brave;
+let procurandoDesde = 0;
+function progAjuda() {
+  if (prog.conectado || radio('audio') !== 'app') { procurandoDesde = 0; $('#prog-ajuda').classList.add('hidden'); return; }
+  if (!procurandoDesde) procurandoDesde = Date.now();
+  const mostrar = EH_BRAVE || Date.now() - procurandoDesde > 10000;
+  $('#prog-ajuda').classList.toggle('hidden', !mostrar);
+  // no Brave, o passo do Brave vem primeiro e em destaque; nos outros, ele vem por último
+  const brave = $('#ajuda-brave');
+  if (EH_BRAVE && brave.parentNode.firstElementChild !== brave) brave.parentNode.prepend(brave);
+  if (!EH_BRAVE && brave.parentNode.lastElementChild !== brave) brave.parentNode.append(brave);
+}
+setInterval(() => { if (!$('#tx').classList.contains('hidden')) progAjuda(); }, 1000);
+
 function progProcurar() {
   if (prog.ws || radio('audio') !== 'app' || $('#tx').classList.contains('hidden')) return;
   let ws;
