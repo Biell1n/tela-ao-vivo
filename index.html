@@ -1437,8 +1437,9 @@ function tocar(s) {
 
 // ============================================================ volume extra (celular)
 // Em call no Discord o iPhone abaixa o som dos outros apps. Aqui o som da transmissão passa por um
-// ganho (até 4x) e um limitador, que segura os picos: fica bem mais alto sem estourar.
-const reforco = { ctx: null, src: null, trilha: null, ganho: null, mudo: false, nivel: Math.min(4, Math.max(1, +(guardar.get('reforco') || 1) || 1)) };
+// ganho (até 6x) e um limitador, que segura os picos: fica bem mais alto sem estourar.
+const REFORCO_MAX = 6;
+const reforco = { ctx: null, src: null, trilha: null, ganho: null, mudo: false, nivel: Math.min(REFORCO_MAX, Math.max(1, +(guardar.get('reforco') || 1) || 1)) };
 const reforcoAtivo = () => !!reforco.src;
 async function aplicarReforco() {
   const s = video.srcObject, trilha = s && s.getAudioTracks()[0];
@@ -1775,7 +1776,7 @@ $('#bt-stats').onclick = alternarStats;
 if (TOQUE) {
   $('#bt-reforco').classList.remove('hidden');
   mostrarReforco();
-  $('#bt-reforco').onclick = e => { e.stopPropagation(); definirReforco(reforco.nivel >= 4 ? 1 : reforco.nivel + 1, true); };
+  $('#bt-reforco').onclick = e => { e.stopPropagation(); definirReforco(reforco.nivel >= REFORCO_MAX ? 1 : reforco.nivel + 1, true); };
 }
 if (PODE_CALL) { $('#bt-call').classList.remove('hidden'); $('#bt-call').onclick = e => { e.stopPropagation(); alternarModoCall(); }; aplicarModoCall(); }
 $('#bt-sair').onclick = sairRx;
