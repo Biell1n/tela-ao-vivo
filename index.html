@@ -573,6 +573,7 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
       <span class="ao-vivo-rx">AO VIVO</span>
       <span id="info-rx"></span>
       <span class="flex"></span>
+      <button id="bt-qrx" class="bt-p" title="Qualidade pra você" aria-label="Qualidade pra você"><svg class="i"><use href="#i-stats"/></svg><span id="txt-qrx" class="rotulo-reforco">AUTO</span></button>
       <button id="bt-reforco" class="bt-p hidden" title="Volume extra" aria-label="Volume extra"><svg class="i"><use href="#i-som"/></svg><span id="txt-reforco" class="rotulo-reforco">1x</span></button>
       <button id="bt-call" class="bt-p hidden" title="Ouvir junto da call" aria-label="Ouvir junto da call do Discord"><svg class="i"><use href="#i-fone"/></svg><span class="txt">Junto da call</span></button>
       <button id="bt-stats" class="bt-p" title="Estatísticas (S)" aria-label="Estatísticas"><svg class="i"><use href="#i-stats"/></svg></button>
@@ -747,6 +748,7 @@ function resumoStats(st) {
 let peerTx = null, streamTx = null, trilhaAudio = null, audioDaCaptura = false, qualAtual = null;
 const chamadas = new Map();
 const conexoes = new Map(); // canal de dados com cada pessoa: manda pra ela a resolução real e o motivo de cair
+const pedidos = new Map();  // qualidade que cada pessoa pediu (celular pede menos; o AUTO baixa quando trava)
 let ctxAudio = null, rafNivel = 0, fonteNivel = null;
 
 function contexto() {
@@ -1159,8 +1161,15 @@ async function abrirSala(novo) {
   });
   p.on('connection', conn => {
     conn.on('open', () => { conexoes.set(conn.peer, conn); ligarPara(conn.peer); });
+    conn.on('data', d => {
+      if (!d || d.tipo !== 'pedido') return;
+      pedidos.set(conn.peer, { kbps: +d.kbps || 0, altura: +d.altura || 0, fps: +d.fps || 0 });
+      const c = chamadas.get(conn.peer);
+      if (c && c.peerConnection) aplicarParametros(c.peerConnection, conn.peer);
+    });
     conn.on('close', () => {
       if (conexoes.get(conn.peer) === conn) conexoes.delete(conn.peer);
+      pedidos.delete(conn.peer);
       const c = chamadas.get(conn.peer);
       if (c) { try { c.close(); } catch {} chamadas.delete(conn.peer); }
     });
@@ -1177,25 +1186,31 @@ function ligarPara(id) {
   chamadas.set(id, call);
   const pc = call.peerConnection;
   if (pc) pc.addEventListener('connectionstatechange', () => {
-    if (pc.connectionState === 'connected') aplicarParametros(pc);
+    if (pc.connectionState === 'connected') aplicarParametros(pc, id);
     if (pc.connectionState === 'failed') { try { call.close(); } catch {} }
   });
   call.on('close', () => { if (chamadas.get(id) === call) chamadas.delete(id); });
   call.on('error', () => {});
 }
 
-async function aplicarParametros(pc) {
+async function aplicarParametros(pc, id) {
   if (!qualAtual) return;
   const dica = radio('dica');
+  const ped = id ? pedidos.get(id) : null;
+  const vt = streamTx && streamTx.getVideoTracks()[0];
+  const alturaTela = (vt && vt.getSettings().height) || qualAtual.h;
   for (const s of pc.getSenders()) {
     if (!s.track) continue;
     const p = s.getParameters();
     if (!p.encodings || !p.encodings.length) continue;
     if (s.track.kind === 'video') {
-      p.encodings[0].maxBitrate = kbpsDe(qualAtual) * 1000;
+      // o que a pessoa pediu (ex.: celular em 720p) manda mais que a qualidade escolhida, se for menor
+      const kbps = ped && ped.kbps ? Math.min(kbpsDe(qualAtual), ped.kbps) : kbpsDe(qualAtual);
+      p.encodings[0].maxBitrate = kbps * 1000;
       p.encodings[0].priority = 'high';
       p.encodings[0].networkPriority = 'high';
-      p.encodings[0].maxFramerate = qualAtual.fps;
+      p.encodings[0].maxFramerate = ped && ped.fps ? Math.min(qualAtual.fps, ped.fps) : qualAtual.fps;
+      p.encodings[0].scaleResolutionDownBy = ped && ped.altura && alturaTela > ped.altura ? alturaTela / ped.altura : 1;
       p.degradationPreference = dica === 'detail' ? 'maintain-resolution' : qualAtual.h > 1080 ? 'balanced' : 'maintain-framerate';
     } else {
       p.encodings[0].maxBitrate = 160000;
@@ -1215,7 +1230,7 @@ async function trocarQualidade() {
   const vt = streamTx.getVideoTracks()[0];
   try { vt.contentHint = radio('dica'); } catch {}
   try { await vt.applyConstraints({ frameRate: { ideal: qualAtual.fps, max: qualAtual.fps }, width: { max: qualAtual.w }, height: { max: qualAtual.h } }); } catch {}
-  for (const c of chamadas.values()) if (c.peerConnection) aplicarParametros(c.peerConnection);
+  for (const [id, c] of chamadas) if (c.peerConnection) aplicarParametros(c.peerConnection, id);
 }
 
 function pararTx() {
@@ -1328,7 +1343,7 @@ function abrirCanal() {
   if (conRx) try { conRx.close(); } catch {}
   const con = peerRx.connect(PREFIXO + codigoRx, { reliable: true });
   conRx = con;
-  con.on('open', () => { if (!callRx) esperar('Conectado. Recebendo a imagem...'); });
+  con.on('open', () => { if (!callRx) esperar('Conectado. Recebendo a imagem...'); enviarPedido(); });
   con.on('data', d => { if (d && d.tipo === 'info') infoTx = { ...d, quando: Date.now() }; });
   con.on('close', () => { if (conRx === con && rxAtivo) agendarReconexao(2500, 'Seu amigo parou de transmitir. Esperando voltar...'); });
   con.on('error', () => {});
@@ -1358,10 +1373,93 @@ async function medirSomRx(pc) {
     : `chegando${nivel != null ? ` (nível ${nivel}%)` : ''}${video.muted ? ' · player MUDO: toque no vídeo' : ''}`;
 }
 
+// Qualidade de quem assiste. Cada pessoa pede a sua: celular começa em 1080p, PC na máxima.
+// Se a conexão nasce travando, quase sempre é o caminho que saiu ruim (ex.: caiu no servidor de
+// retransmissão): reconecta sozinho até 2 vezes pra sortear outro caminho. Só se continuar ruim,
+// o AUTO baixa um degrau; estável por 45 s, sobe de novo.
+const NIVEIS_RX = [
+  { rot: 'MÁX',  nome: 'máxima (a que quem transmite escolheu)', kbps: 0,    altura: 0,    fps: 0 },
+  { rot: '1080', nome: '1080p',                                   kbps: 8000, altura: 1080, fps: 60 },
+  { rot: '720',  nome: '720p',                                    kbps: 3500, altura: 720,  fps: 60 },
+  { rot: '540',  nome: '540p',                                    kbps: 1800, altura: 540,  fps: 30 },
+  { rot: '360',  nome: '360p',                                    kbps: 800,  altura: 360,  fps: 30 },
+];
+const EH_TOQUE = matchMedia('(pointer: coarse)').matches;
+const TETO_AUTO = EH_TOQUE ? 1 : 0; // no AUTO, o melhor que o celular pede é 1080p; o PC, a máxima
+const qRx = {
+  auto: guardar.get('qRxAuto') !== '0',
+  nivel: Math.min(NIVEIS_RX.length - 1, Math.max(0, +(guardar.get('qRxNivel') ?? TETO_AUTO) || 0)),
+  ruimDesde: 0, calmo: 0, ultimaTroca: 0, perdasAntes: 0, recebAntes: 0, travAntes: 0, historico: [],
+  conectouEm: 0, reconexoes: 0, estavelDesde: 0,
+};
+if (qRx.auto) qRx.nivel = TETO_AUTO;
+function enviarPedido() {
+  if (!conRx || !conRx.open) return;
+  const n = NIVEIS_RX[qRx.nivel];
+  try { conRx.send({ tipo: 'pedido', kbps: n.kbps, altura: n.altura, fps: n.fps }); } catch {}
+  mostrarQualidadeRx();
+}
+function mostrarQualidadeRx() {
+  const b = $('#txt-qrx');
+  if (b) b.textContent = (qRx.auto ? 'AUTO ' : '') + NIVEIS_RX[qRx.nivel].rot;
+}
+function trocarNivelRx(n, motivo) {
+  n = Math.min(NIVEIS_RX.length - 1, Math.max(0, n));
+  if (n === qRx.nivel) return;
+  qRx.nivel = n; qRx.ultimaTroca = Date.now(); qRx.calmo = 0;
+  if (!qRx.auto) guardar.set('qRxNivel', String(n));
+  enviarPedido();
+  if (motivo) avisoRx(motivo);
+}
+// chamado 1x por segundo com as estatísticas
+function ajustarQualidadeRx(st) {
+  const perdas = st.perdidos - qRx.perdasAntes, receb = st.recebidos - qRx.recebAntes, trav = st.travadas - qRx.travAntes;
+  qRx.perdasAntes = st.perdidos; qRx.recebAntes = st.recebidos; qRx.travAntes = st.travadas;
+  qRx.historico.push({ perdas: Math.max(0, perdas), receb: Math.max(0, receb), trav: Math.max(0, trav) });
+  if (qRx.historico.length > 8) qRx.historico.shift();
+  if (!qRx.auto) return;
+  const h = qRx.historico.reduce((a, x) => ({ perdas: a.perdas + x.perdas, receb: a.receb + x.receb, trav: a.trav + x.trav }), { perdas: 0, receb: 0, trav: 0 });
+  const perda = h.perdas / Math.max(1, h.perdas + h.receb);
+  const ruim = h.trav >= 2 || perda > 0.03;
+  const desdeTroca = Date.now() - qRx.ultimaTroca;
+  // 1º remédio: a conexão nasceu ruim? reconecta (é o "reiniciar até ficar liso", só que sozinho)
+  if (ruim && qRx.conectouEm && Date.now() - qRx.conectouEm > 4000 && Date.now() - qRx.conectouEm < 30000 && qRx.reconexoes < 2) {
+    reconectarPorTravar();
+    return;
+  }
+  if (!ruim) { if (!qRx.estavelDesde) qRx.estavelDesde = Date.now(); if (Date.now() - qRx.estavelDesde > 90000) qRx.reconexoes = 0; }
+  else qRx.estavelDesde = 0;
+  if (ruim && desdeTroca > 6000 && qRx.nivel < NIVEIS_RX.length - 1) {
+    trocarNivelRx(qRx.nivel + 1, `Conexão instável: baixei pra ${NIVEIS_RX[qRx.nivel + 1].nome} pra não travar.`);
+    qRx.historico = [];
+  } else if (!ruim && ++qRx.calmo > 45 && qRx.nivel > TETO_AUTO) {
+    trocarNivelRx(qRx.nivel - 1, `Conexão estável: subi pra ${NIVEIS_RX[qRx.nivel - 1].nome}.`);
+  }
+}
+function reconectarPorTravar() {
+  qRx.reconexoes++;
+  qRx.conectouEm = 0;
+  avisoRx(`A conexão veio travando: reconectando pra achar um caminho melhor (${qRx.reconexoes}/2)...`);
+  const c = callRx;
+  if (c) try { c.close(); } catch {} // o "close" da chamada já agenda a reconexão (canal e chamada novos)
+  if (conRx) { const k = conRx; conRx = null; try { k.close(); } catch {} }
+  setTimeout(() => { if (!callRx) esperar('Reconectando pra achar um caminho melhor...'); }, 60);
+}
+function alternarQualidadeRx() {
+  // AUTO → MÁX → 1080 → 720 → 540 → 360 → AUTO
+  if (qRx.auto) { qRx.auto = false; trocarNivelRx(0); }
+  else if (qRx.nivel < NIVEIS_RX.length - 1) trocarNivelRx(qRx.nivel + 1);
+  else { qRx.auto = true; qRx.calmo = 0; trocarNivelRx(TETO_AUTO); }
+  guardar.set('qRxAuto', qRx.auto ? '1' : '0');
+  if (!qRx.auto) guardar.set('qRxNivel', String(qRx.nivel));
+  enviarPedido();
+  avisoRx(qRx.auto ? 'Qualidade automática: baixa sozinha se travar e sobe quando estabiliza.' : `Qualidade fixa em ${NIVEIS_RX[qRx.nivel].nome}.`);
+}
+
 // Folga (buffer) da imagem de quem assiste. Começa no automático do navegador (já é pouca, ~50 ms).
 // Se a imagem travar, aumenta a folga: atrasa um pouquinho, mas para de congelar.
 const FOLGAS = [null, 150, 300, 500]; // ms; null = automático
-let folgaNivel = 0, travadasAntes = 0, travadasTempo = 0, folgaCalma = 0;
+let folgaNivel = matchMedia('(pointer: coarse)').matches ? 1 : 0, travadasAntes = 0, travadasTempo = 0, folgaCalma = 0;
 function aplicarFolga(r) {
   if (!r || !r.track) return;
   const ms = FOLGAS[folgaNivel];
@@ -1393,7 +1491,11 @@ function receberChamada(call) {
     pc.addEventListener('connectionstatechange', () => {
       if (callRx !== call) return;
       const st = pc.connectionState;
-      if (st === 'connected' && video.srcObject) esconderEspera();
+      if (st === 'connected') {
+        qRx.conectouEm = Date.now();
+        qRx.perdasAntes = qRx.recebAntes = qRx.travAntes = 0; qRx.historico = [];
+        if (video.srcObject) esconderEspera();
+      }
       if (st === 'disconnected') esperar('Conexão instável, aguardando...');
       if (st === 'failed') {
         try { call.close(); } catch {}
@@ -1699,6 +1801,7 @@ setInterval(async () => {
                  : 'reduzido pelo Chrome de quem transmite';
         }
         ajustarFolga(st);
+        ajustarQualidadeRx(st);
         await medirSomRx(callRx.peerConnection);
         function causaFps(i) {
           if (i.limite === 'bandwidth') return 'internet (upload) de quem transmite';
@@ -1720,7 +1823,8 @@ setInterval(async () => {
           `Ping        ${st.ping != null ? st.ping + ' ms' : '?'} (${st.rota || '?'})\n` +
           `Perdidos    ${st.perdidos} pacotes${st.recebidos ? ` (${(100 * st.perdidos / (st.perdidos + st.recebidos)).toFixed(1)}%)` : ''}\n` +
           `Travadas    ${st.travadas}${st.jitter != null ? ` · variação ${st.jitter} ms` : ''}\n` +
-          `Folga       ${FOLGAS[folgaNivel] == null ? 'automática' : FOLGAS[folgaNivel] + ' ms (aumentou porque travou)'}\n` +
+          `Folga       ${FOLGAS[folgaNivel] == null ? 'automática' : FOLGAS[folgaNivel] + ' ms'}\n` +
+          `Pra você    ${qRx.auto ? 'AUTO · ' : ''}${NIVEIS_RX[qRx.nivel].nome}\n` +
           `Som         ${somRx.texto}\n` +
           `Descartados ${st.descartados} quadros\nDecoder     ${st.decoder || '?'}` +
           (it && it.encoder ? `\nEncoder dele ${it.encoder}` : '');
@@ -1773,6 +1877,8 @@ $('#bt-full').onclick = alternarTelaCheia;
 $('#bt-pip').onclick = alternarPip;
 if (!video.requestPictureInPicture && !video.webkitSetPresentationMode) $('#bt-pip').classList.add('hidden');
 $('#bt-stats').onclick = alternarStats;
+$('#bt-qrx').onclick = e => { e.stopPropagation(); alternarQualidadeRx(); };
+mostrarQualidadeRx();
 if (TOQUE) {
   $('#bt-reforco').classList.remove('hidden');
   mostrarReforco();
