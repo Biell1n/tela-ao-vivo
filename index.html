@@ -168,6 +168,11 @@ select option{background:var(--sup-2)}
 .prog-passos{margin:0;padding-left:20px;font-size:13px;color:var(--sub)}
 .prog-passos li{margin:4px 0;text-wrap:pretty}
 .prog-passos b{color:var(--texto);font-weight:600}
+.card-celular{margin-top:12px;font-size:13.5px;color:var(--sub);padding:14px 16px;border-radius:var(--r-m);background:rgba(244,181,63,.07);border:1px solid rgba(244,181,63,.25)}
+.card-celular b{color:var(--texto);font-weight:600}
+.card-celular p{margin:0 0 8px}
+.card-celular ul{margin:6px 0 0;padding-left:18px}
+.card-celular li{margin:5px 0;text-wrap:pretty}
 .prog-ajuda{font-size:13px;color:var(--sub);padding:12px 14px;border-radius:var(--r-s);background:rgba(244,181,63,.07);border:1px solid rgba(244,181,63,.25)}
 .prog-ajuda b{color:var(--texto);font-weight:600}
 .prog-ajuda ul{margin:8px 0 0;padding-left:18px}
@@ -349,6 +354,7 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
   <symbol id="i-fone" viewBox="0 0 24 24"><path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="4.5" height="6.5" rx="1.5"/><rect x="16.5" y="14" width="4.5" height="6.5" rx="1.5"/></symbol>
   <symbol id="i-mais" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
   <symbol id="i-baixar" viewBox="0 0 24 24"><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/></symbol>
+  <symbol id="i-celular" viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M11 18.5h2"/></symbol>
   <symbol id="i-usuarios" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14.2A6.5 6.5 0 0 1 21.5 20"/></symbol>
 </svg>
 
@@ -382,6 +388,7 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
         <span><svg class="i"><use href="#i-monitor"/></svg>Tela inteira</span>
         <span><svg class="i"><use href="#i-janela"/></svg>Janela</span>
         <span><svg class="i"><use href="#i-aba"/></svg>Aba</span>
+        <span><svg class="i"><use href="#i-celular"/></svg>Tela do iPhone</span>
         <span><svg class="i"><use href="#i-fone"/></svg>Áudio sem o Discord</span>
       </span>
     </button>
@@ -415,6 +422,7 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
           <label class="op"><input type="radio" name="fonte" value="browser"><span class="op-caixa"><svg class="i"><use href="#i-aba"/></svg><span><b>Aba</b><small>Uma aba do Chrome</small></span></span></label>
         </div>
         <p id="dica-fonte" class="dica"></p>
+        <div id="card-celular" class="card-celular hidden"></div>
       </fieldset>
 
       <fieldset class="bloco" id="bloco-audio">
@@ -652,6 +660,13 @@ const TEXTO_CAPTURA = {
   browser: { titulo: 'Som da aba', etq: '',
              desc: 'Pega só o som da aba escolhida. Deixe marcado "Compartilhar áudio da aba" no seletor do Chrome.' },
 };
+// ---------- transmitir pelo celular
+// iPhone/iPad com iOS 27 (Safari) já deixa o site pegar a tela inteira do aparelho (abre o seletor de
+// transmissão do próprio iPhone). Android: nenhum navegador libera ainda (Chrome, Samsung, Firefox).
+const CELULAR_TX = matchMedia('(pointer: coarse)').matches && !matchMedia('(hover: hover)').matches;
+const EH_WEBKIT = /apple/i.test(navigator.vendor || '');
+const EH_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const PODE_TELA = !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
 const DICA_FONTE = {
   monitor: 'No seletor do Chrome, vá na aba "Tela inteira". Em jogos como Valorant, use "Janela em tela cheia" pra imagem não congelar.',
   window:  'No seletor do Chrome, vá na aba "Janela" e escolha o jogo ou app. Ele precisa estar aberto e não minimizado.',
@@ -873,6 +888,39 @@ function atualizarFonte() {
   $('#cap-etq').textContent = t.etq;
   $('#cap-etq').classList.toggle('hidden', !t.etq);
   $('#dica-fonte').textContent = DICA_FONTE[fonte];
+  if (CELULAR_TX) {
+    $('#cap-titulo').textContent = 'Som do celular';
+    $('#cap-etq').classList.add('hidden');
+    $('#cap-desc').textContent = 'Se o aparelho deixar, vai junto o som do que estiver tocando. Se não vier som, tente "Sem áudio" e use o som da call.';
+    $('#dica-fonte').textContent = 'Toque em Começar a transmitir e, na janela do iPhone, em "Iniciar transmissão". Depois pode abrir o jogo ou app que quiser.';
+  }
+}
+function prepararCelular() {
+  if (!CELULAR_TX) return;
+  // celular: só existe "a tela do aparelho"; programa de áudio e cabo virtual são coisas de PC
+  document.querySelectorAll('input[name="fonte"]').forEach(i => { if (i.value !== 'monitor') i.closest('.op').classList.add('hidden'); });
+  marcar('fonte', 'monitor');
+  const op = document.querySelector('input[name="fonte"][value="monitor"]').closest('.op');
+  op.querySelector('b').textContent = 'Tela do celular';
+  op.querySelector('small').textContent = 'Tudo que aparecer na tela';
+  ['app', 'device'].forEach(v => document.querySelector(`input[name="audio"][value="${v}"]`).closest('.op-l').classList.add('hidden'));
+  if (!['captura', 'none'].includes(radio('audio'))) marcar('audio', 'captura');
+  $('#card-direta').classList.add('hidden');
+  atualizarFonte();
+  if (PODE_TELA) return;
+  // sem a função: explica e mostra o caminho
+  const c = $('#card-celular');
+  c.innerHTML = EH_IOS
+    ? '<p><b>Esse iPhone ainda não deixa o site transmitir a tela.</b></p><ul><li>Atualize pro <b>iOS 27</b> (Ajustes › Geral › Atualização de Software).</li><li>Abra o site no <b>Safari</b> (é nele que a Apple liberou).</li></ul>'
+    : '<p><b>O Android ainda não deixa nenhum site transmitir a tela</b> (nem o Chrome, nem o Samsung Internet, nem o Firefox). É uma limitação do Android, não do site. No iPhone com iOS 27 já funciona.</p>' +
+      '<p>Pra transmitir o Android hoje, passe a tela dele pro PC e transmita pelo PC:</p><ul>' +
+      '<li><b>Vincular ao Celular</b> (já vem no Windows): espelha a tela de vários Android (Samsung e outros).</li>' +
+      '<li><b>scrcpy</b> (grátis): espelha qualquer Android pelo cabo USB ou Wi-Fi, com som.</li>' +
+      '<li>No PC, aqui no site, escolha <b>Janela</b> e selecione a janela do espelhamento.</li></ul>';
+  c.classList.remove('hidden');
+  $('#bt-comecar').disabled = true;
+  $('#dica-fonte').classList.add('hidden');
+  $('#bloco-audio').classList.add('hidden');
 }
 // escolheu "Aba": o natural é mandar o som da própria aba (o Chrome entrega certinho)
 function trocouFonte() {
@@ -1116,9 +1164,10 @@ async function comecar() {
   const fonte = radio('fonte'), modo = radio('audio'), dica = radio('dica');
   const pedeAudio = modo === 'captura';
   const opcoes = {
-    video: { displaySurface: fonte, frameRate: { ideal: qualAtual.fps, max: qualAtual.fps },
+    // Safari/iPhone: pedir qualquer tamanho faz ele capturar em ~640 px (bug do WebKit); lá vai sem restrição
+    video: EH_WEBKIT ? true : { displaySurface: fonte, frameRate: { ideal: qualAtual.fps, max: qualAtual.fps },
              width: { max: qualAtual.w }, height: { max: qualAtual.h } },
-    audio: pedeAudio ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false, suppressLocalAudioPlayback: false } : false,
+    audio: pedeAudio ? (EH_WEBKIT ? true : { echoCancellation: false, noiseSuppression: false, autoGainControl: false, suppressLocalAudioPlayback: false }) : false,
     selfBrowserSurface: 'exclude', surfaceSwitching: 'include', monitorTypeSurfaces: 'include',
   };
   if (pedeAudio) {
@@ -1131,6 +1180,12 @@ async function comecar() {
   let tela;
   try { tela = await navigator.mediaDevices.getDisplayMedia(opcoes); }
   catch (e) {
+    if (e.name !== 'NotAllowedError' && pedeAudio && CELULAR_TX) {
+      // o celular não aceitou levar o som junto: deixa pronto pra tentar só com a imagem
+      marcar('audio', 'none'); atualizarModoAudio();
+      statusTx('Esse aparelho não deixou levar o som junto. Toque em Começar de novo pra transmitir só a imagem.', 'aviso');
+      return;
+    }
     statusTx(e.name === 'NotAllowedError' ? 'Você cancelou a escolha da tela.' : 'Não deu pra capturar a tela (' + e.name + ').', 'aviso');
     return;
   }
@@ -1188,7 +1243,7 @@ async function abrirSala(novo) {
     $('#bt-copiar').disabled = $('#bt-link').disabled = false;
     $('#tag-vivo').classList.remove('hidden');
     $('#pill-vivo').classList.remove('hidden');
-    statusTx('Ao vivo. Mande o código ou o link pro seu amigo.', 'ok');
+    statusTx(CELULAR_TX ? 'Ao vivo. Mande o link e pode abrir o app ou jogo que quiser. Se parar ao sair do Safari, volte pra ele.' : 'Ao vivo. Mande o código ou o link pro seu amigo.', 'ok');
   });
   p.on('error', e => {
     if (peerTx !== p) return;
@@ -1241,7 +1296,8 @@ async function aplicarParametros(pc, id) {
   const dica = radio('dica');
   const ped = id ? pedidos.get(id) : null;
   const vt = streamTx && streamTx.getVideoTracks()[0];
-  const alturaTela = (vt && vt.getSettings().height) || qualAtual.h;
+  const cfg = vt ? vt.getSettings() : {};
+  const alturaTela = cfg.width && cfg.height ? Math.min(cfg.width, cfg.height) : qualAtual.h; // "1080p" = lado menor (vale pra tela em pé)
   for (const s of pc.getSenders()) {
     if (!s.track) continue;
     const p = s.getParameters();
@@ -1272,7 +1328,7 @@ async function trocarQualidade() {
   if (!streamTx) return;
   const vt = streamTx.getVideoTracks()[0];
   try { vt.contentHint = radio('dica'); } catch {}
-  try { await vt.applyConstraints({ frameRate: { ideal: qualAtual.fps, max: qualAtual.fps }, width: { max: qualAtual.w }, height: { max: qualAtual.h } }); } catch {}
+  if (!EH_WEBKIT) try { await vt.applyConstraints({ frameRate: { ideal: qualAtual.fps, max: qualAtual.fps }, width: { max: qualAtual.w }, height: { max: qualAtual.h } }); } catch {}
   for (const [id, c] of chamadas) if (c.peerConnection) aplicarParametros(c.peerConnection, id);
 }
 
@@ -1891,11 +1947,12 @@ marcar('audio', ['app', 'device', 'captura', 'none'].includes(guardar.get('modoA
 document.querySelectorAll('input[name="progmodo"]').forEach(i => i.onchange = () => { prog.modo = radio('progmodo'); progConfig(); progDesenharLista(); });
 marcar('dica', guardar.get('dica') === 'detail' ? 'detail' : 'motion');
 atualizarFonte();
+prepararCelular();
 document.querySelectorAll('input[name="fonte"]').forEach(i => i.onchange = trocouFonte);
 document.querySelectorAll('input[name="audio"]').forEach(i => i.onchange = atualizarModoAudio);
 document.querySelectorAll('input[name="dica"]').forEach(i => i.onchange = trocarQualidade);
 
-$('#bt-modo-tx').onclick = () => { mostrar('tx'); atualizarModoAudio(); verConexaoDireta(); };
+$('#bt-modo-tx').onclick = () => { mostrar('tx'); atualizarModoAudio(); if (!CELULAR_TX) verConexaoDireta(); };
 document.querySelectorAll('[data-voltar]').forEach(b => b.onclick = () => {
   pararTx();
   if (trilhaAudio) { trilhaAudio.stop(); trilhaAudio = null; }
