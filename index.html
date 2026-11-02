@@ -171,6 +171,7 @@ select option{background:var(--sup-2)}
 .prog-ajuda{font-size:13px;color:var(--sub);padding:12px 14px;border-radius:var(--r-s);background:rgba(244,181,63,.07);border:1px solid rgba(244,181,63,.25)}
 .prog-ajuda b{color:var(--texto);font-weight:600}
 .prog-ajuda ul{margin:8px 0 0;padding-left:18px}
+.prog-ajuda a{color:var(--acento)}
 .prog-ajuda li{margin:5px 0;text-wrap:pretty}
 .prog-procurando{display:flex;align-items:center;gap:9px;margin:0;font-size:12.5px;color:var(--fraco)}
 .ponto-pulsa{width:7px;height:7px;border-radius:50%;background:var(--aviso);animation:pulsa 1.4s infinite}
@@ -449,7 +450,8 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
               <b>O programa já está aberto e o site não acha?</b> O navegador está bloqueando o site de falar com programas do seu PC.
               <ul>
                 <li id="ajuda-brave"><b>Brave:</b> clique no ícone à esquerda do endereço › <b>Configurações do site</b> › <b>Acesso ao localhost</b> › <b>Permitir</b>. Se não achar, clique no leão do Brave e desligue os <b>Shields</b> pra este site. Depois aperte F5.</li>
-                <li><b>Chrome / Edge / Opera:</b> clique no ícone à esquerda do endereço › procure <b>Rede local</b> (ou "Acesso à rede local") › <b>Permitir</b>. Depois aperte F5.</li>
+                <li><b>Chrome / Edge / Opera:</b> clique no ícone à esquerda do endereço › <b>Configurações do site</b> e coloque em <b>Permitir</b> as duas: <b>"Apps neste dispositivo"</b> (ou "Aplicativos no dispositivo") e <b>"Rede local"</b>. Depois aperte F5. Liberar só a "Rede local" não basta: o programa conta como app do próprio PC.</li>
+                <li><b>Teste rápido:</b> abra <a href="http://localhost:47800/" target="_blank" rel="noopener">localhost:47800</a> numa aba nova. Se aparecer <code>tela-ao-vivo-audio</code>, o programa está certo e é o navegador que está bloqueando (veja os itens acima). Se a página não abrir, o problema é no programa: feche pelo ícone perto do relógio (botão direito › Sair) e abra de novo; se a janela dele disser "Não consegui abrir a porta", outro programa está usando a mesma porta.</li>
                 <li>Antivírus ou firewall às vezes bloqueiam também: libere o <b>TelaAoVivoAudio.exe</b>.</li>
               </ul>
             </div>
@@ -925,10 +927,13 @@ function progAjuda() {
 }
 setInterval(() => { if (!$('#tx').classList.contains('hidden')) progAjuda(); }, 1000);
 
+let progTentativa = 0;
 function progProcurar() {
   if (prog.ws || radio('audio') !== 'app' || $('#tx').classList.contains('hidden')) return;
   let ws;
-  try { ws = new WebSocket('ws://localhost:47800/'); } catch { return; }
+  // alterna "localhost" e "127.0.0.1": se um estiver ocupado por outro programa (ou o IPv6 bloqueado), o outro resolve
+  progTentativa = (progTentativa + 1) % 2;
+  try { ws = new WebSocket(progTentativa ? 'ws://127.0.0.1:47800/' : 'ws://localhost:47800/'); } catch { return; }
   ws.binaryType = 'arraybuffer';
   prog.ws = ws;
   ws.onopen = async () => {
