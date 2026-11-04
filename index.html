@@ -271,6 +271,12 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
 #player{position:fixed;inset:0;z-index:10;background:#000;overflow:hidden}
 #player:not(.ativo){cursor:none}
 #video{width:100%;height:100%;object-fit:contain;background:#000;display:block;touch-action:manipulation}
+#video.girado{position:absolute;top:50%;left:50%;max-width:none}
+.giro-tx{display:grid;grid-template-columns:repeat(3,1fr);padding:3px;border-radius:var(--r-m);background:var(--bg-2);border:1px solid var(--linha);margin-top:12px}
+.giro-tx label{position:relative;cursor:pointer}
+.giro-tx input{position:absolute;opacity:0;pointer-events:none}
+.giro-tx span{display:block;padding:8px 4px;border-radius:9px;font-size:13px;font-weight:500;color:var(--sub);text-align:center;transition:background .2s,color .2s}
+.giro-tx input:checked+span{background:var(--sup-3);color:var(--texto)}
 #espera{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;background:var(--bg);text-align:center;padding:24px}
 #espera p{margin:0;color:var(--sub);max-width:420px;font-size:15px;text-wrap:balance}
 .sinal{display:flex;align-items:flex-end;gap:5px;height:34px}
@@ -354,6 +360,7 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
   <symbol id="i-fone" viewBox="0 0 24 24"><path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="4.5" height="6.5" rx="1.5"/><rect x="16.5" y="14" width="4.5" height="6.5" rx="1.5"/></symbol>
   <symbol id="i-mais" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
   <symbol id="i-baixar" viewBox="0 0 24 24"><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/></symbol>
+  <symbol id="i-girar" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.5M20 4v4.5h-4.5"/><rect x="8" y="10" width="8" height="10" rx="1.5" transform="rotate(-90 12 15)"/></symbol>
   <symbol id="i-celular" viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M11 18.5h2"/></symbol>
   <symbol id="i-usuarios" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14.2A6.5 6.5 0 0 1 21.5 20"/></symbol>
 </svg>
@@ -422,6 +429,15 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
           <label class="op"><input type="radio" name="fonte" value="browser"><span class="op-caixa"><svg class="i"><use href="#i-aba"/></svg><span><b>Aba</b><small>Uma aba do Chrome</small></span></span></label>
         </div>
         <p id="dica-fonte" class="dica"></p>
+        <div id="bloco-giro" class="hidden">
+          <p class="rotulo-campo" style="margin:14px 0 0">Vai jogar com o celular deitado?</p>
+          <div class="giro-tx" role="radiogroup" aria-label="Orientação do jogo">
+            <label><input type="radio" name="giro" value="0"><span>Em pé</span></label>
+            <label><input type="radio" name="giro" value="270"><span>Deitado ↺</span></label>
+            <label><input type="radio" name="giro" value="90"><span>Deitado ↻</span></label>
+          </div>
+          <p class="dica">O iPhone manda a imagem sempre em pé. Escolhendo aqui, quem assiste já recebe girado. Se ficar de cabeça pra baixo, troque pro outro "Deitado" (dá pra trocar com a transmissão rolando).</p>
+        </div>
         <div id="card-celular" class="card-celular hidden"></div>
       </fieldset>
 
@@ -593,6 +609,7 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
       <span class="ao-vivo-rx">AO VIVO</span>
       <span id="info-rx"></span>
       <span class="flex"></span>
+      <button id="bt-girar" class="bt-p" title="Girar a imagem" aria-label="Girar a imagem"><svg class="i"><use href="#i-girar"/></svg></button>
       <button id="bt-qrx" class="bt-p" title="Qualidade pra você" aria-label="Qualidade pra você"><svg class="i"><use href="#i-stats"/></svg><span id="txt-qrx" class="rotulo-reforco">AUTO</span></button>
       <button id="bt-reforco" class="bt-p hidden" title="Volume extra" aria-label="Volume extra"><svg class="i"><use href="#i-som"/></svg><span id="txt-reforco" class="rotulo-reforco">1x</span></button>
       <button id="bt-call" class="bt-p hidden" title="Ouvir junto da call" aria-label="Ouvir junto da call do Discord"><svg class="i"><use href="#i-fone"/></svg><span class="txt">Junto da call</span></button>
@@ -897,6 +914,11 @@ function atualizarFonte() {
 }
 function prepararCelular() {
   if (!CELULAR_TX) return;
+  if (PODE_TELA) {
+    $('#bloco-giro').classList.remove('hidden');
+    marcar('giro', ['0', '90', '270'].includes(guardar.get('giroTx')) ? guardar.get('giroTx') : '0');
+    document.querySelectorAll('input[name="giro"]').forEach(i => i.onchange = () => guardar.set('giroTx', radio('giro')));
+  }
   // celular: só existe "a tela do aparelho"; programa de áudio e cabo virtual são coisas de PC
   document.querySelectorAll('input[name="fonte"]').forEach(i => { if (i.value !== 'monitor') i.closest('.op').classList.add('hidden'); });
   marcar('fonte', 'monitor');
@@ -1394,6 +1416,7 @@ function iniciarAssistir() {
   $('#erro-codigo').classList.add('hidden');
   if (typeof Peer === 'undefined') { $('#erro-peer').classList.remove('hidden'); return; }
   codigoRx = c;
+  giroRx = 0; giroManual = false; aplicarGiro();
   guardar.set('ultimoCodigo', c);
   rxAtivo = true;
   mostrar('rx-player');
@@ -1443,7 +1466,12 @@ function abrirCanal() {
   const con = peerRx.connect(PREFIXO + codigoRx, { reliable: true });
   conRx = con;
   con.on('open', () => { if (!callRx) esperar('Conectado. Recebendo a imagem...'); enviarPedido(); });
-  con.on('data', d => { if (d && d.tipo === 'info') infoTx = { ...d, quando: Date.now() }; });
+  con.on('data', d => {
+    if (!d || d.tipo !== 'info') return;
+    infoTx = { ...d, quando: Date.now() };
+    // quem transmite pelo celular disse que o jogo está deitado: gira sozinho (se a pessoa não girou na mão)
+    if (d.giro != null && !giroManual && d.giro !== giroRx) { giroRx = d.giro; aplicarGiro(); }
+  });
   con.on('close', () => { if (conRx === con && rxAtivo) agendarReconexao(2500, 'Seu amigo parou de transmitir. Esperando voltar...'); });
   con.on('error', () => {});
 }
@@ -1544,6 +1572,24 @@ function reconectarPorTravar() {
   if (c) try { c.close(); } catch {} // o "close" da chamada já agenda a reconexão (canal e chamada novos)
   if (conRx) { const k = conRx; conRx = null; try { k.close(); } catch {} }
   setTimeout(() => { if (!callRx) esperar('Reconectando pra achar um caminho melhor...'); }, 60);
+}
+// Girar a imagem (celular transmitindo jogo deitado chega de lado: o iPhone manda sempre em pé)
+let giroRx = 0, giroManual = false;
+function aplicarGiro() {
+  const v = video;
+  if (!giroRx) { v.classList.remove('girado'); v.style.width = v.style.height = v.style.transform = ''; return; }
+  const r = player.getBoundingClientRect();
+  const lado = giroRx % 180 !== 0;
+  v.classList.add('girado');
+  v.style.width = (lado ? r.height : r.width) + 'px';
+  v.style.height = (lado ? r.width : r.height) + 'px';
+  v.style.transform = `translate(-50%,-50%) rotate(${giroRx}deg)`;
+}
+function girarRx() {
+  giroRx = (giroRx + 90) % 360;
+  giroManual = true;
+  aplicarGiro();
+  avisoRx(giroRx ? `Imagem girada ${giroRx}°. Toque de novo pra girar mais.` : 'Imagem na posição original.');
 }
 function alternarQualidadeRx() {
   // AUTO → MÁX → 1080 → 720 → 540 → 360 → AUTO
@@ -1783,7 +1829,8 @@ async function alternarTelaCheia() {
   }
   if (pedir) {
     // celular: vira de lado sozinho quando o vídeo é deitado
-    if (TOQUE && video.videoWidth >= video.videoHeight) try { await screen.orientation.lock('landscape'); } catch {}
+    const deitado = giroRx % 180 ? video.videoHeight >= video.videoWidth : video.videoWidth >= video.videoHeight;
+    if (TOQUE && deitado) try { await screen.orientation.lock('landscape'); } catch {}
     return;
   }
   // iPhone: só o próprio <video> entra em tela cheia (com os controles do sistema)
@@ -1864,7 +1911,8 @@ setInterval(async () => {
         if (conn && conn.open) try {
           conn.send({ tipo: 'info', capW: vs ? vs.width : 0, capH: vs ? vs.height : 0, w: s.w, h: s.h, limite: s.limite,
                       qualidade: qualAtual ? qualAtual.nome : '', encoder: (tipoEncoder(s.encoder) || [''])[0], codec: s.codec,
-                      fps: s.fps, fpsCaptura: s.fpsCaptura, fpsAlvo: qualAtual ? qualAtual.fps : 0 });
+                      fps: s.fps, fpsCaptura: s.fpsCaptura, fpsAlvo: qualAtual ? qualAtual.fps : 0,
+                      giro: CELULAR_TX ? +(radio('giro') || 0) : null });
         } catch {}
       }
       if (todas[0]) {
@@ -1980,6 +2028,10 @@ $('#bt-pip').onclick = alternarPip;
 if (!video.requestPictureInPicture && !video.webkitSetPresentationMode) $('#bt-pip').classList.add('hidden');
 $('#bt-stats').onclick = alternarStats;
 $('#bt-qrx').onclick = e => { e.stopPropagation(); alternarQualidadeRx(); };
+$('#bt-girar').onclick = e => { e.stopPropagation(); girarRx(); };
+window.addEventListener('resize', aplicarGiro);
+document.addEventListener('fullscreenchange', () => setTimeout(aplicarGiro, 50));
+document.addEventListener('webkitfullscreenchange', () => setTimeout(aplicarGiro, 50));
 mostrarQualidadeRx();
 if (TOQUE) {
   $('#bt-reforco').classList.remove('hidden');
