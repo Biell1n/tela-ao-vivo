@@ -3,6 +3,7 @@
 Compartilhe a tela com áudio direto pelo navegador, sem configurar porta nem firewall.
 
 - **Quem transmite:** Transmitir → escolhe **Tela inteira / Janela / Aba** → escolhe o áudio → **Começar a transmitir** → manda o código ou o link.
+- **Câmera:** escolha "Câmera" pra transmitir só ela (com microfone), ou marque "Câmera por cima da tela" (estilo OBS) e arraste a câmera na prévia pra posicionar; dá pra mudar tamanho, retângulo/círculo e esconder ao vivo.
 - **Quem assiste:** digita o código na página inicial, ou abre o link (`?c=codigo`).
 
 ## Áudio

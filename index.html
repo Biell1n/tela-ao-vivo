@@ -113,7 +113,32 @@ h1 em{font-style:normal;color:var(--acento)}
 .num{width:22px;height:22px;border-radius:7px;display:grid;place-items:center;background:var(--sup-3);font:600 11.5px var(--mono);color:var(--sub)}
 .bloco[disabled] .op,.bloco [disabled]+.linha-op{cursor:not-allowed}
 
-.fontes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.fontes{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.bloco-cam{margin-top:14px}
+.cam-liga{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:var(--r-m);background:var(--bg-2);border:1px solid var(--linha);cursor:pointer;transition:border-color .2s}
+.cam-liga:hover{border-color:var(--linha-2)}
+.cam-liga:has(input:checked){border-color:var(--acento);background:linear-gradient(180deg,var(--acento-suave),transparent 80%),var(--bg-2)}
+.cam-liga input{width:18px;height:18px;margin:2px 0 0;accent-color:var(--acento);flex:none;cursor:pointer}
+.cam-liga b{font-size:14px;font-weight:600}
+.cam-liga small{display:block;color:var(--fraco);font-size:12.5px;line-height:1.4;margin-top:2px}
+.cam-liga:has(input:disabled){opacity:.6;cursor:not-allowed}
+.cam-opcoes{margin-top:12px}
+.cam-linha{display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap}
+.cam-linha .rotulo-campo{margin:0}
+.cam-linha input[type=range]{flex:1;min-width:120px;accent-color:var(--acento)}
+.cam-tam-txt{font:500 12.5px var(--mono);color:var(--sub);min-width:36px;text-align:right}
+.cam-forma{flex:1;min-width:200px;margin-top:0}
+.cam-cantos{display:grid;grid-template-columns:repeat(4,36px);gap:6px}
+.cam-cantos button{height:36px;border-radius:9px;background:var(--bg-2);border:1px solid var(--linha);color:var(--sub);font-size:16px;transition:border-color .2s,color .2s}
+.cam-cantos button:hover{border-color:var(--acento);color:var(--texto)}
+.cam-check{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13.5px;color:var(--sub);cursor:pointer}
+.cam-check input{accent-color:var(--acento);width:16px;height:16px}
+.cam-caixa{position:absolute;border:2px dashed var(--acento);border-radius:8px;cursor:move;touch-action:none;box-shadow:0 0 0 1px rgba(0,0,0,.4)}
+.cam-caixa.circ{border-radius:50%}
+.cam-alca{position:absolute;right:-7px;bottom:-7px;width:16px;height:16px;border-radius:4px;background:var(--acento);cursor:nwse-resize;touch-action:none}
+.bt-quadro{position:absolute;left:12px;bottom:12px;display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 12px;border-radius:10px;
+  background:rgba(13,14,16,.72);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.1);color:#eceef2;font-size:13px;font-weight:500;transition:background .2s}
+.bt-quadro:hover{background:rgba(30,32,38,.88)}
 .op{position:relative;cursor:pointer}
 .op input,.op-l input,.seg input{position:absolute;opacity:0;pointer-events:none}
 .op-caixa{display:flex;flex-direction:column;gap:12px;height:100%;padding:14px;border-radius:var(--r-m);background:var(--bg-2);border:1px solid var(--linha);
@@ -322,7 +347,7 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
   .tela{padding:16px}
   .topo{padding:16px 16px 0}
   .specs{grid-template-columns:repeat(2,auto)}
-  .fontes{grid-template-columns:1fr}
+  .fontes{grid-template-columns:1fr 1fr}
   .op-caixa{flex-direction:row;align-items:center}
   .sala{grid-template-columns:1fr}
   .sala-bt{flex-direction:row}
@@ -361,6 +386,7 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
   <symbol id="i-mais" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
   <symbol id="i-baixar" viewBox="0 0 24 24"><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/></symbol>
   <symbol id="i-girar" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.5M20 4v4.5h-4.5"/><rect x="8" y="10" width="8" height="10" rx="1.5" transform="rotate(-90 12 15)"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24"><path d="M3 8a2 2 0 0 1 2-2h2l1.5-2h7L17 6h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><circle cx="12" cy="13" r="3.5"/></symbol>
   <symbol id="i-celular" viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M11 18.5h2"/></symbol>
   <symbol id="i-usuarios" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14.2A6.5 6.5 0 0 1 21.5 20"/></symbol>
 </svg>
@@ -427,8 +453,33 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
           <label class="op"><input type="radio" name="fonte" value="monitor"><span class="op-caixa"><svg class="i"><use href="#i-monitor"/></svg><span><b>Tela inteira</b><small>O monitor todo</small></span></span></label>
           <label class="op"><input type="radio" name="fonte" value="window"><span class="op-caixa"><svg class="i"><use href="#i-janela"/></svg><span><b>Janela</b><small>Só um jogo ou app</small></span></span></label>
           <label class="op"><input type="radio" name="fonte" value="browser"><span class="op-caixa"><svg class="i"><use href="#i-aba"/></svg><span><b>Aba</b><small>Uma aba do Chrome</small></span></span></label>
+          <label class="op"><input type="radio" name="fonte" value="camera"><span class="op-caixa"><svg class="i"><use href="#i-camera"/></svg><span><b>Câmera</b><small>Só a câmera</small></span></span></label>
         </div>
         <p id="dica-fonte" class="dica"></p>
+        <div id="bloco-cam" class="bloco-cam">
+          <label class="cam-liga" id="op-cam-junto"><input type="checkbox" id="cam-junto"><span><b>Câmera por cima da tela</b><span class="etq rec">ESTILO OBS</span>
+            <small>Sua câmera num cantinho da transmissão. Depois de começar, arraste ela na prévia pra posicionar.</small></span></label>
+          <div id="cam-opcoes" class="cam-opcoes hidden">
+            <label class="rotulo-campo" for="sel-cam">Câmera</label>
+            <select id="sel-cam"><option value="">Carregando...</option></select>
+            <div id="cam-layout">
+              <div class="cam-linha"><span class="rotulo-campo">Tamanho</span><input type="range" id="cam-tam" min="10" max="50" step="1" aria-label="Tamanho da câmera"><span id="cam-tam-txt" class="cam-tam-txt">25%</span></div>
+              <div class="cam-linha">
+                <div class="seg cam-forma" role="radiogroup" aria-label="Forma da câmera">
+                  <label><input type="radio" name="camforma" value="ret"><span>Retângulo</span></label>
+                  <label><input type="radio" name="camforma" value="circ"><span>Círculo</span></label>
+                </div>
+                <div class="cam-cantos" aria-label="Posição rápida">
+                  <button type="button" data-canto="ce" title="Canto de cima, esquerda">↖</button>
+                  <button type="button" data-canto="cd" title="Canto de cima, direita">↗</button>
+                  <button type="button" data-canto="be" title="Canto de baixo, esquerda">↙</button>
+                  <button type="button" data-canto="bd" title="Canto de baixo, direita">↘</button>
+                </div>
+              </div>
+              <label class="cam-check"><input type="checkbox" id="cam-espelho"> Espelhar a câmera (como no espelho)</label>
+            </div>
+          </div>
+        </div>
         <div id="bloco-giro" class="hidden">
           <p class="rotulo-campo" style="margin:14px 0 0">Vai jogar com o celular deitado?</p>
           <div class="giro-tx" role="radiogroup" aria-label="Orientação do jogo">
@@ -451,8 +502,8 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
             <span><b id="cap-titulo">Som do Windows inteiro</b><span id="cap-etq" class="etq alerta">INCLUI A CALL</span>
             <small id="cap-desc">Pega tudo, inclusive a voz dos seus amigos. Bom só quando você não está em call.</small></span></label>
           <label class="op-l"><input type="radio" name="audio" value="device"><span class="radio"></span>
-            <span><b>Cabo virtual (Voicemeeter ou VB-Cable)</b>
-            <small>Pra quem já tem cabo de áudio virtual configurado.</small></span></label>
+            <span><b id="disp-titulo">Cabo virtual (Voicemeeter ou VB-Cable)</b>
+            <small id="disp-desc">Pra quem já tem cabo de áudio virtual configurado.</small></span></label>
           <label class="op-l"><input type="radio" name="audio" value="none"><span class="radio"></span>
             <span><b>Sem áudio</b><small>Só a imagem.</small></span></label>
         </div>
@@ -563,6 +614,8 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
         <div id="quadro-vazio" class="quadro-vazio cantos"><svg class="i"><use href="#i-monitor"/></svg>A prévia aparece aqui</div>
         <span id="tag-vivo" class="tag-vivo hidden"><span class="ponto"></span>AO VIVO</span>
         <span id="tag-res" class="tag-res hidden"></span>
+        <div id="cam-caixa" class="cam-caixa hidden" title="Arraste pra mover · puxe o canto pra mudar o tamanho"><span class="cam-alca"></span></div>
+        <button id="bt-cam-onoff" class="bt-quadro hidden"><svg class="i"><use href="#i-camera"/></svg><span>Esconder câmera</span></button>
       </div>
 
       <div class="sala">
@@ -688,6 +741,7 @@ const DICA_FONTE = {
   monitor: 'No seletor do Chrome, vá na aba "Tela inteira". Em jogos como Valorant, use "Janela em tela cheia" pra imagem não congelar.',
   window:  'No seletor do Chrome, vá na aba "Janela" e escolha o jogo ou app. Ele precisa estar aberto e não minimizado.',
   browser: 'No seletor do Chrome, vá na aba "Guia do Chrome" e escolha a aba (YouTube, por exemplo).',
+  camera:  'Transmite só a câmera, com o microfone. Pra câmera junto da tela (estilo OBS), escolha Tela inteira, Janela ou Aba e marque "Câmera por cima da tela".',
 };
 
 // ------------------------------------------------------------ util
@@ -850,12 +904,13 @@ function trilhaSilenciosa() {
 }
 async function pegarAudio(dev) {
   if (!dev || dev === 'none') return trilhaSilenciosa();
-  const s = await navigator.mediaDevices.getUserMedia({ audio: {
-    deviceId: { exact: dev }, echoCancellation: false, noiseSuppression: false, autoGainControl: false,
-    channelCount: { ideal: 2 }, sampleRate: { ideal: 48000 },
-  }});
+  const voz = radio('fonte') === 'camera'; // microfone: tira eco e ruído; cabo virtual: som cru do jogo
+  const s = await navigator.mediaDevices.getUserMedia({ audio: voz
+    ? { deviceId: { exact: dev }, echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+    : { deviceId: { exact: dev }, echoCancellation: false, noiseSuppression: false, autoGainControl: false,
+        channelCount: { ideal: 2 }, sampleRate: { ideal: 48000 } } });
   const t = s.getAudioTracks()[0];
-  try { t.contentHint = 'music'; } catch {}
+  try { t.contentHint = voz ? 'speech' : 'music'; } catch {}
   return t;
 }
 function medir(track) {
@@ -894,13 +949,16 @@ async function listarAudio() {
   if (!devs.length) sel.add(new Option('Nenhum dispositivo encontrado', ''));
   devs.forEach(d => sel.add(new Option(d.label || 'Dispositivo de áudio', d.deviceId)));
   const salvo = guardar.get('audioDev');
-  const escolhido = devs.find(d => d.deviceId === salvo)
-    || devs.find(d => /voicemeeter out b3/i.test(d.label))
-    || devs.find(d => /^cable output/i.test(d.label));
+  const virtual = d => /voicemeeter|cable|virtual|vb-audio/i.test(d.label);
+  const escolhido = radio('fonte') === 'camera'
+    ? (devs.find(d => d.deviceId === guardar.get('micDev')) || devs.find(d => !virtual(d)))
+    : (devs.find(d => d.deviceId === salvo)
+      || devs.find(d => /voicemeeter out b3/i.test(d.label))
+      || devs.find(d => /^cable output/i.test(d.label)));
   // sem cabo virtual achado: não escolhe um microfone por conta própria
   if (!escolhido) { sel.add(new Option('Escolha o cabo virtual...', ''), 0); sel.value = ''; }
   else sel.value = escolhido.deviceId;
-  if (!devs.some(d => /voicemeeter|cable|virtual/i.test(d.label))) $('#guia').open = true;
+  if (radio('fonte') !== 'camera' && !devs.some(d => /voicemeeter|cable|virtual/i.test(d.label))) $('#guia').open = true;
   await selecionarAudio();
 }
 
@@ -923,7 +981,7 @@ async function trocarTrilha(nova) {
 async function selecionarAudio() {
   if (radio('audio') !== 'device') return;
   const dev = $('#sel-audio').value;
-  guardar.set('audioDev', dev);
+  guardar.set(radio('fonte') === 'camera' ? 'micDev' : 'audioDev', dev);
   let nova;
   try { nova = await pegarAudio(dev); }
   catch (e) { statusTx('Não consegui abrir esse áudio (' + (e.name || e.message) + ').', 'erro'); nova = trilhaSilenciosa(); }
@@ -931,24 +989,42 @@ async function selecionarAudio() {
   await trocarTrilha(nova);
   medir(dev ? nova : null);
   const rot = $('#sel-audio').selectedOptions[0];
-  $('#aviso-disp').classList.toggle('hidden', !dev || !rot || /voicemeeter|cable|virtual|vb-audio|stereo mix|mixagem/i.test(rot.text));
+  $('#aviso-disp').classList.toggle('hidden', radio('fonte') === 'camera' || !dev || !rot || /voicemeeter|cable|virtual|vb-audio|stereo mix|mixagem/i.test(rot.text));
 }
 
 function atualizarFonte() {
   const fonte = radio('fonte');
   guardar.set('fonte', fonte);
   const t = TEXTO_CAPTURA[fonte];
-  $('#cap-titulo').textContent = t.titulo;
-  $('#cap-desc').textContent = t.desc;
-  $('#cap-etq').textContent = t.etq;
-  $('#cap-etq').classList.toggle('hidden', !t.etq);
-  $('#dica-fonte').textContent = DICA_FONTE[fonte];
-  if (CELULAR_TX) {
+  if (t) {
+    $('#cap-titulo').textContent = t.titulo;
+    $('#cap-desc').textContent = t.desc;
+    $('#cap-etq').textContent = t.etq;
+    $('#cap-etq').classList.toggle('hidden', !t.etq);
+  }
+  $('#dica-fonte').textContent = DICA_FONTE[fonte] || '';
+  ajustarAudioPraFonte();
+  mostrarOpcoesCamera();
+  if (CELULAR_TX && fonte !== 'camera') {
     $('#cap-titulo').textContent = 'Som do celular';
     $('#cap-etq').classList.add('hidden');
     $('#cap-desc').textContent = 'Se o aparelho deixar, vai junto o som do que estiver tocando. Se não vier som, tente "Sem áudio" e use o som da call.';
     $('#dica-fonte').textContent = 'Toque em Começar a transmitir e, na janela do iPhone, em "Iniciar transmissão". Depois pode abrir o jogo ou app que quiser.';
   }
+}
+function ajustarAudioPraFonte() {
+  const cam = radio('fonte') === 'camera';
+  const op = v => document.querySelector(`input[name="audio"][value="${v}"]`).closest('.op-l');
+  // câmera: o som é do microfone (ou do programa/cabo no PC); "som da tela" não existe
+  op('captura').classList.toggle('hidden', cam);
+  op('device').classList.toggle('hidden', CELULAR_TX && !cam);
+  op('app').classList.toggle('hidden', CELULAR_TX);
+  $('#disp-titulo').textContent = cam ? 'Microfone' : 'Cabo virtual (Voicemeeter ou VB-Cable)';
+  $('#disp-desc').textContent = cam ? 'Sua voz junto da câmera.' : 'Pra quem já tem cabo de áudio virtual configurado.';
+  $('#guia').classList.toggle('hidden', cam);
+  const naTela = !$('#tx').classList.contains('hidden');
+  if (cam && radio('audio') === 'captura') { marcar('audio', 'device'); if (naTela) atualizarModoAudio(); }
+  if (!cam && CELULAR_TX && radio('audio') === 'device') { marcar('audio', 'captura'); if (naTela) atualizarModoAudio(); }
 }
 function prepararCelular() {
   if (!CELULAR_TX) return;
@@ -958,13 +1034,12 @@ function prepararCelular() {
     document.querySelectorAll('input[name="giro"]').forEach(i => i.onchange = () => guardar.set('giroTx', radio('giro')));
   }
   // celular: só existe "a tela do aparelho"; programa de áudio e cabo virtual são coisas de PC
-  document.querySelectorAll('input[name="fonte"]').forEach(i => { if (i.value !== 'monitor') i.closest('.op').classList.add('hidden'); });
-  marcar('fonte', 'monitor');
+  document.querySelectorAll('input[name="fonte"]').forEach(i => { if (i.value !== 'monitor' && i.value !== 'camera') i.closest('.op').classList.add('hidden'); });
+  if (radio('fonte') !== 'camera') marcar('fonte', 'monitor');
   const op = document.querySelector('input[name="fonte"][value="monitor"]').closest('.op');
   op.querySelector('b').textContent = 'Tela do celular';
   op.querySelector('small').textContent = 'Tudo que aparecer na tela';
-  ['app', 'device'].forEach(v => document.querySelector(`input[name="audio"][value="${v}"]`).closest('.op-l').classList.add('hidden'));
-  if (!['captura', 'none'].includes(radio('audio'))) marcar('audio', 'captura');
+  if (radio('fonte') !== 'camera' && !['captura', 'none'].includes(radio('audio'))) marcar('audio', 'captura');
   $('#card-direta').classList.add('hidden');
   atualizarFonte();
   if (PODE_TELA) return;
@@ -976,11 +1051,14 @@ function prepararCelular() {
       '<p>Pra transmitir o Android hoje, passe a tela dele pro PC e transmita pelo PC:</p><ul>' +
       '<li><b>Vincular ao Celular</b> (já vem no Windows): espelha a tela de vários Android (Samsung e outros).</li>' +
       '<li><b>scrcpy</b> (grátis): espelha qualquer Android pelo cabo USB ou Wi-Fi, com som.</li>' +
-      '<li>No PC, aqui no site, escolha <b>Janela</b> e selecione a janela do espelhamento.</li></ul>';
+      '<li>No PC, aqui no site, escolha <b>Janela</b> e selecione a janela do espelhamento.</li></ul>' +
+      '<p style="margin-top:8px"><b>A câmera do celular funciona:</b> escolha "Câmera" acima.</p>';
   c.classList.remove('hidden');
-  $('#bt-comecar').disabled = true;
-  $('#dica-fonte').classList.add('hidden');
-  $('#bloco-audio').classList.add('hidden');
+  // sem tela: a câmera vira a fonte
+  document.querySelector('input[name="fonte"][value="monitor"]').closest('.op').classList.add('hidden');
+  $('#bloco-giro').classList.add('hidden');
+  marcar('fonte', 'camera');
+  atualizarFonte();
 }
 // escolheu "Aba": o natural é mandar o som da própria aba (o Chrome entrega certinho)
 function trocouFonte() {
@@ -1216,7 +1294,183 @@ function notaAudio(msg) {
 
 function travarConfig(travar) {
   document.querySelectorAll('input[name="fonte"], input[name="audio"]').forEach(i => i.disabled = travar);
+  $('#cam-junto').disabled = travar;
+  $('#sel-cam').disabled = travar;
 }
+
+// ============================================================ câmera (como fonte, ou por cima da tela estilo OBS)
+const camLayout = Object.assign({ x: 0.73, y: 0.66, w: 0.25, forma: 'ret', espelho: true },
+  (() => { try { return JSON.parse(guardar.get('camLayout') || '{}'); } catch { return {}; } })());
+let camVisivel = true, composicao = null, camerasListadas = false;
+function salvarLayout() { guardar.set('camLayout', JSON.stringify(camLayout)); posicionarCaixaCam(); }
+
+async function listarCameras() {
+  const sel = $('#sel-cam');
+  let devs = [];
+  try { devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput'); } catch {}
+  if (devs.length && !devs[0].label) {
+    // sem permissão ainda os nomes vêm vazios: pede uma vez e lista de novo
+    try { const st = await navigator.mediaDevices.getUserMedia({ video: true }); st.getTracks().forEach(t => t.stop()); } catch {}
+    try { devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput'); } catch {}
+  }
+  sel.innerHTML = '';
+  if (!devs.length) sel.add(new Option('Nenhuma câmera encontrada', ''));
+  devs.forEach((d, i) => sel.add(new Option(d.label || 'Câmera ' + (i + 1), d.deviceId)));
+  const salvo = guardar.get('camDev');
+  if (devs.some(d => d.deviceId === salvo)) sel.value = salvo;
+  camerasListadas = true;
+}
+async function abrirCamera(w, h, fps) {
+  const dev = $('#sel-cam').value;
+  const st = await navigator.mediaDevices.getUserMedia({ video: {
+    ...(dev ? { deviceId: { exact: dev } } : { facingMode: 'user' }),
+    width: { ideal: w }, height: { ideal: h }, frameRate: { ideal: fps } } });
+  const t = st.getVideoTracks()[0];
+  try { t.contentHint = 'motion'; } catch {}
+  return t;
+}
+
+// Junta tela + câmera num vídeo só. Usa os "Insertable Streams" do Chrome: os quadros chegam e são
+// desenhados conforme a tela/câmera mandam (sem timer), então continua rodando com a aba escondida,
+// enquanto você joga. Cada quadro novo da tela OU da câmera gera um quadro novo da transmissão.
+const PODE_COMPOR = 'MediaStreamTrackProcessor' in window && 'MediaStreamTrackGenerator' in window && 'VideoFrame' in window && 'OffscreenCanvas' in window;
+function comporTelaECamera(telaTrack, camTrack, fps) {
+  const gen = new MediaStreamTrackGenerator({ kind: 'video' });
+  const escritor = gen.writable.getWriter();
+  let tela = null, cam = null, parado = false, ultimo = 0, canvas = null, ctx = null, ocupado = false;
+  const intervalo = 1000 / Math.max(15, fps) - 1.5;
+  const comp = { track: gen, camAsp: 9 / 16, parar };
+  async function desenhar() {
+    if (parado || ocupado || !tela) return;
+    const agora = performance.now();
+    if (agora - ultimo < intervalo) return;
+    ocupado = true; ultimo = agora;
+    try {
+      const W = tela.displayWidth, H = tela.displayHeight;
+      if (!canvas || canvas.width !== W || canvas.height !== H) { canvas = new OffscreenCanvas(W, H); ctx = canvas.getContext('2d'); }
+      ctx.drawImage(tela, 0, 0, W, H);
+      if (cam && camVisivel) desenharCamera(ctx, cam, W, H);
+      await escritor.write(new VideoFrame(canvas, { timestamp: Math.round(agora * 1000) }));
+    } catch {}
+    ocupado = false;
+  }
+  async function ler(track, ehTela) {
+    const leitor = new MediaStreamTrackProcessor({ track }).readable.getReader();
+    while (!parado) {
+      let r;
+      try { r = await leitor.read(); } catch { break; }
+      if (r.done) break;
+      if (ehTela) { if (tela) tela.close(); tela = r.value; }
+      else { if (cam) cam.close(); cam = r.value; comp.camAsp = cam.displayHeight / cam.displayWidth; }
+      desenhar();
+    }
+  }
+  ler(telaTrack, true);
+  ler(camTrack, false);
+  function parar() {
+    parado = true;
+    try { telaTrack.stop(); } catch {}
+    try { camTrack.stop(); } catch {}
+    try { gen.stop(); } catch {}
+    setTimeout(() => { try { tela && tela.close(); } catch {} try { cam && cam.close(); } catch {} }, 200);
+  }
+  return comp;
+}
+function desenharCamera(ctx, f, W, H) {
+  const cw = f.displayWidth, ch = f.displayHeight;
+  const circ = camLayout.forma === 'circ';
+  const w = Math.round(W * camLayout.w), h = circ ? w : Math.round(w * ch / cw);
+  const x = Math.round(Math.min(Math.max(camLayout.x, 0), 1 - camLayout.w) * W);
+  const y = Math.round(Math.min(Math.max(camLayout.y, 0), 1 - h / H) * H);
+  // recorte da câmera: no círculo, o quadrado do meio
+  let sx = 0, sy = 0, sw = cw, sh = ch;
+  if (circ) { const lado = Math.min(cw, ch); sx = (cw - lado) / 2; sy = (ch - lado) / 2; sw = sh = lado; }
+  ctx.save();
+  ctx.beginPath();
+  if (circ) ctx.arc(x + w / 2, y + h / 2, w / 2, 0, Math.PI * 2);
+  else ctx.roundRect(x, y, w, h, Math.round(w * 0.05));
+  ctx.clip();
+  if (camLayout.espelho) { ctx.translate(x + w, y); ctx.scale(-1, 1); ctx.drawImage(f, sx, sy, sw, sh, 0, 0, w, h); }
+  else ctx.drawImage(f, sx, sy, sw, sh, x, y, w, h);
+  ctx.restore();
+  ctx.save();
+  ctx.lineWidth = Math.max(2, Math.round(W * 0.002));
+  ctx.strokeStyle = 'rgba(255,255,255,.85)';
+  ctx.beginPath();
+  if (circ) ctx.arc(x + w / 2, y + h / 2, w / 2, 0, Math.PI * 2);
+  else ctx.roundRect(x, y, w, h, Math.round(w * 0.05));
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ---------- caixa na prévia pra arrastar/redimensionar a câmera
+function retanguloPrevia() {
+  const pv = $('#preview'), q = $('.quadro').getBoundingClientRect();
+  const vw = pv.videoWidth, vh = pv.videoHeight;
+  if (!vw || !vh) return null;
+  const esc = Math.min(q.width / vw, q.height / vh);
+  const w = vw * esc, h = vh * esc;
+  return { x: (q.width - w) / 2, y: (q.height - h) / 2, w, h };
+}
+function posicionarCaixaCam() {
+  const cx = $('#cam-caixa');
+  const R = composicao && retanguloPrevia();
+  if (!R || !camVisivel) { cx.classList.add('hidden'); return; }
+  const circ = camLayout.forma === 'circ';
+  const w = camLayout.w * R.w;
+  const h = circ ? w : w * composicao.camAsp;
+  const x = Math.min(Math.max(camLayout.x, 0), 1 - camLayout.w) * R.w;
+  const y = Math.min(Math.max(camLayout.y, 0), 1 - h / R.h) * R.h;
+  Object.assign(cx.style, { left: R.x + x + 'px', top: R.y + y + 'px', width: w + 'px', height: h + 'px' });
+  cx.classList.toggle('circ', circ);
+  cx.classList.remove('hidden');
+}
+setInterval(() => { if (composicao) posicionarCaixaCam(); }, 400);
+window.addEventListener('resize', posicionarCaixaCam);
+(function arrastarCam() {
+  const cx = $('#cam-caixa');
+  let modo = null, ini = null;
+  cx.addEventListener('pointerdown', e => {
+    const R = retanguloPrevia(); if (!R) return;
+    modo = e.target.classList.contains('cam-alca') ? 'tamanho' : 'mover';
+    ini = { px: e.clientX, py: e.clientY, x: camLayout.x, y: camLayout.y, w: camLayout.w, R };
+    cx.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  cx.addEventListener('pointermove', e => {
+    if (!modo) return;
+    const dx = (e.clientX - ini.px) / ini.R.w, dy = (e.clientY - ini.py) / ini.R.h;
+    if (modo === 'mover') {
+      camLayout.x = Math.min(Math.max(ini.x + dx, 0), 1 - camLayout.w);
+      camLayout.y = Math.min(Math.max(ini.y + dy, 0), 0.98);
+    } else {
+      camLayout.w = Math.min(Math.max(ini.w + dx, 0.08), 0.6);
+      $('#cam-tam').value = Math.round(camLayout.w * 100);
+      $('#cam-tam-txt').textContent = Math.round(camLayout.w * 100) + '%';
+    }
+    posicionarCaixaCam();
+  });
+  const soltar = () => { if (modo) { modo = null; salvarLayout(); } };
+  cx.addEventListener('pointerup', soltar);
+  cx.addEventListener('pointercancel', soltar);
+})();
+function cantoCam(c) {
+  const m = 0.02, alt = (camLayout.forma === 'circ' ? camLayout.w * 16 / 9 : camLayout.w * 16 / 9 * ((composicao && composicao.camAsp) || 9 / 16));
+  camLayout.x = c[1] === 'e' ? m : 1 - camLayout.w - m;
+  camLayout.y = c[0] === 'c' ? m * 16 / 9 : Math.max(0, 1 - alt - m * 16 / 9);
+  salvarLayout();
+}
+function mostrarOpcoesCamera() {
+  const fonte = radio('fonte');
+  const soCamera = fonte === 'camera';
+  const junto = !soCamera && $('#cam-junto').checked;
+  // celular e navegador sem a montagem: só "câmera" como fonte
+  $('#op-cam-junto').classList.toggle('hidden', soCamera || CELULAR_TX || !PODE_COMPOR);
+  $('#cam-opcoes').classList.toggle('hidden', !(soCamera || junto));
+  $('#cam-layout').classList.toggle('hidden', soCamera);
+  if ((soCamera || junto) && !camerasListadas && !$('#tx').classList.contains('hidden')) listarCameras();
+}
+
 
 async function comecar() {
   if (typeof Peer === 'undefined') { statusTx('O componente de conexão não carregou. Confira a internet e aperte F5.', 'erro'); return; }
@@ -1238,6 +1492,13 @@ async function comecar() {
   }
   notaAudio('');
   let tela;
+  if (fonte === 'camera') {
+    let ct;
+    try { ct = await abrirCamera(qualAtual.w, qualAtual.h, Math.min(60, qualAtual.fps)); }
+    catch (e) { statusTx(e.name === 'NotAllowedError' ? 'O navegador não deixou usar a câmera. Libere a permissão e tente de novo.' : 'Não consegui abrir a câmera (' + e.name + ').', 'erro'); return; }
+    guardar.set('camDev', $('#sel-cam').value);
+    tela = new MediaStream([ct]);
+  } else
   try { tela = await navigator.mediaDevices.getDisplayMedia(opcoes); }
   catch (e) {
     if (e.name !== 'NotAllowedError' && pedeAudio && CELULAR_TX) {
@@ -1249,9 +1510,24 @@ async function comecar() {
     statusTx(e.name === 'NotAllowedError' ? 'Você cancelou a escolha da tela.' : 'Não deu pra capturar a tela (' + e.name + ').', 'aviso');
     return;
   }
-  const vt = tela.getVideoTracks()[0];
-  try { vt.contentHint = dica; } catch {}
+  let vt = tela.getVideoTracks()[0];
+  try { vt.contentHint = fonte === 'camera' ? 'motion' : dica; } catch {}
   vt.addEventListener('ended', pararTx);
+
+  // estilo OBS: junta a tela com a câmera por cima
+  if (fonte !== 'camera' && $('#cam-junto').checked && PODE_COMPOR && !CELULAR_TX) {
+    let ct = null;
+    try { ct = await abrirCamera(1280, 720, 30); guardar.set('camDev', $('#sel-cam').value); }
+    catch (e) { statusTx('Não consegui abrir a câmera (' + e.name + '). Transmitindo só a tela.', 'aviso'); }
+    if (ct) {
+      composicao = comporTelaECamera(vt, ct, qualAtual.fps);
+      vt = composicao.track;
+      try { vt.contentHint = dica; } catch {}
+      camVisivel = true;
+      $('#bt-cam-onoff').classList.remove('hidden');
+      $('#bt-cam-onoff span').textContent = 'Esconder câmera';
+    }
+  }
 
   if (modo === 'captura') {
     const at = tela.getAudioTracks()[0];
@@ -1405,6 +1681,9 @@ async function trocarQualidade() {
 }
 
 function pararTx() {
+  if (composicao) { const c = composicao; composicao = null; c.parar(); }
+  $('#cam-caixa').classList.add('hidden');
+  $('#bt-cam-onoff').classList.add('hidden');
   for (const c of chamadas.values()) try { c.close(); } catch {}
   chamadas.clear();
   if (peerTx) { const p = peerTx; peerTx = null; try { p.destroy(); } catch {} }
@@ -2040,7 +2319,7 @@ $('#turbo').checked = guardar.get('turbo') === '1';
 $('#turbo').onchange = () => { guardar.set('turbo', $('#turbo').checked ? '1' : '0'); dicaQualidade(); trocarQualidade(); };
 dicaQualidade();
 
-marcar('fonte', ['monitor', 'window', 'browser'].includes(guardar.get('fonte')) ? guardar.get('fonte') : 'monitor');
+marcar('fonte', ['monitor', 'window', 'browser', 'camera'].includes(guardar.get('fonte')) ? guardar.get('fonte') : 'monitor');
 marcar('audio', ['app', 'device', 'captura', 'none'].includes(guardar.get('modoAudio')) ? guardar.get('modoAudio') : 'app');
 document.querySelectorAll('input[name="progmodo"]').forEach(i => i.onchange = () => { prog.modo = radio('progmodo'); progConfig(); progDesenharLista(); });
 marcar('dica', guardar.get('dica') === 'detail' ? 'detail' : 'motion');
@@ -2050,7 +2329,7 @@ document.querySelectorAll('input[name="fonte"]').forEach(i => i.onchange = troco
 document.querySelectorAll('input[name="audio"]').forEach(i => i.onchange = atualizarModoAudio);
 document.querySelectorAll('input[name="dica"]').forEach(i => i.onchange = trocarQualidade);
 
-$('#bt-modo-tx').onclick = () => { mostrar('tx'); atualizarModoAudio(); if (!CELULAR_TX) verConexaoDireta(); };
+$('#bt-modo-tx').onclick = () => { mostrar('tx'); atualizarModoAudio(); mostrarOpcoesCamera(); if (!CELULAR_TX) verConexaoDireta(); };
 document.querySelectorAll('[data-voltar]').forEach(b => b.onclick = () => {
   pararTx();
   if (trilhaAudio) { trilhaAudio.stop(); trilhaAudio = null; }
@@ -2061,6 +2340,22 @@ document.querySelectorAll('[data-voltar]').forEach(b => b.onclick = () => {
 $('#sel-audio').onchange = selecionarAudio;
 $('#bt-atualizar').onclick = listarAudio;
 $('#bt-comecar').onclick = comecar;
+$('#cam-junto').checked = guardar.get('camJunto') === '1';
+$('#cam-junto').onchange = () => { guardar.set('camJunto', $('#cam-junto').checked ? '1' : '0'); mostrarOpcoesCamera(); };
+$('#sel-cam').onchange = () => guardar.set('camDev', $('#sel-cam').value);
+$('#cam-tam').value = Math.round(camLayout.w * 100);
+$('#cam-tam-txt').textContent = Math.round(camLayout.w * 100) + '%';
+$('#cam-tam').oninput = () => { camLayout.w = +$('#cam-tam').value / 100; $('#cam-tam-txt').textContent = $('#cam-tam').value + '%'; salvarLayout(); };
+marcar('camforma', camLayout.forma === 'circ' ? 'circ' : 'ret');
+document.querySelectorAll('input[name="camforma"]').forEach(i => i.onchange = () => { camLayout.forma = radio('camforma'); salvarLayout(); });
+$('#cam-espelho').checked = camLayout.espelho !== false;
+$('#cam-espelho').onchange = () => { camLayout.espelho = $('#cam-espelho').checked; salvarLayout(); };
+document.querySelectorAll('[data-canto]').forEach(b => b.onclick = () => cantoCam(b.dataset.canto));
+$('#bt-cam-onoff').onclick = () => {
+  camVisivel = !camVisivel;
+  $('#bt-cam-onoff span').textContent = camVisivel ? 'Esconder câmera' : 'Mostrar câmera';
+  posicionarCaixaCam();
+};
 $('#bt-direta').onclick = liberarConexaoDireta;
 $('#bt-parar').onclick = pararTx;
 $('#bt-copiar').onclick = () => copiar($('#codigo').textContent, $('#bt-copiar'), 'Copiar código');
