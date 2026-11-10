@@ -1981,7 +1981,7 @@ setInterval(async () => {
           if (st.rota) m.append(chip(st.rota));
           const enc = tipoEncoder(st.encoder);
           if (enc) m.append(chip(enc[0], enc[1]));
-          if (st.codec) m.append(chip(st.codec, /h264/i.test(st.codec) ? '' : 'ruim'));
+          if (st.codec) m.append(chip(st.codec, /vp8/i.test(st.codec) ? 'ruim' : /h265|av1/i.test(st.codec) ? 'bom' : ''));
           if (st.limite === 'bandwidth') m.append(chip('limitado pelo upload', 'ruim'));
           if (st.limite === 'cpu') m.append(chip('limitado pelo processador', 'ruim'));
         }
@@ -2014,7 +2014,7 @@ setInterval(async () => {
           (it && it.capW ? `Tela dele   ${it.capW}×${it.capH}\n` : '') +
           (porque ? `Por quê      ${porque.replace('reduzido: ', '')}\n` : '') +
           (it && it.qualidade ? `Qualidade   ${it.qualidade}\n` : '') +
-          (st.codec ? `Formato     ${st.codec}${/h264/i.test(st.codec) ? '' : ' (sem placa de vídeo: pesa no PC dele)'}\n` : '') +
+          (st.codec ? `Formato     ${st.codec}${/vp8/i.test(st.codec) ? ' (antigo, sem placa de vídeo: pesa no PC dele)' : /h265|av1/i.test(st.codec) ? ' (moderno: mais imagem com menos internet)' : ''}\n` : '') +
           `FPS         ${st.fps}${it && it.fpsAlvo ? ` de ${it.fpsAlvo}` : ''}${it && it.fpsCaptura != null ? ` (captura dele: ${it.fpsCaptura})` : ''}\n` +
           (it && it.fpsAlvo && st.fps < it.fpsAlvo * 0.8 ? `FPS caindo  ${causaFps(it)}\n` : '') +
           `Taxa        ${st.mbps.toFixed(2)} Mbps\n` +
