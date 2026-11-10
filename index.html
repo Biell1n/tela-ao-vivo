@@ -720,19 +720,29 @@ function chip(txt, cls = '', ico = '') {
   return s;
 }
 
-// H264 primeiro (encoder da placa de vídeo), Opus estéreo e com mais qualidade
-function ajustarSDP(sdp) {
+// Formato do vídeo escolhido primeiro (codec = "H265", "AV1", "VP9" ou "H264"; null = não mexe na ordem,
+// usado na resposta de quem assiste pra valer a escolha de quem transmite). Opus estéreo, com mais
+// qualidade e com correção de perda (FEC) pra internet ruim.
+function ajustarSDP(sdp, codec = 'H264') {
   let linhas = sdp.split('\r\n');
   const opus = (sdp.match(/a=rtpmap:(\d+) opus\/48000/i) || [])[1];
-  const h264 = [];
-  linhas.forEach(l => { const m = l.match(/^a=rtpmap:(\d+) H264\/90000/i); if (m) h264.push(m[1]); });
-  const h264pm1 = h264.filter(pt => linhas.some(l => l.startsWith('a=fmtp:' + pt + ' ') && /packetization-mode=1/.test(l)));
-  const preferidos = h264pm1.length ? h264pm1 : h264;
+  const pts = nome => { const r = []; linhas.forEach(l => { const m = l.match(new RegExp('^a=rtpmap:(\\d+) ' + nome + '/90000', 'i')); if (m) r.push(m[1]); }); return r; };
+  const fmtp = pt => linhas.find(l => l.startsWith('a=fmtp:' + pt + ' ')) || '';
+  let preferidos = [];
+  if (codec === 'H264') {
+    const h264 = pts('H264');
+    const pm1 = h264.filter(pt => /packetization-mode=1/.test(fmtp(pt)));
+    preferidos = pm1.length ? pm1 : h264;
+  } else if (codec) {
+    preferidos = pts(codec);
+    if (codec === 'VP9') preferidos = preferidos.filter(pt => !/profile-id=[12]/.test(fmtp(pt))); // VP9: só o perfil 0 (o comum)
+    if (!preferidos.length) { const h = pts('H264'); preferidos = h.filter(pt => /packetization-mode=1/.test(fmtp(pt))); if (!preferidos.length) preferidos = h; }
+  }
 
   linhas = linhas.map(l => {
     if (opus && l.startsWith('a=fmtp:' + opus + ' ')) {
-      const base = l.replace(/;?\s*(stereo|sprop-stereo|maxaveragebitrate)=[^;]*/g, '');
-      return base + ';stereo=1;sprop-stereo=1;maxaveragebitrate=160000';
+      const base = l.replace(/;?\s*(stereo|sprop-stereo|maxaveragebitrate|useinbandfec|usedtx)=[^;]*/g, '');
+      return base + ';stereo=1;sprop-stereo=1;maxaveragebitrate=160000;useinbandfec=1;usedtx=0';
     }
     const fm = l.match(/^a=fmtp:(\d+) /);
     if (fm && preferidos.includes(fm[1]) && !/x-google-start-bitrate/.test(l)) {
@@ -748,6 +758,26 @@ function ajustarSDP(sdp) {
   });
   return linhas.join('\r\n');
 }
+
+// Quais formatos este aparelho faz no hardware (placa de vídeo/chip). H.265 e AV1 entregam a mesma imagem
+// com ~30-50% menos internet que o H.264; só vale se os DOIS lados fazem no hardware.
+const FORMATOS_BONS = ['AV1', 'H265', 'VP9'];
+async function formatosHardware(tipo) {
+  const ok = [];
+  try {
+    const Cls = tipo === 'enc' ? RTCRtpSender : RTCRtpReceiver;
+    const caps = (Cls.getCapabilities && Cls.getCapabilities('video') || { codecs: [] }).codecs.map(c => c.mimeType.split('/')[1].toUpperCase());
+    for (const c of FORMATOS_BONS) {
+      if (!caps.includes(c) || !navigator.mediaCapabilities) continue;
+      const cfg = { type: 'webrtc', video: { contentType: 'video/' + c, width: 1920, height: 1080, bitrate: 6000000, framerate: 60 } };
+      const r = await (tipo === 'enc' ? navigator.mediaCapabilities.encodingInfo(cfg) : navigator.mediaCapabilities.decodingInfo(cfg));
+      if (r.supported && r.powerEfficient) ok.push(c);
+    }
+  } catch {}
+  return ok;
+}
+const formatosEnc = formatosHardware('enc'); // promessa: quem transmite
+const formatosDec = formatosHardware('dec'); // promessa: quem assiste
 
 const statsAnteriores = new WeakMap();
 async function lerStats(pc, tipo) {
@@ -800,6 +830,14 @@ let peerTx = null, streamTx = null, trilhaAudio = null, audioDaCaptura = false, 
 const chamadas = new Map();
 const conexoes = new Map(); // canal de dados com cada pessoa: manda pra ela a resolução real e o motivo de cair
 const pedidos = new Map();  // qualidade que cada pessoa pediu (celular pede menos; o AUTO baixa quando trava)
+const esperandoPedido = new Map(); // quem abriu o canal e ainda não mandou o pedido (com o formato que decodifica)
+let formatosEncLista = [];
+formatosEnc.then(l => { formatosEncLista = l; });
+function formatoPara(id) {
+  const ped = pedidos.get(id);
+  const dec = ped && ped.decod;
+  return (dec && FORMATOS_BONS.find(c => formatosEncLista.includes(c) && dec.includes(c))) || 'H264';
+}
 let ctxAudio = null, rafNivel = 0, fonteNivel = null;
 
 function contexto() {
@@ -1280,10 +1318,20 @@ async function abrirSala(novo) {
     setTimeout(() => { if (peerTx === p && !p.destroyed && p.disconnected) try { p.reconnect(); } catch {} }, 2000);
   });
   p.on('connection', conn => {
-    conn.on('open', () => { conexoes.set(conn.peer, conn); ligarPara(conn.peer); });
+    conn.on('open', () => {
+      conexoes.set(conn.peer, conn);
+      // espera um instante o "pedido" (diz o que o aparelho decodifica); quem tem versão antiga do site não manda
+      const t = setTimeout(() => ligarPara(conn.peer), 1500);
+      esperandoPedido.set(conn.peer, () => { clearTimeout(t); ligarPara(conn.peer); });
+    });
     conn.on('data', d => {
       if (!d || d.tipo !== 'pedido') return;
-      pedidos.set(conn.peer, { kbps: +d.kbps || 0, altura: +d.altura || 0, fps: +d.fps || 0 });
+      pedidos.set(conn.peer, { kbps: +d.kbps || 0, altura: +d.altura || 0, fps: +d.fps || 0, decod: Array.isArray(d.decod) ? d.decod : null });
+      const pronto = esperandoPedido.get(conn.peer);
+      if (pronto) { esperandoPedido.delete(conn.peer); pronto(); return; }
+      // o pedido chegou depois da ligação sair: se agora dá pra usar um formato melhor, refaz a ligação nele
+      const atual = chamadas.get(conn.peer);
+      if (atual && atual.__formato && atual.__formato !== formatoPara(conn.peer)) { ligarPara(conn.peer); return; }
       const c = chamadas.get(conn.peer);
       if (c && c.peerConnection) aplicarParametros(c.peerConnection, conn.peer);
     });
@@ -1301,8 +1349,10 @@ function ligarPara(id) {
   if (!streamTx || !peerTx) return;
   const antiga = chamadas.get(id);
   if (antiga) try { antiga.close(); } catch {}
-  const call = peerTx.call(id, streamTx, { sdpTransform: ajustarSDP });
+  const formato = formatoPara(id);
+  const call = peerTx.call(id, streamTx, { sdpTransform: sdp => ajustarSDP(sdp, formato) });
   if (!call) return;
+  call.__formato = formato;
   chamadas.set(id, call);
   const pc = call.peerConnection;
   if (pc) pc.addEventListener('connectionstatechange', () => {
@@ -1332,7 +1382,7 @@ async function aplicarParametros(pc, id) {
       p.encodings[0].networkPriority = 'high';
       p.encodings[0].maxFramerate = ped && ped.fps ? Math.min(qualAtual.fps, ped.fps) : qualAtual.fps;
       p.encodings[0].scaleResolutionDownBy = ped && ped.altura && alturaTela > ped.altura ? alturaTela / ped.altura : 1;
-      p.degradationPreference = dica === 'detail' ? 'maintain-resolution' : qualAtual.h > 1080 ? 'balanced' : 'maintain-framerate';
+      p.degradationPreference = dica === 'detail' ? 'maintain-resolution' : 'balanced';
     } else {
       p.encodings[0].maxBitrate = 160000;
       p.encodings[0].priority = 'high';
@@ -1523,7 +1573,7 @@ if (qRx.auto) qRx.nivel = TETO_AUTO;
 function enviarPedido() {
   if (!conRx || !conRx.open) return;
   const n = NIVEIS_RX[qRx.nivel];
-  try { conRx.send({ tipo: 'pedido', kbps: n.kbps, altura: n.altura, fps: n.fps }); } catch {}
+  formatosDec.then(dec => { try { conRx && conRx.open && conRx.send({ tipo: 'pedido', kbps: n.kbps, altura: n.altura, fps: n.fps, decod: dec }); } catch {} });
   mostrarQualidadeRx();
 }
 function mostrarQualidadeRx() {
@@ -1629,7 +1679,7 @@ function receberChamada(call) {
   if (!rxAtivo) { try { call.close(); } catch {} return; }
   if (callRx && callRx !== call) try { callRx.close(); } catch {}
   callRx = call;
-  call.answer(undefined, { sdpTransform: ajustarSDP });
+  call.answer(undefined, { sdpTransform: s => ajustarSDP(s, null) }); // vale o formato que quem transmite escolheu
   const pc = call.peerConnection;
   if (pc) {
     pc.addEventListener('track', e => aplicarFolga(e.receiver));
