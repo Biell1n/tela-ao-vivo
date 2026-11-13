@@ -55,6 +55,21 @@ svg.i{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-widt
   max-width:1240px;width:100%;margin:0 auto;padding:22px 24px 0}
 .logo{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:-.01em;font-size:16px}
 .tally{width:10px;height:10px;border-radius:50%;background:var(--acento);box-shadow:0 0 0 4px var(--acento-suave)}
+.topo-dir{display:flex;align-items:center;gap:10px}
+.link-baixar{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 13px;border-radius:10px;background:var(--sup-2);border:1px solid var(--linha-2);
+  color:var(--texto);font-size:13px;font-weight:500;text-decoration:none;transition:background .2s,border-color .2s}
+.link-baixar:hover{background:var(--sup-3);border-color:var(--acento)}
+.link-baixar svg.i{width:16px;height:16px;color:var(--acento)}
+.celular .so-pc{display:none!important}
+.cartao-prog{display:flex;align-items:center;gap:14px;padding:16px 18px;border-radius:var(--r-l);background:var(--sup);border:1px solid var(--linha)}
+.cartao-prog img{border-radius:10px;flex:none}
+.cartao-prog b{display:block;font-size:14.5px;font-weight:600}
+.cartao-prog small{display:block;color:var(--fraco);font-size:12.5px;line-height:1.4}
+.cartao-prog .btn{flex:none;text-decoration:none;margin-left:auto}
+.link-rebaixar{display:inline-flex;align-items:center;gap:6px;margin-top:10px;font-size:12.5px;color:var(--sub);text-decoration:none}
+.link-rebaixar:hover{color:var(--acento)}
+.link-rebaixar svg.i{width:14px;height:14px}
+@media (max-width:560px){.link-baixar span{display:none}.link-baixar{width:34px;padding:0;justify-content:center}.cartao-prog{flex-wrap:wrap}.cartao-prog .btn{margin-left:0;width:100%}}
 .pill{display:inline-flex;align-items:center;gap:8px;height:30px;padding:0 12px;border-radius:999px;font:600 12px/1 var(--mono);
   letter-spacing:.06em;background:var(--acento-suave);color:var(--acento);border:1px solid rgba(255,91,55,.25)}
 .pill .ponto{width:7px;height:7px;border-radius:50%;background:var(--acento);animation:pulsa 1.6s infinite}
@@ -393,7 +408,10 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
 
 <header class="topo">
   <div class="logo"><span class="tally"></span>Tela ao Vivo</div>
-  <span id="pill-vivo" class="pill hidden"><span class="ponto"></span>AO VIVO · <span id="pill-viewers">0</span></span>
+  <div class="topo-dir">
+    <span id="pill-vivo" class="pill hidden"><span class="ponto"></span>AO VIVO · <span id="pill-viewers">0</span></span>
+    <a class="link-baixar so-pc" href="TelaAoVivoAudio.exe" download title="Tela ao Vivo Áudio: tira o Discord do som (Windows 10 e 11)"><svg class="i"><use href="#i-baixar"/></svg><span>Baixar programa de áudio</span></a>
+  </div>
 </header>
 
 <main>
@@ -406,7 +424,7 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
     <ul class="specs">
       <li><b>até 4K</b>60 fps</li>
       <li><b>Opus estéreo</b>160 kbps</li>
-      <li><b>H.264</b>pela placa</li>
+      <li><b>H.265</b>pela placa</li>
       <li><b>P2P</b>sem servidor no meio</li>
     </ul>
   </div>
@@ -434,6 +452,11 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
       </div>
       <p id="erro-codigo" class="erro-campo hidden">Digite o código que seu amigo mandou.</p>
     </form>
+    <div class="cartao-prog so-pc">
+      <img src="app-audio/icone.png" alt="" width="40" height="40">
+      <div><b>Tela ao Vivo Áudio</b><small>Programinha pra quem transmite: tira o Discord do som ou manda só os apps que você marcar. Windows 10 e 11, 73 KB.</small></div>
+      <a class="btn primario" href="TelaAoVivoAudio.exe" download><svg class="i"><use href="#i-baixar"/></svg>Baixar</a>
+    </div>
     <div id="erro-peer" class="banner erro hidden">O componente de conexão não carregou. Confira a internet e aperte F5.</div>
   </div>
 </section>
@@ -538,6 +561,7 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
             </div>
             <ul id="prog-lista" class="prog-lista" aria-label="Apps com som"></ul>
             <p id="prog-nota" class="dica"></p>
+            <a class="link-rebaixar" href="TelaAoVivoAudio.exe" download><svg class="i"><use href="#i-baixar"/></svg>Baixar o programa de novo (pra reinstalar ou mandar pra um amigo)</a>
           </div>
         </div>
 
@@ -2325,6 +2349,7 @@ document.querySelectorAll('input[name="progmodo"]').forEach(i => i.onchange = ()
 marcar('dica', guardar.get('dica') === 'detail' ? 'detail' : 'motion');
 atualizarFonte();
 prepararCelular();
+if (CELULAR_TX) document.body.classList.add('celular');
 document.querySelectorAll('input[name="fonte"]').forEach(i => i.onchange = trocouFonte);
 document.querySelectorAll('input[name="audio"]').forEach(i => i.onchange = atualizarModoAudio);
 document.querySelectorAll('input[name="dica"]').forEach(i => i.onchange = trocarQualidade);
