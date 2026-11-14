@@ -535,7 +535,7 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
           <div id="prog-fora" class="prog-card">
             <div class="prog-cab">
               <img src="app-audio/icone.png" alt="" width="40" height="40">
-              <div><b>Tela ao Vivo Áudio</b><small>Programinha de 73 KB pra Windows 10 e 11. Não precisa instalar nada além dele.</small></div>
+              <div><b>Tela ao Vivo Áudio</b><small>Programinha de 73 KB pra Windows 10 e 11 (versão 1.1). Não precisa instalar nada além dele.</small></div>
             </div>
             <a class="btn primario" href="TelaAoVivoAudio.exe" download><svg class="i"><use href="#i-baixar"/></svg>Baixar o programa</a>
             <ol class="prog-passos">
@@ -558,6 +558,7 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
             <div class="seg" role="radiogroup" aria-label="O que vai no som">
               <label><input type="radio" name="progmodo" value="excluir"><span>Tudo menos o Discord<small>o que tocar no PC</small></span></label>
               <label><input type="radio" name="progmodo" value="incluir"><span>Só os apps que eu marcar<small>escolha na lista</small></span></label>
+              <label><input type="radio" name="progmodo" value="tudo"><span>Tudo do PC<small>com a call junto</small></span></label>
             </div>
             <ul id="prog-lista" class="prog-lista" aria-label="Apps com som"></ul>
             <p id="prog-nota" class="dica"></p>
@@ -602,6 +603,16 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
           <div class="rodape-medidor"><span>nível do que vai na transmissão</span><span id="nivel-txt">sem sinal</span></div>
         </div>
         <p id="aviso-disp" class="dica aviso hidden">Isso parece um microfone: vai a sua voz, não o som do PC. Escolha o cabo virtual.</p>
+        <div id="bloco-mic" class="bloco-cam">
+          <label class="cam-liga"><input type="checkbox" id="mic-junto"><span><b>Adicionar meu microfone</b><span class="etq rec">MODO LIVE</span>
+            <small>Sua voz misturada com o som escolhido acima, cada um com o seu volume. Use fone de ouvido pra não dar eco.</small></span></label>
+          <div id="mic-opcoes" class="cam-opcoes hidden">
+            <label class="rotulo-campo" for="sel-mic">Microfone</label>
+            <select id="sel-mic"><option value="">Carregando...</option></select>
+            <div class="cam-linha"><span class="rotulo-campo">Microfone</span><input type="range" id="vol-mic" min="0" max="200" step="5" aria-label="Volume do microfone"><span id="vol-mic-txt" class="cam-tam-txt">100%</span></div>
+            <div class="cam-linha"><span class="rotulo-campo">Som do PC</span><input type="range" id="vol-pc" min="0" max="200" step="5" aria-label="Volume do som do PC"><span id="vol-pc-txt" class="cam-tam-txt">100%</span></div>
+          </div>
+        </div>
         <p id="nota-audio" class="dica aviso hidden"></p>
       </fieldset>
 
@@ -990,16 +1001,99 @@ async function listarAudio() {
 async function trocarTrilha(nova) {
   const velha = trilhaAudio;
   trilhaAudio = nova;
-  if (streamTx) {
-    if (velha) streamTx.removeTrack(velha);
-    streamTx.addTrack(nova);
-    for (const c of chamadas.values()) {
-      const pc = c.peerConnection; if (!pc) continue;
-      const s = pc.getSenders().find(s => s.track && s.track.kind === 'audio');
-      if (s) try { await s.replaceTrack(nova); } catch {}
-    }
-  }
+  if (micLigado()) ligarBaseNoMix(nova); // a saída continua sendo a mistura; só troca o que entra nela
+  else await trocarSaida(nova);
   if (velha && velha !== nova) velha.stop();
+}
+// troca o áudio que vai pra quem assiste (sem desligar a trilha antiga)
+async function trocarSaida(t) {
+  if (!streamTx || !t) return;
+  streamTx.getAudioTracks().forEach(a => streamTx.removeTrack(a));
+  streamTx.addTrack(t);
+  for (const c of chamadas.values()) {
+    const pc = c.peerConnection; if (!pc) continue;
+    const snd = pc.getSenders().find(x => x.track && x.track.kind === 'audio');
+    if (snd) try { await snd.replaceTrack(t); } catch {}
+  }
+}
+
+// ============================================================ modo live: microfone misturado com o som do PC
+const mix = { ctx: null, dest: null, gBase: null, gMic: null, srcBase: null, srcMic: null, mic: null, saida: null };
+const micLigado = () => $('#mic-junto').checked && radio('fonte') !== 'camera';
+function garantirMix() {
+  if (!mix.ctx) {
+    mix.ctx = new AudioContext({ sampleRate: 48000 });
+    mix.dest = mix.ctx.createMediaStreamDestination();
+    mix.dest.channelCount = 2;
+    mix.gBase = mix.ctx.createGain();
+    mix.gMic = mix.ctx.createGain();
+    mix.gBase.connect(mix.dest);
+    mix.gMic.connect(mix.dest);
+    mix.saida = mix.dest.stream.getAudioTracks()[0];
+    try { mix.saida.contentHint = 'music'; } catch {}
+  }
+  if (mix.ctx.state === 'suspended') mix.ctx.resume().catch(() => {});
+  mix.gMic.gain.value = +$('#vol-mic').value / 100;
+  mix.gBase.gain.value = +$('#vol-pc').value / 100;
+}
+function ligarBaseNoMix(track) {
+  garantirMix();
+  if (mix.srcBase) try { mix.srcBase.disconnect(); } catch {}
+  mix.srcBase = null;
+  if (track && track.readyState === 'live') { mix.srcBase = mix.ctx.createMediaStreamSource(new MediaStream([track])); mix.srcBase.connect(mix.gBase); }
+}
+async function listarMics() {
+  const sel = $('#sel-mic');
+  let devs = [];
+  try { devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput' && d.deviceId !== 'communications'); } catch {}
+  if (devs.length && !devs[0].label) {
+    try { const st = await navigator.mediaDevices.getUserMedia({ audio: true }); st.getTracks().forEach(t => t.stop()); } catch {}
+    try { devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput' && d.deviceId !== 'communications'); } catch {}
+  }
+  const virtual = d => /voicemeeter|cable|virtual|vb-audio/i.test(d.label);
+  devs.sort((a, b) => virtual(a) - virtual(b));
+  sel.innerHTML = '';
+  devs.forEach(d => sel.add(new Option(d.deviceId === 'default' ? 'Padrão do Windows' + (d.label ? ' (' + d.label.replace(/^Padrão - |^Default - /, '') + ')' : '') : d.label || 'Microfone', d.deviceId)));
+  const salvo = guardar.get('micLive');
+  if (devs.some(d => d.deviceId === salvo)) sel.value = salvo;
+}
+async function ligarMic() {
+  garantirMix();
+  if (mix.srcMic) try { mix.srcMic.disconnect(); } catch {}
+  if (mix.mic) mix.mic.stop();
+  mix.srcMic = mix.mic = null;
+  const dev = $('#sel-mic').value;
+  try {
+    const st = await navigator.mediaDevices.getUserMedia({ audio: { ...(dev ? { deviceId: { exact: dev } } : {}), echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    mix.mic = st.getAudioTracks()[0];
+    mix.srcMic = mix.ctx.createMediaStreamSource(st);
+    mix.srcMic.connect(mix.gMic);
+    guardar.set('micLive', dev);
+  } catch (e) { statusTx('Não consegui abrir o microfone (' + (e.name || e.message) + ').', 'erro'); }
+}
+function desligarMic() {
+  if (mix.srcMic) try { mix.srcMic.disconnect(); } catch {}
+  if (mix.mic) mix.mic.stop();
+  mix.srcMic = mix.mic = null;
+}
+// a trilha que vai pra quem assiste: a mistura (com microfone) ou o som escolhido puro
+function audioSaida() {
+  if (!micLigado()) return trilhaAudio;
+  ligarBaseNoMix(trilhaAudio);
+  return mix.saida;
+}
+async function mudouMic() {
+  guardar.set('micJunto', $('#mic-junto').checked ? '1' : '0');
+  $('#mic-opcoes').classList.toggle('hidden', !$('#mic-junto').checked);
+  if (micLigado()) {
+    if (!$('#sel-mic').options.length || !$('#sel-mic').value && $('#sel-mic').options[0].value === '') await listarMics();
+    if (!streamTx) return; // o microfone só abre quando a transmissão começar
+    await ligarMic();
+    await trocarSaida(audioSaida());
+  } else {
+    desligarMic();
+    await trocarSaida(trilhaAudio);
+  }
 }
 
 async function selecionarAudio() {
@@ -1046,6 +1140,8 @@ function ajustarAudioPraFonte() {
   $('#disp-titulo').textContent = cam ? 'Microfone' : 'Cabo virtual (Voicemeeter ou VB-Cable)';
   $('#disp-desc').textContent = cam ? 'Sua voz junto da câmera.' : 'Pra quem já tem cabo de áudio virtual configurado.';
   $('#guia').classList.toggle('hidden', cam);
+  $('#bloco-mic').classList.toggle('hidden', cam);
+  if (!cam && $('#mic-junto').checked && !$('#tx').classList.contains('hidden') && $('#sel-mic').options[0] && $('#sel-mic').options[0].value === '') listarMics();
   const naTela = !$('#tx').classList.contains('hidden');
   if (cam && radio('audio') === 'captura') { marcar('audio', 'device'); if (naTela) atualizarModoAudio(); }
   if (!cam && CELULAR_TX && radio('audio') === 'device') { marcar('audio', 'captura'); if (naTela) atualizarModoAudio(); }
@@ -1115,7 +1211,7 @@ async function atualizarModoAudio() {
 // ou "só os apps marcados" (PCM 48 kHz estéreo 16 bits, pacotes de 10 ms).
 const prog = {
   ws: null, conectado: false, apps: [], icones: {}, discordAberto: false, erro: null,
-  modo: guardar.get('progModo') === 'incluir' ? 'incluir' : 'excluir',
+  modo: ['incluir', 'tudo'].includes(guardar.get('progModo')) ? guardar.get('progModo') : 'excluir', versao: '',
   marcados: new Set((() => { try { return JSON.parse(guardar.get('progApps') || '[]'); } catch { return []; } })()),
   no: null, trilha: null, ctx: null,
 };
@@ -1158,6 +1254,7 @@ function progProcurar() {
   ws.onmessage = e => {
     if (typeof e.data !== 'string') { if (prog.no) prog.no.port.postMessage(e.data, [e.data]); return; }
     let m; try { m = JSON.parse(e.data); } catch { return; }
+    if (m.tipo === 'ola') { prog.versao = m.versao || ''; progDesenharLista(); return; }
     if (m.tipo !== 'apps') return;
     for (const a of m.lista) if (a.icone) prog.icones[a.exe] = a.icone;
     prog.apps = m.lista.filter(a => !ESCONDER_APPS.test(a.exe));
@@ -1191,7 +1288,8 @@ function progDesenhar() {
 const linhasApp = new Map();
 function progDesenharLista() {
   const ul = $('#prog-lista');
-  const excluir = prog.modo === 'excluir';
+  const excluir = prog.modo !== 'incluir'; // "excluir" e "tudo" não usam as caixinhas
+  const tudo = prog.modo === 'tudo';
   ul.classList.toggle('excluir', excluir);
   const vistos = new Set();
   prog.apps.forEach((a, i) => {
@@ -1212,12 +1310,12 @@ function progDesenharLista() {
       const img = document.createElement('img'); img.src = prog.icones[a.exe]; img.alt = '';
       li.querySelector('.sem-icone').replaceWith(img);
     }
-    const vai = excluir ? !a.discord : prog.marcados.has(a.exe);
+    const vai = tudo ? true : excluir ? !a.discord : prog.marcados.has(a.exe);
     li.querySelector('input').checked = prog.marcados.has(a.exe);
     li.classList.toggle('vai', vai);
     li.classList.toggle('fora', !vai);
     li.querySelector('small').textContent = excluir
-      ? (a.discord ? 'fica de fora' : 'vai junto')
+      ? (a.discord && !tudo ? 'fica de fora' : 'vai junto')
       : (vai ? 'vai na transmissão' : 'não vai');
     li.querySelector('.mini-nivel i').style.transform = `scaleX(${Math.min(1, a.pico * 1.6)})`;
     if (ul.children[i] !== li) ul.insertBefore(li, ul.children[i] || null);
@@ -1226,7 +1324,9 @@ function progDesenharLista() {
 
   let nota = '';
   if (prog.erro) nota = 'O Windows recusou capturar um dos apps (' + prog.erro + '). Tente fechar e abrir o programa.';
-  else if (excluir && !prog.discordAberto) nota = 'O Discord está fechado agora. Quando abrir, ele já fica de fora sozinho.';
+  else if (tudo && prog.versao && prog.versao < '1.1') nota = 'Seu programa é antigo e não tem "Tudo do PC". Baixe de novo (link abaixo), feche o antigo e abra o novo.';
+  else if (tudo) nota = 'Vai tudo que tocar no PC, inclusive a call do Discord. Use fone pra não dar eco.';
+  else if (excluir && !tudo && !prog.discordAberto) nota = 'O Discord está fechado agora. Quando abrir, ele já fica de fora sozinho.';
   else if (excluir) nota = 'Vai tudo que tocar no PC, menos o Discord. Discord aberto pelo navegador (discord.com) não dá pra separar: use o app.';
   else if (!prog.marcados.size) nota = 'Marque os apps que vão na transmissão.';
   $('#prog-nota').textContent = nota;
@@ -1578,7 +1678,8 @@ async function comecar() {
     if (!trilhaAudio) trilhaAudio = trilhaSilenciosa();
   }
 
-  streamTx = new MediaStream([vt, trilhaAudio]);
+  if (micLigado() && !mix.srcMic) await ligarMic();
+  streamTx = new MediaStream([vt, audioSaida()]);
   const pv = $('#preview');
   pv.muted = true;
   pv.srcObject = streamTx;
@@ -1705,6 +1806,7 @@ async function trocarQualidade() {
 }
 
 function pararTx() {
+  desligarMic();
   if (composicao) { const c = composicao; composicao = null; c.parar(); }
   $('#cam-caixa').classList.add('hidden');
   $('#bt-cam-onoff').classList.add('hidden');
@@ -2365,6 +2467,20 @@ document.querySelectorAll('[data-voltar]').forEach(b => b.onclick = () => {
 $('#sel-audio').onchange = selecionarAudio;
 $('#bt-atualizar').onclick = listarAudio;
 $('#bt-comecar').onclick = comecar;
+$('#mic-junto').checked = guardar.get('micJunto') === '1';
+$('#mic-opcoes').classList.toggle('hidden', !$('#mic-junto').checked);
+$('#mic-junto').onchange = mudouMic;
+$('#sel-mic').onchange = () => { if (micLigado()) ligarMic(); else guardar.set('micLive', $('#sel-mic').value); };
+for (const [id, chave] of [['vol-mic', 'volMic'], ['vol-pc', 'volPc']]) {
+  const el = $('#' + id);
+  el.value = guardar.get(chave) || 100;
+  $('#' + id + '-txt').textContent = el.value + '%';
+  el.oninput = () => {
+    $('#' + id + '-txt').textContent = el.value + '%';
+    guardar.set(chave, el.value);
+    if (mix.ctx) { mix.gMic.gain.value = +$('#vol-mic').value / 100; mix.gBase.gain.value = +$('#vol-pc').value / 100; }
+  };
+}
 $('#cam-junto').checked = guardar.get('camJunto') === '1';
 $('#cam-junto').onchange = () => { guardar.set('camJunto', $('#cam-junto').checked ? '1' : '0'); mostrarOpcoesCamera(); };
 $('#sel-cam').onchange = () => guardar.set('camDev', $('#sel-cam').value);

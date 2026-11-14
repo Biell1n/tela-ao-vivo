@@ -230,7 +230,7 @@ namespace TelaAoVivoAudio
             if ((tipo as string) != "config") return;
             lock (travaConfig)
             {
-                object mo; if (m.TryGetValue("modo", out mo) && (mo as string == "incluir" || mo as string == "excluir")) modo = (string)mo;
+                object mo; if (m.TryGetValue("modo", out mo) && (mo as string == "incluir" || mo as string == "excluir" || mo as string == "tudo")) modo = (string)mo;
                 object ap;
                 if (m.TryGetValue("apps", out ap) && ap is System.Collections.ArrayList)
                     apps = new HashSet<string>(((System.Collections.ArrayList)ap).OfType<string>().Select(x => x.ToLowerInvariant()));
@@ -287,7 +287,12 @@ namespace TelaAoVivoAudio
             if (cs.Length > 0)
             {
                 lista = Sessoes.Listar(procs);
-                if (m == "excluir")
+                if (m == "tudo")
+                {
+                    // tudo do PC, inclusive a call: tira só o próprio programa (que não toca nada)
+                    var c = new Captura((uint)Process.GetCurrentProcess().Id, true); desejadas[c.Chave] = c;
+                }
+                else if (m == "excluir")
                 {
                     // tudo menos o Discord: o Windows tira um processo (e os filhos dele) do som
                     uint alvo = 0;
@@ -318,6 +323,7 @@ namespace TelaAoVivoAudio
             // status pra janela
             bool discordAberto = Discords.Any(d => Sessoes.Raizes(d, procs).Count > 0);
             if (cs.Length == 0) { Estado = "Esperando o site"; Detalhe = "Abra o Tela ao Vivo no Chrome e escolha o áudio pelo programa."; }
+            else if (m == "tudo") { Estado = "Conectado ao site"; Detalhe = "Mandando todo o som do PC, inclusive a call do Discord."; }
             else if (m == "excluir") { Estado = "Conectado ao site"; Detalhe = discordAberto ? "Mandando todo o som do PC, menos o Discord." : "Mandando todo o som do PC (o Discord está fechado)."; }
             else { Estado = "Conectado ao site"; Detalhe = marcados.Count == 0 ? "Nenhum app marcado: indo sem som." : "Mandando o som de " + marcados.Count + (marcados.Count == 1 ? " app." : " apps."); }
 
