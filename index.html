@@ -1993,9 +1993,16 @@ function trocarNivelRx(n, motivo) {
   enviarPedido();
   if (motivo) avisoRx(motivo);
 }
+// Tela de quem transmite parada (área de trabalho, menu): o Chrome manda poucos quadros de propósito.
+// O player vê esse intervalo como "travada", mas não é: nesse caso só a perda de pacotes conta.
+function telaParada() {
+  const it = infoTx && Date.now() - infoTx.quando < 5000 ? infoTx : null;
+  return !!(it && it.fpsCaptura != null && it.fpsAlvo && it.fpsCaptura < it.fpsAlvo * 0.7);
+}
 // chamado 1x por segundo com as estatísticas
 function ajustarQualidadeRx(st) {
-  const perdas = st.perdidos - qRx.perdasAntes, receb = st.recebidos - qRx.recebAntes, trav = st.travadas - qRx.travAntes;
+  const perdas = st.perdidos - qRx.perdasAntes, receb = st.recebidos - qRx.recebAntes;
+  const trav = telaParada() ? 0 : st.travadas - qRx.travAntes;
   qRx.perdasAntes = st.perdidos; qRx.recebAntes = st.recebidos; qRx.travAntes = st.travadas;
   qRx.historico.push({ perdas: Math.max(0, perdas), receb: Math.max(0, receb), trav: Math.max(0, trav) });
   if (qRx.historico.length > 8) qRx.historico.shift();
@@ -2015,7 +2022,7 @@ function ajustarQualidadeRx(st) {
   if (ruim && desdeTroca > 6000 && qRx.nivel < NIVEIS_RX.length - 1) {
     trocarNivelRx(qRx.nivel + 1, `Conexão instável: baixei pra ${NIVEIS_RX[qRx.nivel + 1].nome} pra não travar.`);
     qRx.historico = [];
-  } else if (!ruim && ++qRx.calmo > 45 && qRx.nivel > TETO_AUTO) {
+  } else if (!ruim && ++qRx.calmo > 20 && qRx.nivel > TETO_AUTO) {
     trocarNivelRx(qRx.nivel - 1, `Conexão estável: subi pra ${NIVEIS_RX[qRx.nivel - 1].nome}.`);
   }
 }
@@ -2068,7 +2075,7 @@ function aplicarFolga(r) {
 }
 function ajustarFolga(st) {
   if (!callRx || !callRx.peerConnection) return;
-  const novas = st.travadas - travadasAntes;
+  const novas = telaParada() ? 0 : st.travadas - travadasAntes;
   travadasAntes = st.travadas;
   if (novas > 0 && folgaNivel < FOLGAS.length - 1 && Date.now() - travadasTempo > 4000) {
     folgaNivel++; travadasTempo = Date.now(); folgaCalma = 0;
