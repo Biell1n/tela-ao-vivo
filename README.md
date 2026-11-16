@@ -4,7 +4,7 @@ Compartilhe a tela com áudio direto pelo navegador, sem configurar porta nem fi
 
 - **Quem transmite:** Transmitir → escolhe **Tela inteira / Janela / Aba** → escolhe o áudio → **Começar a transmitir** → manda o código ou o link.
 - **Câmera:** escolha "Câmera" pra transmitir só ela (com microfone), ou marque "Câmera por cima da tela" (estilo OBS) e arraste a câmera na prévia pra posicionar; dá pra mudar tamanho, retângulo/círculo e esconder ao vivo.
-- **Grupo:** "Criar grupo" na página inicial, escolhe um nome e manda o link. Todo mundo que entra pode compartilhar a tela (várias ao mesmo tempo), em grade ou com uma em destaque; miniaturas pedem 360p pra poupar internet. O dono pode expulsar.
+- **Grupo:** "Criar grupo" na página inicial, escolhe um nome e manda o link. Todo mundo que entra pode compartilhar a tela (várias ao mesmo tempo), em grade ou com uma em destaque; miniaturas pedem 360p pra poupar internet. O grupo continua aberto enquanto tiver alguém nele (se quem segura a sala sai, outro assume); fechar o site não tira ninguém do grupo. Só quem criou pode expulsar (chave guardada no navegador).
 - **Quem assiste:** digita o código na página inicial, ou abre o link (`?c=codigo`).
 
 ## Áudio

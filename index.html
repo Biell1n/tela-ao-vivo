@@ -256,6 +256,7 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
 
 .seg{display:grid;grid-template-columns:1fr 1fr;padding:3px;border-radius:var(--r-m);background:var(--bg-2);border:1px solid var(--linha);margin-top:10px}
 .seg label{position:relative;cursor:pointer}
+.seg:has(label:nth-child(3)){grid-template-columns:repeat(3,1fr)}
 .seg span{display:flex;flex-direction:column;align-items:center;padding:8px 6px;border-radius:9px;font-size:13.5px;font-weight:500;color:var(--sub);transition:background .2s,color .2s;text-align:center}
 .seg span small{font-size:11.5px;color:var(--fraco);font-weight:400}
 .seg input:checked+span{background:var(--sup-3);color:var(--texto);box-shadow:0 1px 0 rgba(255,255,255,.05) inset}
@@ -290,6 +291,12 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
 .codigo{font:600 34px/1.15 var(--mono);letter-spacing:.14em;margin-top:4px;color:var(--texto);font-variant-numeric:tabular-nums}
 .codigo.vazio{color:var(--linha-2)}
 .sala-bt{display:flex;flex-direction:column;gap:8px}
+.resumo-tx{display:flex;flex-wrap:wrap;gap:6px}
+.resumo-tx span{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:8px;background:var(--bg-2);border:1px solid var(--linha);font-size:12.5px;color:var(--sub)}
+.resumo-tx span b{color:var(--texto);font-weight:600}
+.comecar-flut{position:fixed;left:16px;right:16px;bottom:max(14px,env(safe-area-inset-bottom));z-index:20;height:52px;border-radius:14px;font-size:15px;
+  box-shadow:0 14px 36px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.06) inset}
+.ponto-vivo{width:8px;height:8px;border-radius:50%;background:var(--acento-tinta);opacity:.8}
 .status{display:flex;align-items:center;gap:9px;font-size:14px;color:var(--sub);min-height:22px}
 .status::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--fraco);flex:none}
 .status.ok{color:var(--texto)}.status.ok::before{background:var(--ok);box-shadow:0 0 0 4px rgba(63,216,132,.14)}
@@ -777,7 +784,9 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
         <button id="bt-direta" class="btn">Liberar conexão direta</button>
       </div>
 
+      <div id="resumo-tx" class="resumo-tx" aria-live="polite"></div>
       <button id="bt-comecar" class="btn primario grande">Começar a transmitir</button>
+      <button id="bt-comecar-flut" class="btn primario comecar-flut hidden" type="button"><span class="ponto-vivo"></span>Começar a transmitir</button>
       <button id="bt-parar" class="btn perigo grande hidden">Parar transmissão</button>
     </aside>
   </div>
@@ -820,7 +829,7 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
     <aside class="grupo-membros">
       <div class="rotulo">No grupo <span id="grupo-contagem"></span></div>
       <ul id="lista-membros"></ul>
-      <p class="dica">Quem tem o link pode entrar. O grupo fica aberto enquanto quem criou estiver com ele aberto.</p>
+      <p class="dica">Quem tem o link pode entrar. O grupo continua aberto enquanto tiver alguém nele, mesmo que quem criou saia. Fechar o site não tira você do grupo: ao voltar, você entra de novo.</p>
     </aside>
   </div>
 </section>
@@ -2253,7 +2262,7 @@ function renderMenu(vista) {
   } else if (vista === 'qualidade') {
     m.append(cabMenu('Qualidade'));
     m.append(itemMenu('Automática', null, () => { escolherQualidadeRx('auto'); fecharMenu(); }, { marcado: qRx.auto }));
-    NIVEIS_RX.forEach((n, i) => m.append(itemMenu(n.rot === 'MÁX' ? 'Máxima' : n.rot + 'p', null, () => { escolherQualidadeRx(i); fecharMenu(); }, { marcado: !qRx.auto && qRx.nivel === i })));
+    NIVEIS_RX.forEach((n, i) => m.append(itemMenu(n.rot === 'MÁX' ? 'Máxima (até 4K)' : n.rot + 'p', null, () => { escolherQualidadeRx(i); fecharMenu(); }, { marcado: !qRx.auto && qRx.nivel === i })));
     const nota = document.createElement('p'); nota.className = 'menu-nota';
     nota.textContent = 'Automática baixa só se a sua internet ficar ruim por um tempo, e volta sozinha. Escolhendo uma fixa, ela não muda.';
     m.append(nota);
@@ -2673,14 +2682,16 @@ setInterval(async () => {
 
 
 // ============================================================ MODO GRUPO
-// Um grupo é uma sala onde todo mundo que entra pelo link pode compartilhar a tela. O dono do grupo
-// (quem criou) guarda a lista de membros e repassa pra todos pelo PeerJS. Cada tela compartilhada é
-// uma transmissão normal do site (com H.265, AUTO, áudio etc.); quem assiste vê cada uma num player
-// embutido (iframe ?c=sala&embed=1). As miniaturas pedem 360p pra poupar a internet de quem compartilha.
+// Um grupo é uma sala onde todo mundo que entra pelo link pode compartilhar a tela. Alguém do grupo
+// "segura" a sala (guarda a lista e repassa pra todos pelo PeerJS). Se essa pessoa sair, outro membro
+// assume sozinho em segundos, então o grupo fica aberto enquanto tiver alguém nele; vazio, o primeiro
+// que abrir o link reabre. Quem criou guarda uma chave no navegador: só ela pode expulsar, seja quem
+// for que esteja segurando a sala. Cada tela compartilhada é uma transmissão normal do site; quem
+// assiste vê cada uma num player embutido (iframe ?c=sala&embed=1). Miniaturas pedem 360p.
 const PREFIXO_G = 'telaaovivo-g1-';
 const grupo = {
-  ativo: false, dono: false, codigo: '', nome: '', peer: null, con: null, conns: new Map(),
-  membros: [], banidos: new Set(), meuId: '', expulso: false, recon: null,
+  ativo: false, host: false, codigo: '', nome: '', peer: null, peerHost: null, con: null, conns: new Map(),
+  membros: [], banidos: [], donoHash: '', meuId: '', expulso: false, recon: null, assumindo: false,
   layout: guardar.get('grupoLayout') === 'destaque' ? 'destaque' : 'grade', foco: null, somManual: new Map(),
 };
 let salaTx = null; // código da minha transmissão (quando estou compartilhando)
@@ -2688,6 +2699,16 @@ let salaTx = null; // código da minha transmissão (quando estou compartilhando
 const nomeLimpo = n => String(n || '').replace(/\s+/g, ' ').trim().slice(0, 24) || 'Sem nome';
 const linkGrupo = c => location.origin + location.pathname + '?g=' + encodeURIComponent(c);
 function statusGrupo(msg, tipo = '') { const e = $('#grupo-status'); e.textContent = msg; e.className = 'status ' + tipo; }
+const chaveDono = c => guardar.get('grupoChave-' + c) || '';
+const souDono = () => !!chaveDono(grupo.codigo);
+async function hashChave(t) {
+  const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('tela-ao-vivo:' + t));
+  return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join('');
+}
+function lembrarGrupo() { guardar.set('meuGrupo', JSON.stringify({ codigo: grupo.codigo, nome: grupo.nome })); }
+function esquecerGrupo() { guardar.set('meuGrupo', ''); }
+function grupoLembrado() { try { return JSON.parse(guardar.get('meuGrupo') || 'null'); } catch { return null; } }
+const jitter = (a, b) => a + Math.random() * (b - a);
 
 function abrirEntradaGrupo(codigo, criando) {
   grupo.codigo = codigo;
@@ -2702,65 +2723,167 @@ function abrirEntradaGrupo(codigo, criando) {
   setTimeout(() => $('#in-nome').focus(), 50);
 }
 function criarGrupo() {
+  if (grupo.ativo) { grupo.ativo = false; desligarGrupo(); }
   const c = novoCodigo();
-  guardar.set('grupoDono', c);
+  const chave = [...crypto.getRandomValues(new Uint8Array(16))].map(x => x.toString(16).padStart(2, '0')).join('');
+  guardar.set('grupoChave-' + c, chave);
   abrirEntradaGrupo(c, true);
 }
 function entrarNoGrupo() {
   const nome = $('#in-nome').value.trim();
   if (!nome) { $('#erro-nome').classList.remove('hidden'); $('#in-nome').focus(); return; }
+  iniciarGrupo(grupo.codigo, nome);
+}
+function iniciarGrupo(codigo, nome) {
   if (typeof Peer === 'undefined') { $('#erro-peer').classList.remove('hidden'); return; }
+  desligarGrupo(); // estava em outro grupo (ou reentrando): fecha as conexões antigas antes
   guardar.set('meuNome', nome);
-  Object.assign(grupo, { ativo: true, nome: nomeLimpo(nome), expulso: false, membros: [], foco: null });
+  Object.assign(grupo, { ativo: true, codigo, nome: nomeLimpo(nome), expulso: false, membros: [], foco: null, host: false });
+  lembrarGrupo();
+  history.replaceState(null, '', '?g=' + encodeURIComponent(codigo));
   mostrar('grupo');
   renderGrupo();
   statusGrupo('Entrando no grupo...');
-  if (guardar.get('grupoDono') === grupo.codigo) virarDono(); else virarMembro();
+  criarPeerMembro();
 }
 
-// ---------- dono: guarda a lista e repassa pra todos
-async function virarDono() {
+// ---------- entrar: como membro (se ninguém estiver segurando o grupo, assume)
+async function criarPeerMembro() {
   const opcoes = await opcoesPeer();
   if (!grupo.ativo) return;
-  const p = new Peer(PREFIXO_G + grupo.codigo, opcoes);
+  const p = new Peer(opcoes);
   grupo.peer = p;
-  p.on('open', id => {
-    grupo.dono = true; grupo.meuId = id;
-    garantirEu();
-    difundir();
-    statusGrupo('Grupo aberto. Mande o link pro pessoal: quem entrar pode compartilhar a tela. Deixe esta aba aberta (o grupo vive nela).', 'ok');
-  });
-  p.on('connection', conexaoDoMembro);
+  p.on('open', id => { if (!grupo.host) grupo.meuId = id; conectarAoHost(); });
   p.on('error', e => {
-    if (grupo.peer !== p) return;
-    if (e.type === 'unavailable-id') { p.destroy(); grupo.peer = null; virarMembro(); return; } // o grupo já está aberto em outra aba: entra como membro
-    if (['network', 'server-error', 'socket-error', 'socket-closed', 'disconnected'].includes(e.type)) statusGrupo('Sem conexão com o servidor de pareamento. Tentando de novo...', 'aviso');
+    if (grupo.peer !== p || !grupo.ativo || grupo.host) return;
+    if (e.type === 'peer-unavailable') tentarAssumir(); // ninguém segurando o grupo agora: eu seguro
+    else if (['network', 'server-error', 'socket-error', 'socket-closed', 'disconnected'].includes(e.type)) { statusGrupo('Sem conexão com o servidor de pareamento. Tentando de novo...', 'aviso'); agendarReconexaoGrupo(4000); }
   });
   p.on('disconnected', () => setTimeout(() => { if (grupo.peer === p && !p.destroyed && p.disconnected) try { p.reconnect(); } catch {} }, 2000));
 }
+function agendarReconexaoGrupo(ms) {
+  clearTimeout(grupo.recon);
+  grupo.recon = setTimeout(() => { if (grupo.ativo && !grupo.expulso && !grupo.host && !(grupo.con && grupo.con.open)) conectarAoHost(); }, ms);
+}
+function conectarAoHost() {
+  if (!grupo.ativo || grupo.host || !grupo.peer || grupo.peer.destroyed) return;
+  if (!grupo.peer.open) { agendarReconexaoGrupo(2000); return; }
+  if (grupo.con) try { grupo.con.close(); } catch {}
+  const con = grupo.peer.connect(PREFIXO_G + grupo.codigo, { reliable: true });
+  grupo.con = con;
+  // quem segurava pode ter caído sem avisar: se não abrir logo, tenta assumir
+  const limite = setTimeout(() => { if (grupo.con === con && !con.open && grupo.ativo && !grupo.host) { try { con.close(); } catch {} tentarAssumir(); } }, 7000);
+  con.on('open', () => {
+    clearTimeout(limite);
+    grupo.vistoHost = Date.now();
+    // a conexão pode falhar por baixo sem o PeerJS avisar (aba fechada sem despedida): escuta direto
+    const pc = con.peerConnection;
+    if (pc) pc.addEventListener('connectionstatechange', () => { if (['failed', 'closed'].includes(pc.connectionState) && grupo.con === con) try { con.close(); } catch {} });
+    con.send({ tipo: 'entrar', nome: grupo.nome, sala: salaTx, chave: chaveDono(grupo.codigo) || undefined });
+    statusGrupo('Você está no grupo. Clique em "Compartilhar minha tela" pra todos verem a sua.', 'ok');
+  });
+  con.on('data', d => {
+    if (!d || typeof d !== 'object') return;
+    grupo.vistoHost = Date.now();
+    if (d.tipo === 'estado' && Array.isArray(d.lista)) {
+      grupo.membros = d.lista.slice(0, 500);
+      if (Array.isArray(d.banidos)) grupo.banidos = d.banidos.slice(0, 500);
+      if (typeof d.donoHash === 'string') grupo.donoHash = d.donoHash;
+      renderGrupo();
+    }
+    if (d.tipo === 'expulso') foiExpulso();
+  });
+  con.on('close', () => {
+    clearTimeout(limite);
+    if (grupo.con !== con || !grupo.ativo || grupo.expulso || grupo.host) return;
+    statusGrupo('Quem segurava o grupo saiu. Reconectando (alguém do grupo assume)...', 'aviso');
+    setTimeout(() => { if (grupo.ativo && !grupo.host && !(grupo.con && grupo.con.open)) conectarAoHost(); }, jitter(400, 1600));
+  });
+  con.on('error', () => {});
+}
+
+// ---------- segurar o grupo: guarda a lista e repassa pra todos
+async function tentarAssumir() {
+  if (grupo.assumindo || grupo.host || !grupo.ativo) return;
+  grupo.assumindo = true;
+  await new Promise(r => setTimeout(r, jitter(0, 1200))); // sorteio: evita todo mundo tentando no mesmo instante
+  if (!grupo.ativo || grupo.host || (grupo.con && grupo.con.open)) { grupo.assumindo = false; return; }
+  const opcoes = await opcoesPeer();
+  const p = new Peer(PREFIXO_G + grupo.codigo, opcoes);
+  p.on('open', async id => {
+    grupo.assumindo = false;
+    if (!grupo.ativo) { p.destroy(); return; }
+    grupo.host = true; grupo.peerHost = p; grupo.meuId = id;
+    if (grupo.con) try { grupo.con.close(); } catch {}
+    grupo.con = null;
+    // a lista recomeça comigo; quem estava no grupo reconecta em segundos
+    grupo.membros = grupo.membros.filter(m => m.id === id);
+    if (!grupo.donoHash && souDono()) grupo.donoHash = await hashChave(chaveDono(grupo.codigo));
+    garantirEu();
+    difundir();
+    statusGrupo('Grupo aberto. Mande o link pro pessoal: quem entrar pode compartilhar a tela.', 'ok');
+  });
+  p.on('connection', conexaoDoMembro);
+  p.on('error', e => {
+    if (e.type === 'unavailable-id') {
+      // alguém assumiu antes (ou ainda está segurando): entra como membro
+      p.destroy(); grupo.assumindo = false;
+      if (grupo.peerHost === p) grupo.peerHost = null;
+      setTimeout(() => { if (grupo.ativo && !grupo.host) conectarAoHost(); }, jitter(500, 1500));
+      return;
+    }
+    if (grupo.peerHost === p && ['network', 'server-error', 'socket-error', 'socket-closed', 'disconnected'].includes(e.type)) statusGrupo('Sem conexão com o servidor de pareamento. Tentando de novo...', 'aviso');
+    else if (grupo.peerHost !== p) grupo.assumindo = false;
+  });
+  p.on('disconnected', () => setTimeout(() => { if (grupo.peerHost === p && !p.destroyed && p.disconnected) try { p.reconnect(); } catch {} }, 2000));
+}
+// batimento: quem segura o grupo e os membros se avisam a cada 3 s. Sem sinal por 10 s, a pessoa saiu
+// (fechar a aba nem sempre avisa): o membro reconecta (e alguém assume); quem segura tira da lista.
+setInterval(() => {
+  if (!grupo.ativo) return;
+  if (grupo.host) {
+    for (const c of grupo.conns.values()) if (c.open) try { c.send({ tipo: 'ping' }); } catch {}
+    const antes = grupo.membros.length;
+    grupo.membros = grupo.membros.filter(m => m.id === grupo.meuId || !m.visto || Date.now() - m.visto < 12000);
+    if (grupo.membros.length !== antes) difundir();
+  } else if (grupo.con && grupo.con.open) {
+    try { grupo.con.send({ tipo: 'ping' }); } catch {}
+    if (Date.now() - (grupo.vistoHost || 0) > 10000) { const c = grupo.con; try { c.close(); } catch {} }
+  }
+}, 3000);
 function garantirEu() {
   let eu = grupo.membros.find(m => m.id === grupo.meuId);
-  if (!eu) { eu = { id: grupo.meuId, nome: grupo.nome, sala: salaTx, dono: grupo.dono }; grupo.membros.unshift(eu); }
-  eu.nome = grupo.nome; eu.sala = salaTx; eu.dono = grupo.dono;
+  if (!eu) { eu = { id: grupo.meuId, nome: grupo.nome, sala: salaTx, dono: false }; grupo.membros.unshift(eu); }
+  eu.nome = grupo.nome; eu.sala = salaTx; eu.dono = souDono();
 }
+const banido = (id, nome) => grupo.banidos.includes(id) || grupo.banidos.includes('nome:' + String(nome || '').toLowerCase());
 function conexaoDoMembro(conn) {
   conn.on('open', () => {
-    if (grupo.banidos.has(conn.peer)) { try { conn.send({ tipo: 'expulso' }); } catch {} setTimeout(() => conn.close(), 300); return; }
+    if (banido(conn.peer)) { try { conn.send({ tipo: 'expulso' }); } catch {} setTimeout(() => conn.close(), 300); return; }
     grupo.conns.set(conn.peer, conn);
   });
-  conn.on('data', d => {
+  conn.on('data', async d => {
     if (!d || typeof d !== 'object') return;
     let m = grupo.membros.find(x => x.id === conn.peer);
+    if (m) m.visto = Date.now();
     if (d.tipo === 'entrar') {
       const nome = nomeLimpo(d.nome);
-      if (grupo.banidos.has('nome:' + nome.toLowerCase())) { try { conn.send({ tipo: 'expulso' }); } catch {} setTimeout(() => conn.close(), 300); return; }
+      if (banido(conn.peer, nome)) { try { conn.send({ tipo: 'expulso' }); } catch {} setTimeout(() => conn.close(), 300); return; }
       if (!m) { m = { id: conn.peer, nome, sala: null, dono: false }; grupo.membros.push(m); }
-      m.nome = nome;
+      m.nome = nome; m.visto = Date.now();
       if (d.sala !== undefined) m.sala = typeof d.sala === 'string' ? d.sala.slice(0, 40) : null;
+      // quem criou prova com a chave; o primeiro a provar define a chave do grupo
+      if (typeof d.chave === 'string' && d.chave) {
+        const h = await hashChave(d.chave);
+        if (!grupo.donoHash) grupo.donoHash = h;
+        m.dono = h === grupo.donoHash;
+      }
       difundir();
     } else if (d.tipo === 'sala' && m) {
       m.sala = typeof d.sala === 'string' ? d.sala.slice(0, 40) : null;
       difundir();
+    } else if (d.tipo === 'expulsar' && typeof d.chave === 'string') {
+      if (grupo.donoHash && await hashChave(d.chave) === grupo.donoHash) expulsarAqui(d.id);
     }
   });
   conn.on('close', () => {
@@ -2771,70 +2894,34 @@ function conexaoDoMembro(conn) {
   conn.on('error', () => {});
 }
 function difundir() {
-  if (grupo.dono) {
+  if (grupo.host) {
     garantirEu();
-    const lista = grupo.membros.map(m => ({ id: m.id, nome: m.nome, sala: m.sala, dono: m.dono }));
-    for (const c of grupo.conns.values()) if (c.open) try { c.send({ tipo: 'membros', lista }); } catch {}
+    const msg = { tipo: 'estado', lista: grupo.membros.map(m => ({ id: m.id, nome: m.nome, sala: m.sala, dono: !!m.dono })), banidos: grupo.banidos, donoHash: grupo.donoHash };
+    for (const c of grupo.conns.values()) if (c.open) try { c.send(msg); } catch {}
   }
   renderGrupo();
 }
+// expulsar: só quem criou o grupo (tem a chave); se outra pessoa estiver segurando a sala, o pedido vai pra ela
 function expulsar(id) {
-  if (!grupo.dono) return;
+  if (!souDono()) return;
   const m = grupo.membros.find(x => x.id === id);
-  grupo.banidos.add(id);
-  if (m) grupo.banidos.add('nome:' + m.nome.toLowerCase());
+  if (grupo.host) expulsarAqui(id);
+  else if (grupo.con && grupo.con.open) try { grupo.con.send({ tipo: 'expulsar', id, chave: chaveDono(grupo.codigo) }); } catch {}
+  statusGrupo(`${m ? m.nome : 'A pessoa'} foi expulso(a) do grupo.`, 'ok');
+}
+function expulsarAqui(id) {
+  const m = grupo.membros.find(x => x.id === id);
+  if (!m || m.id === grupo.meuId) return;
+  grupo.banidos.push(id, 'nome:' + m.nome.toLowerCase());
   const c = grupo.conns.get(id);
   if (c) { try { c.send({ tipo: 'expulso' }); } catch {} setTimeout(() => { try { c.close(); } catch {} }, 300); }
   grupo.membros = grupo.membros.filter(x => x.id !== id);
   difundir();
-  statusGrupo(`${m ? m.nome : 'A pessoa'} foi expulso(a) do grupo.`, 'ok');
-}
-
-// ---------- membro: conversa com o dono
-async function virarMembro() {
-  grupo.dono = false;
-  const opcoes = await opcoesPeer();
-  if (!grupo.ativo) return;
-  const p = new Peer(opcoes);
-  grupo.peer = p;
-  p.on('open', id => { grupo.meuId = id; conectarAoDono(); });
-  p.on('error', e => {
-    if (grupo.peer !== p || !grupo.ativo) return;
-    if (e.type === 'peer-unavailable') { statusGrupo('Grupo não encontrado: quem criou precisa estar com o grupo aberto. Tentando de novo...', 'aviso'); agendarReconexaoGrupo(5000); }
-    else if (['network', 'server-error', 'socket-error', 'socket-closed', 'disconnected'].includes(e.type)) { statusGrupo('Sem conexão com o servidor de pareamento. Tentando de novo...', 'aviso'); agendarReconexaoGrupo(4000); }
-  });
-  p.on('disconnected', () => setTimeout(() => { if (grupo.peer === p && !p.destroyed && p.disconnected) try { p.reconnect(); } catch {} }, 2000));
-}
-function agendarReconexaoGrupo(ms) {
-  clearTimeout(grupo.recon);
-  grupo.recon = setTimeout(() => { if (grupo.ativo && !grupo.expulso && !(grupo.con && grupo.con.open)) conectarAoDono(); }, ms);
-}
-function conectarAoDono() {
-  if (!grupo.ativo || !grupo.peer || grupo.peer.destroyed) return;
-  if (!grupo.peer.open) { agendarReconexaoGrupo(2000); return; }
-  if (grupo.con) try { grupo.con.close(); } catch {}
-  const con = grupo.peer.connect(PREFIXO_G + grupo.codigo, { reliable: true });
-  grupo.con = con;
-  con.on('open', () => {
-    con.send({ tipo: 'entrar', nome: grupo.nome, sala: salaTx });
-    statusGrupo('Você está no grupo. Clique em "Compartilhar minha tela" pra todos verem a sua.', 'ok');
-  });
-  con.on('data', d => {
-    if (!d || typeof d !== 'object') return;
-    if (d.tipo === 'membros' && Array.isArray(d.lista)) { grupo.membros = d.lista.slice(0, 500); renderGrupo(); }
-    if (d.tipo === 'expulso') foiExpulso();
-  });
-  con.on('close', () => {
-    if (grupo.con !== con || !grupo.ativo || grupo.expulso) return;
-    statusGrupo('Perdi a conexão com o grupo (quem criou pode ter saído). Tentando de novo...', 'aviso');
-    agendarReconexaoGrupo(3000);
-  });
-  con.on('error', () => {});
 }
 function foiExpulso() {
   grupo.expulso = true;
   if (streamTx) pararTx(); // expulso para de compartilhar com o grupo
-  sairDoGrupo(true);
+  sairDoGrupo();
   alertaHome('Você foi removido do grupo pelo dono.');
 }
 function alertaHome(msg) {
@@ -2845,18 +2932,29 @@ function alertaHome(msg) {
 }
 function avisarSala(sala) {
   if (!grupo.ativo) return;
-  if (grupo.dono) { difundir(); return; }
+  if (grupo.host) { difundir(); return; }
   if (grupo.con && grupo.con.open) try { grupo.con.send({ tipo: 'sala', sala }); } catch {}
   renderGrupo();
 }
-function sairDoGrupo(semVoltar) {
-  grupo.ativo = false;
+// sair de verdade (botão "Sair do grupo" ou expulso): esquece o grupo. Fechar o site NÃO sai: ao voltar, reentra.
+function desligarGrupo() {
   clearTimeout(grupo.recon);
   if (grupo.con) try { grupo.con.close(); } catch {}
   for (const c of grupo.conns.values()) try { c.close(); } catch {}
   grupo.conns.clear();
-  if (grupo.peer) try { grupo.peer.destroy(); } catch {}
-  Object.assign(grupo, { con: null, peer: null, membros: [], dono: false });
+  for (const p of [grupo.peer, grupo.peerHost]) if (p) try { p.destroy(); } catch {}
+  Object.assign(grupo, { con: null, peer: null, peerHost: null, host: false, assumindo: false });
+  for (const t of [...$('#grupo-telas').children]) t.remove();
+}
+function sairDoGrupo() {
+  grupo.ativo = false;
+  esquecerGrupo();
+  clearTimeout(grupo.recon);
+  if (grupo.con) try { grupo.con.close(); } catch {}
+  for (const c of grupo.conns.values()) try { c.close(); } catch {}
+  grupo.conns.clear();
+  for (const p of [grupo.peer, grupo.peerHost]) if (p) try { p.destroy(); } catch {}
+  Object.assign(grupo, { con: null, peer: null, peerHost: null, membros: [], host: false, assumindo: false, banidos: [], donoHash: '' });
   for (const t of [...$('#grupo-telas').children]) t.remove();
   document.querySelector('#tx [data-voltar]').lastChild.textContent = 'Início';
   history.replaceState(null, '', location.pathname);
@@ -2879,7 +2977,7 @@ function renderGrupo() {
     li.append(nome);
     if (m.dono) { const t = document.createElement('span'); t.className = 'etq rec'; t.textContent = 'DONO'; li.append(t); }
     if (m.sala) { const t = document.createElement('span'); t.className = 'etq vivo'; t.textContent = 'AO VIVO'; li.append(t); }
-    if (grupo.dono && m.id !== grupo.meuId) {
+    if (souDono() && m.id !== grupo.meuId) {
       const b = document.createElement('button');
       b.className = 'membro-expulsar'; b.textContent = 'Expulsar'; b.title = 'Tirar ' + m.nome + ' do grupo';
       b.onclick = () => expulsar(m.id);
@@ -3040,6 +3138,34 @@ document.querySelectorAll('[data-voltar]').forEach(b => b.onclick = () => {
 $('#sel-audio').onchange = selecionarAudio;
 $('#bt-atualizar').onclick = listarAudio;
 $('#bt-comecar').onclick = comecar;
+$('#bt-comecar-flut').onclick = comecar;
+// resumo: o que vai sair na transmissão, em chips
+function resumoTx() {
+  const r = $('#resumo-tx'); if (!r) return;
+  const fonte = { monitor: CELULAR_TX ? 'Tela do celular' : 'Tela inteira', window: 'Janela', browser: 'Aba', camera: 'Câmera' }[radio('fonte')] || '';
+  const modo = radio('audio');
+  let som = { captura: radio('fonte') === 'browser' ? 'Som da aba' : CELULAR_TX ? 'Som do celular' : 'Som do Windows', device: radio('fonte') === 'camera' ? 'Microfone' : 'Cabo virtual', none: 'Sem som' }[modo] || '';
+  if (modo === 'app') som = 'Programa: ' + ({ excluir: 'sem o Discord', incluir: 'apps marcados', tudo: 'tudo do PC' }[prog.modo] || '');
+  const q = QUALIDADES[$('#sel-qual').value];
+  const chips = [['', fonte], ['', som], ['', q ? q.nome.split(' · ').slice(0, 2).join(' · ') : '']];
+  if ($('#turbo').checked) chips.push(['', 'Turbo']);
+  if (radio('fonte') !== 'camera' && $('#cam-junto').checked && !CELULAR_TX) chips.push(['+', 'câmera']);
+  if (micLigado()) chips.push(['+', 'microfone']);
+  r.innerHTML = '';
+  for (const [pre, txt] of chips) { if (!txt) continue; const sp = document.createElement('span'); if (pre) { const b = document.createElement('b'); b.textContent = pre; sp.append(b); } sp.append(txt); r.append(sp); }
+  r.classList.toggle('hidden', !!streamTx);
+  if (streamTx) $('#bt-comecar-flut').classList.add('hidden');
+}
+document.querySelector('#tx').addEventListener('change', resumoTx);
+document.querySelector('#tx').addEventListener('input', resumoTx);
+setInterval(() => { if (!$('#tx').classList.contains('hidden')) resumoTx(); }, 1500);
+// celular: quando o botão de começar sai da vista (rolando pelas opções), aparece um flutuante
+if ('IntersectionObserver' in window) {
+  new IntersectionObserver(([e]) => {
+    const mostrarFlut = !e.isIntersecting && !streamTx && !$('#tx').classList.contains('hidden') && innerWidth <= 980 && !$('#bt-comecar').classList.contains('hidden');
+    $('#bt-comecar-flut').classList.toggle('hidden', !mostrarFlut);
+  }).observe($('#bt-comecar'));
+}
 $('#mic-junto').checked = guardar.get('micJunto') === '1';
 $('#mic-opcoes').classList.toggle('hidden', !$('#mic-junto').checked);
 $('#mic-junto').onchange = mudouMic;
@@ -3137,6 +3263,8 @@ $('#form-nome').onsubmit = e => { e.preventDefault(); entrarNoGrupo(); };
 $('#in-nome').addEventListener('input', () => $('#erro-nome').classList.add('hidden'));
 $('#bt-grupo-entrar-voltar').onclick = () => { history.replaceState(null, '', location.pathname); mostrar('home'); };
 $('#bt-sair-grupo').onclick = () => { if (streamTx) pararTx(); sairDoGrupo(); };
+// fechou o site sem sair do grupo? ao voltar, entra de novo sozinho
+
 $('#bt-grupo-link').onclick = () => copiar(linkGrupo(grupo.codigo), $('#bt-grupo-link'), 'Copiar link do grupo');
 $('#bt-grupo-compartilhar').onclick = () => {
   mostrar('tx');
@@ -3144,8 +3272,16 @@ $('#bt-grupo-compartilhar').onclick = () => {
   if (!streamTx) { atualizarModoAudio(); mostrarOpcoesCamera(); if (!CELULAR_TX) verConexaoDireta(); }
 };
 document.querySelectorAll('input[name="layout"]').forEach(i => i.onchange = () => { grupo.layout = radio('layout'); guardar.set('grupoLayout', grupo.layout); renderGrupo(); });
-const grupoLink = new URLSearchParams(location.search).get('g');
-if (grupoLink && !EMBED) abrirEntradaGrupo(grupoLink.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20), guardar.get('grupoDono') === grupoLink.toLowerCase());
+(function () {
+  const q = new URLSearchParams(location.search);
+  if (EMBED || q.get('c')) return;
+  const link = q.get('g') ? q.get('g').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20) : '';
+  const lembrado = grupoLembrado();
+  const cod = link || (lembrado && lembrado.codigo);
+  if (!cod) return;
+  if (lembrado && lembrado.codigo === cod && lembrado.nome) iniciarGrupo(cod, lembrado.nome); // já estava nele
+  else abrirEntradaGrupo(cod, !!chaveDono(cod));
+})();
 
 const convite = new URLSearchParams(location.search).get('c');
 if (convite) { $('#in-codigo').value = convite; iniciarAssistir(); }
