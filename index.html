@@ -352,6 +352,54 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
   border-radius:12px;padding:12px 14px;font:12px/1.8 var(--mono);color:#d6dae2;white-space:pre}
 
 /* ---------- responsivo ---------- */
+/* ---------- grupo ---------- */
+.acao-grupo{display:flex;flex-direction:column;gap:10px}
+.grupo-titulo{display:flex;align-items:center;gap:8px;font-size:15px}
+.grupo-titulo b{font-weight:600}
+.acao-grupo small{color:var(--sub);font-size:13.5px;line-height:1.45}
+.acao-grupo .btn{align-self:flex-start}
+.grupo-entrada{max-width:520px;margin:clamp(24px,8vh,80px) auto 0}
+.grupo-entrada h2{font-size:28px;letter-spacing:-.03em;margin:18px 0 0}
+.grupo-entrada .lead{margin:8px 0 22px;font-size:15px}
+.grupo-cab{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:4px 0 12px}
+.grupo-cab h2{margin:0;font-size:26px;letter-spacing:-.03em}
+.grupo-cod{font:600 18px var(--mono);letter-spacing:.12em;color:var(--acento);margin-left:6px}
+.grupo-acoes{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}
+#grupo-status{margin-bottom:14px}
+.grupo-corpo{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:20px;align-items:start}
+.grupo-modos{max-width:320px;margin:0 0 12px}
+.grupo-telas{display:grid;gap:10px}
+.grupo-telas.grade{grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr))}
+.grupo-telas.destaque{grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}
+.grupo-telas.destaque .tile.foco{grid-column:1/-1;order:-1}
+.tile{position:relative;aspect-ratio:16/9;background:#000;border-radius:var(--r-m);overflow:hidden;border:1px solid var(--linha)}
+.tile.foco{border-color:var(--acento)}
+.tile iframe,.tile video{position:absolute;inset:0;width:100%;height:100%;border:0;object-fit:contain;background:#000}
+.tile-capa{position:absolute;inset:0;background:transparent;cursor:pointer;z-index:1}
+.grupo-telas.destaque .tile.foco .tile-capa{display:none}
+.grupo-telas.destaque .tile.foco .tile-barra{pointer-events:auto}
+.tile-barra{position:absolute;left:0;right:0;bottom:0;z-index:2;display:flex;align-items:center;gap:6px;padding:18px 10px 8px;
+  background:linear-gradient(transparent,rgba(0,0,0,.75));font-size:13px;font-weight:500;color:#eceef2}
+.grupo-telas.destaque .tile.foco .tile-barra{top:0;bottom:auto;padding:8px 10px 18px;background:linear-gradient(rgba(0,0,0,.7),transparent)}
+.tile-nome{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile-bt{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:8px;background:rgba(255,255,255,.12);color:#fff}
+.tile-bt:hover{background:rgba(255,255,255,.24)}
+.tile-bt svg.i{width:16px;height:16px}
+.tile.eu::after{content:"você";position:absolute;top:8px;right:8px;z-index:2;padding:2px 7px;border-radius:6px;background:var(--acento);color:var(--acento-tinta);font:700 10.5px var(--mono);letter-spacing:.06em}
+.tile:fullscreen{border:0;border-radius:0}
+.grupo-vazio{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:260px;border:1px dashed var(--linha-2);border-radius:var(--r-l);color:var(--fraco);text-align:center;font-size:14px;padding:24px}
+.grupo-vazio svg.i{width:30px;height:30px}
+.grupo-membros{padding:16px;border-radius:var(--r-l);background:var(--sup);border:1px solid var(--linha);position:sticky;top:20px}
+.grupo-membros ul{list-style:none;margin:10px 0 0;padding:0}
+.membro{display:flex;align-items:center;gap:6px;padding:8px 0;border-top:1px solid var(--linha);font-size:14px}
+.membro:first-child{border-top:0}
+.membro-nome{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.etq.vivo{background:var(--acento);color:var(--acento-tinta)}
+.membro-expulsar{font-size:12px;color:var(--erro);padding:3px 7px;border-radius:6px;border:1px solid rgba(255,107,120,.3)}
+.membro-expulsar:hover{background:rgba(255,107,120,.1)}
+/* player embutido no grupo: sem o cabeçalho e sem o "sair" */
+.embed .topo,.embed #bt-sair,.embed #bt-espera-sair,.embed #bt-qrx{display:none!important}
+@media (max-width:980px){.grupo-corpo{grid-template-columns:1fr}.grupo-membros{position:static;order:-1}.grupo-acoes{margin-left:0}}
 @media (max-width:980px){
   #home{grid-template-columns:minmax(0,1fr);gap:36px}
   .acao-rx{order:-1}
@@ -452,6 +500,11 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
       </div>
       <p id="erro-codigo" class="erro-campo hidden">Digite o código que seu amigo mandou.</p>
     </form>
+    <div class="acao acao-grupo">
+      <div class="grupo-titulo"><svg class="i"><use href="#i-usuarios"/></svg><b>Grupo</b><span class="etq rec">NOVO</span></div>
+      <small>Todo mundo que entrar pelo link pode compartilhar a tela, várias ao mesmo tempo. Você escolhe qual fica grande.</small>
+      <button id="bt-criar-grupo" class="btn" type="button">Criar grupo</button>
+    </div>
     <div class="cartao-prog so-pc">
       <img src="app-audio/icone.png" alt="" width="40" height="40">
       <div><b>Tela ao Vivo Áudio</b><small>Programinha pra quem transmite: tira o Discord do som ou manda só os apps que você marcar. Windows 10 e 11, 73 KB.</small></div>
@@ -674,6 +727,48 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
 
       <button id="bt-comecar" class="btn primario grande">Começar a transmitir</button>
       <button id="bt-parar" class="btn perigo grande hidden">Parar transmissão</button>
+    </aside>
+  </div>
+</section>
+
+<!-- ============ GRUPO: ENTRAR ============ -->
+<section id="grupo-entrar" class="tela hidden">
+  <div class="grupo-entrada">
+    <button class="voltar" id="bt-grupo-entrar-voltar"><svg class="i"><use href="#i-voltar"/></svg>Início</button>
+    <h2 id="titulo-entrar-grupo">Entrar no grupo</h2>
+    <p class="lead" id="sub-entrar-grupo">Escolha como seu nome vai aparecer pros outros do grupo.</p>
+    <form id="form-nome" class="campo-codigo" novalidate>
+      <input id="in-nome" type="text" placeholder="Seu nome" maxlength="24" autocomplete="nickname" spellcheck="false">
+      <button class="btn primario" type="submit">Entrar</button>
+    </form>
+    <p id="erro-nome" class="erro-campo hidden">Digite um nome.</p>
+  </div>
+</section>
+
+<!-- ============ GRUPO ============ -->
+<section id="grupo" class="tela hidden">
+  <div class="grupo-cab">
+    <button class="voltar" id="bt-sair-grupo"><svg class="i"><use href="#i-voltar"/></svg>Sair do grupo</button>
+    <h2>Grupo <span id="grupo-codigo" class="grupo-cod"></span></h2>
+    <div class="grupo-acoes">
+      <button id="bt-grupo-link" class="btn"><svg class="i"><use href="#i-link"/></svg><span>Copiar link do grupo</span></button>
+      <button id="bt-grupo-compartilhar" class="btn primario"><svg class="i"><use href="#i-monitor"/></svg><span>Compartilhar minha tela</span></button>
+    </div>
+  </div>
+  <div id="grupo-status" class="status"></div>
+  <div class="grupo-corpo">
+    <div class="grupo-palco">
+      <div class="seg grupo-modos" role="radiogroup" aria-label="Como mostrar as telas">
+        <label><input type="radio" name="layout" value="grade"><span>Grade<small>todas iguais</small></span></label>
+        <label><input type="radio" name="layout" value="destaque"><span>Destaque<small>uma grande</small></span></label>
+      </div>
+      <div id="grupo-telas" class="grupo-telas grade"></div>
+      <div id="grupo-vazio" class="grupo-vazio"><svg class="i"><use href="#i-monitor"/></svg>Ninguém compartilhando ainda.<br>Clique em "Compartilhar minha tela" ou espere alguém começar.</div>
+    </div>
+    <aside class="grupo-membros">
+      <div class="rotulo">No grupo <span id="grupo-contagem"></span></div>
+      <ul id="lista-membros"></ul>
+      <p class="dica">Quem tem o link pode entrar. O grupo fica aberto enquanto quem criou estiver com ele aberto.</p>
     </aside>
   </div>
 </section>
@@ -1705,6 +1800,13 @@ async function abrirSala(novo) {
     $('#tag-vivo').classList.remove('hidden');
     $('#pill-vivo').classList.remove('hidden');
     statusTx(CELULAR_TX ? 'Ao vivo. Mande o link e pode abrir o app ou jogo que quiser. Se parar ao sair do Safari, volte pra ele.' : 'Ao vivo. Mande o código ou o link pro seu amigo.', 'ok');
+    salaTx = codigo;
+    if (grupo.ativo) {
+      // no grupo: avisa todo mundo e volta pra tela do grupo
+      avisarSala(codigo);
+      statusTx('Ao vivo no grupo. Sua tela já aparece pra todo mundo.', 'ok');
+      setTimeout(() => { if (grupo.ativo && streamTx && !$('#tx').classList.contains('hidden')) { mostrar('grupo'); renderGrupo(); } }, 1200);
+    }
   });
   p.on('error', e => {
     if (peerTx !== p) return;
@@ -1806,6 +1908,7 @@ async function trocarQualidade() {
 }
 
 function pararTx() {
+  if (salaTx) { salaTx = null; if (grupo.ativo) avisarSala(null); }
   desligarMic();
   if (composicao) { const c = composicao; composicao = null; c.parar(); }
   $('#cam-caixa').classList.add('hidden');
@@ -1881,8 +1984,9 @@ function iniciarAssistir() {
   video.volume = +vol.value;
   video.muted = guardar.get('mudo') === '1';
   if (TOQUE) { video.muted = false; if (+vol.value === 0) vol.value = 1; video.volume = 1; } // celular: sem barra de volume na tela
+  if (EMBED) { video.muted = embedMudo; video.volume = 1; } // no grupo, quem manda no som é a tela do grupo
   atualizarIconeSom();
-  mexeu();
+  if (!EMBED) mexeu(); // no grupo a barrinha do player só aparece ao passar o mouse
   manterAcesa(true);
   garantirPeerRx();
 }
@@ -1989,7 +2093,7 @@ function trocarNivelRx(n, motivo) {
   n = Math.min(NIVEIS_RX.length - 1, Math.max(0, n));
   if (n === qRx.nivel) return;
   qRx.nivel = n; qRx.ultimaTroca = Date.now(); qRx.calmo = 0;
-  if (!qRx.auto) guardar.set('qRxNivel', String(n));
+  if (!qRx.auto && !EMBED) guardar.set('qRxNivel', String(n));
   enviarPedido();
   if (motivo) avisoRx(motivo);
 }
@@ -2443,6 +2547,327 @@ setInterval(async () => {
   } catch (e) { console.warn(e); }
 }, 1000);
 
+
+// ============================================================ MODO GRUPO
+// Um grupo é uma sala onde todo mundo que entra pelo link pode compartilhar a tela. O dono do grupo
+// (quem criou) guarda a lista de membros e repassa pra todos pelo PeerJS. Cada tela compartilhada é
+// uma transmissão normal do site (com H.265, AUTO, áudio etc.); quem assiste vê cada uma num player
+// embutido (iframe ?c=sala&embed=1). As miniaturas pedem 360p pra poupar a internet de quem compartilha.
+const PREFIXO_G = 'telaaovivo-g1-';
+const grupo = {
+  ativo: false, dono: false, codigo: '', nome: '', peer: null, con: null, conns: new Map(),
+  membros: [], banidos: new Set(), meuId: '', expulso: false, recon: null,
+  layout: guardar.get('grupoLayout') === 'destaque' ? 'destaque' : 'grade', foco: null, somManual: new Map(),
+};
+let salaTx = null; // código da minha transmissão (quando estou compartilhando)
+
+const nomeLimpo = n => String(n || '').replace(/\s+/g, ' ').trim().slice(0, 24) || 'Sem nome';
+const linkGrupo = c => location.origin + location.pathname + '?g=' + encodeURIComponent(c);
+function statusGrupo(msg, tipo = '') { const e = $('#grupo-status'); e.textContent = msg; e.className = 'status ' + tipo; }
+
+function abrirEntradaGrupo(codigo, criando) {
+  grupo.codigo = codigo;
+  $('#titulo-entrar-grupo').textContent = criando ? 'Criar grupo' : 'Entrar no grupo';
+  $('#sub-entrar-grupo').textContent = criando
+    ? 'Escolha como seu nome vai aparecer. Depois é só mandar o link do grupo pro pessoal.'
+    : 'Escolha como seu nome vai aparecer pros outros do grupo.';
+  $('#in-nome').value = guardar.get('meuNome') || '';
+  $('#erro-nome').classList.add('hidden');
+  history.replaceState(null, '', '?g=' + encodeURIComponent(codigo));
+  mostrar('grupo-entrar');
+  setTimeout(() => $('#in-nome').focus(), 50);
+}
+function criarGrupo() {
+  const c = novoCodigo();
+  guardar.set('grupoDono', c);
+  abrirEntradaGrupo(c, true);
+}
+function entrarNoGrupo() {
+  const nome = $('#in-nome').value.trim();
+  if (!nome) { $('#erro-nome').classList.remove('hidden'); $('#in-nome').focus(); return; }
+  if (typeof Peer === 'undefined') { $('#erro-peer').classList.remove('hidden'); return; }
+  guardar.set('meuNome', nome);
+  Object.assign(grupo, { ativo: true, nome: nomeLimpo(nome), expulso: false, membros: [], foco: null });
+  mostrar('grupo');
+  renderGrupo();
+  statusGrupo('Entrando no grupo...');
+  if (guardar.get('grupoDono') === grupo.codigo) virarDono(); else virarMembro();
+}
+
+// ---------- dono: guarda a lista e repassa pra todos
+async function virarDono() {
+  const opcoes = await opcoesPeer();
+  if (!grupo.ativo) return;
+  const p = new Peer(PREFIXO_G + grupo.codigo, opcoes);
+  grupo.peer = p;
+  p.on('open', id => {
+    grupo.dono = true; grupo.meuId = id;
+    garantirEu();
+    difundir();
+    statusGrupo('Grupo aberto. Mande o link pro pessoal: quem entrar pode compartilhar a tela. Deixe esta aba aberta (o grupo vive nela).', 'ok');
+  });
+  p.on('connection', conexaoDoMembro);
+  p.on('error', e => {
+    if (grupo.peer !== p) return;
+    if (e.type === 'unavailable-id') { p.destroy(); grupo.peer = null; virarMembro(); return; } // o grupo já está aberto em outra aba: entra como membro
+    if (['network', 'server-error', 'socket-error', 'socket-closed', 'disconnected'].includes(e.type)) statusGrupo('Sem conexão com o servidor de pareamento. Tentando de novo...', 'aviso');
+  });
+  p.on('disconnected', () => setTimeout(() => { if (grupo.peer === p && !p.destroyed && p.disconnected) try { p.reconnect(); } catch {} }, 2000));
+}
+function garantirEu() {
+  let eu = grupo.membros.find(m => m.id === grupo.meuId);
+  if (!eu) { eu = { id: grupo.meuId, nome: grupo.nome, sala: salaTx, dono: grupo.dono }; grupo.membros.unshift(eu); }
+  eu.nome = grupo.nome; eu.sala = salaTx; eu.dono = grupo.dono;
+}
+function conexaoDoMembro(conn) {
+  conn.on('open', () => {
+    if (grupo.banidos.has(conn.peer)) { try { conn.send({ tipo: 'expulso' }); } catch {} setTimeout(() => conn.close(), 300); return; }
+    grupo.conns.set(conn.peer, conn);
+  });
+  conn.on('data', d => {
+    if (!d || typeof d !== 'object') return;
+    let m = grupo.membros.find(x => x.id === conn.peer);
+    if (d.tipo === 'entrar') {
+      const nome = nomeLimpo(d.nome);
+      if (grupo.banidos.has('nome:' + nome.toLowerCase())) { try { conn.send({ tipo: 'expulso' }); } catch {} setTimeout(() => conn.close(), 300); return; }
+      if (!m) { m = { id: conn.peer, nome, sala: null, dono: false }; grupo.membros.push(m); }
+      m.nome = nome;
+      if (d.sala !== undefined) m.sala = typeof d.sala === 'string' ? d.sala.slice(0, 40) : null;
+      difundir();
+    } else if (d.tipo === 'sala' && m) {
+      m.sala = typeof d.sala === 'string' ? d.sala.slice(0, 40) : null;
+      difundir();
+    }
+  });
+  conn.on('close', () => {
+    if (grupo.conns.get(conn.peer) === conn) grupo.conns.delete(conn.peer);
+    const i = grupo.membros.findIndex(x => x.id === conn.peer);
+    if (i >= 0) { grupo.membros.splice(i, 1); difundir(); }
+  });
+  conn.on('error', () => {});
+}
+function difundir() {
+  if (grupo.dono) {
+    garantirEu();
+    const lista = grupo.membros.map(m => ({ id: m.id, nome: m.nome, sala: m.sala, dono: m.dono }));
+    for (const c of grupo.conns.values()) if (c.open) try { c.send({ tipo: 'membros', lista }); } catch {}
+  }
+  renderGrupo();
+}
+function expulsar(id) {
+  if (!grupo.dono) return;
+  const m = grupo.membros.find(x => x.id === id);
+  grupo.banidos.add(id);
+  if (m) grupo.banidos.add('nome:' + m.nome.toLowerCase());
+  const c = grupo.conns.get(id);
+  if (c) { try { c.send({ tipo: 'expulso' }); } catch {} setTimeout(() => { try { c.close(); } catch {} }, 300); }
+  grupo.membros = grupo.membros.filter(x => x.id !== id);
+  difundir();
+  statusGrupo(`${m ? m.nome : 'A pessoa'} foi expulso(a) do grupo.`, 'ok');
+}
+
+// ---------- membro: conversa com o dono
+async function virarMembro() {
+  grupo.dono = false;
+  const opcoes = await opcoesPeer();
+  if (!grupo.ativo) return;
+  const p = new Peer(opcoes);
+  grupo.peer = p;
+  p.on('open', id => { grupo.meuId = id; conectarAoDono(); });
+  p.on('error', e => {
+    if (grupo.peer !== p || !grupo.ativo) return;
+    if (e.type === 'peer-unavailable') { statusGrupo('Grupo não encontrado: quem criou precisa estar com o grupo aberto. Tentando de novo...', 'aviso'); agendarReconexaoGrupo(5000); }
+    else if (['network', 'server-error', 'socket-error', 'socket-closed', 'disconnected'].includes(e.type)) { statusGrupo('Sem conexão com o servidor de pareamento. Tentando de novo...', 'aviso'); agendarReconexaoGrupo(4000); }
+  });
+  p.on('disconnected', () => setTimeout(() => { if (grupo.peer === p && !p.destroyed && p.disconnected) try { p.reconnect(); } catch {} }, 2000));
+}
+function agendarReconexaoGrupo(ms) {
+  clearTimeout(grupo.recon);
+  grupo.recon = setTimeout(() => { if (grupo.ativo && !grupo.expulso && !(grupo.con && grupo.con.open)) conectarAoDono(); }, ms);
+}
+function conectarAoDono() {
+  if (!grupo.ativo || !grupo.peer || grupo.peer.destroyed) return;
+  if (!grupo.peer.open) { agendarReconexaoGrupo(2000); return; }
+  if (grupo.con) try { grupo.con.close(); } catch {}
+  const con = grupo.peer.connect(PREFIXO_G + grupo.codigo, { reliable: true });
+  grupo.con = con;
+  con.on('open', () => {
+    con.send({ tipo: 'entrar', nome: grupo.nome, sala: salaTx });
+    statusGrupo('Você está no grupo. Clique em "Compartilhar minha tela" pra todos verem a sua.', 'ok');
+  });
+  con.on('data', d => {
+    if (!d || typeof d !== 'object') return;
+    if (d.tipo === 'membros' && Array.isArray(d.lista)) { grupo.membros = d.lista.slice(0, 500); renderGrupo(); }
+    if (d.tipo === 'expulso') foiExpulso();
+  });
+  con.on('close', () => {
+    if (grupo.con !== con || !grupo.ativo || grupo.expulso) return;
+    statusGrupo('Perdi a conexão com o grupo (quem criou pode ter saído). Tentando de novo...', 'aviso');
+    agendarReconexaoGrupo(3000);
+  });
+  con.on('error', () => {});
+}
+function foiExpulso() {
+  grupo.expulso = true;
+  if (streamTx) pararTx(); // expulso para de compartilhar com o grupo
+  sairDoGrupo(true);
+  alertaHome('Você foi removido do grupo pelo dono.');
+}
+function alertaHome(msg) {
+  const b = $('#erro-peer');
+  b.textContent = msg;
+  b.classList.remove('hidden');
+  setTimeout(() => { b.classList.add('hidden'); b.textContent = 'O componente de conexão não carregou. Confira a internet e aperte F5.'; }, 8000);
+}
+function avisarSala(sala) {
+  if (!grupo.ativo) return;
+  if (grupo.dono) { difundir(); return; }
+  if (grupo.con && grupo.con.open) try { grupo.con.send({ tipo: 'sala', sala }); } catch {}
+  renderGrupo();
+}
+function sairDoGrupo(semVoltar) {
+  grupo.ativo = false;
+  clearTimeout(grupo.recon);
+  if (grupo.con) try { grupo.con.close(); } catch {}
+  for (const c of grupo.conns.values()) try { c.close(); } catch {}
+  grupo.conns.clear();
+  if (grupo.peer) try { grupo.peer.destroy(); } catch {}
+  Object.assign(grupo, { con: null, peer: null, membros: [], dono: false });
+  for (const t of [...$('#grupo-telas').children]) t.remove();
+  document.querySelector('#tx [data-voltar]').lastChild.textContent = 'Início';
+  history.replaceState(null, '', location.pathname);
+  mostrar('home');
+}
+
+// ---------- tela do grupo: lista de membros e telas compartilhadas
+function renderGrupo() {
+  if (!$('#grupo')) return;
+  $('#grupo-codigo').textContent = grupo.codigo;
+  // lista de membros
+  const ul = $('#lista-membros');
+  ul.innerHTML = '';
+  for (const m of grupo.membros) {
+    const li = document.createElement('li');
+    li.className = 'membro' + (m.sala ? ' compartilhando' : '');
+    const nome = document.createElement('span');
+    nome.className = 'membro-nome';
+    nome.textContent = m.nome + (m.id === grupo.meuId ? ' (você)' : '');
+    li.append(nome);
+    if (m.dono) { const t = document.createElement('span'); t.className = 'etq rec'; t.textContent = 'DONO'; li.append(t); }
+    if (m.sala) { const t = document.createElement('span'); t.className = 'etq vivo'; t.textContent = 'AO VIVO'; li.append(t); }
+    if (grupo.dono && m.id !== grupo.meuId) {
+      const b = document.createElement('button');
+      b.className = 'membro-expulsar'; b.textContent = 'Expulsar'; b.title = 'Tirar ' + m.nome + ' do grupo';
+      b.onclick = () => expulsar(m.id);
+      li.append(b);
+    }
+    ul.append(li);
+  }
+  $('#grupo-contagem').textContent = grupo.membros.length ? `${grupo.membros.length} no grupo` : '';
+  // telas: uma por pessoa compartilhando
+  const box = $('#grupo-telas');
+  const compart = grupo.membros.filter(m => m.sala);
+  const chaves = new Set(compart.map(m => m.sala));
+  for (const t of [...box.children]) if (!chaves.has(t.dataset.sala)) t.remove();
+  for (const m of compart) {
+    let t = box.querySelector(`[data-sala="${CSS.escape(m.sala)}"]`);
+    if (!t) { t = criarTile(m); box.append(t); }
+    t.querySelector('.tile-nome').textContent = m.id === grupo.meuId ? 'Você (sua tela)' : m.nome;
+  }
+  if (!grupo.foco || !chaves.has(grupo.foco)) {
+    const outro = compart.find(m => m.id !== grupo.meuId) || compart[0];
+    grupo.foco = outro ? outro.sala : null;
+  }
+  box.className = 'grupo-telas ' + grupo.layout + ' n' + Math.min(compart.length, 9);
+  for (const t of box.children) t.classList.toggle('foco', t.dataset.sala === grupo.foco);
+  $('#grupo-vazio').classList.toggle('hidden', compart.length > 0);
+  marcar('layout', grupo.layout);
+  // botão de compartilhar
+  const b = $('#bt-grupo-compartilhar span');
+  b.textContent = salaTx ? 'Minha transmissão' : 'Compartilhar minha tela';
+  ajustarTiles();
+}
+function criarTile(m) {
+  const t = document.createElement('div');
+  t.className = 'tile';
+  t.dataset.sala = m.sala;
+  const eu = m.id === grupo.meuId;
+  if (eu) {
+    // a minha própria tela: prévia local (não gasta internet)
+    const v = document.createElement('video');
+    v.muted = true; v.autoplay = true; v.playsInline = true;
+    v.srcObject = streamTx;
+    t.append(v);
+    t.classList.add('eu');
+  } else {
+    const f = document.createElement('iframe');
+    f.src = location.pathname + '?c=' + encodeURIComponent(m.sala) + '&embed=1';
+    f.allow = 'autoplay; fullscreen; picture-in-picture';
+    f.title = 'Tela de ' + m.nome;
+    f.addEventListener('load', () => setTimeout(ajustarTiles, 300));
+    t.append(f);
+  }
+  const capa = document.createElement('button');
+  capa.className = 'tile-capa'; capa.title = 'Clique pra destacar esta tela';
+  capa.onclick = () => { grupo.foco = t.dataset.sala; grupo.layout = 'destaque'; guardar.set('grupoLayout', 'destaque'); renderGrupo(); };
+  const barra = document.createElement('div');
+  barra.className = 'tile-barra';
+  barra.innerHTML = '<span class="tile-nome"></span><span class="flex"></span>' +
+    (eu ? '' : '<button class="tile-bt tile-som" title="Som desta tela"><svg class="i"><use href="#i-mudo"/></svg></button>') +
+    '<button class="tile-bt tile-cheia" title="Tela cheia"><svg class="i"><use href="#i-cheia"/></svg></button>';
+  const som = barra.querySelector('.tile-som');
+  if (som) som.onclick = e => { e.stopPropagation(); grupo.somManual.set(t.dataset.sala, !somLigado(t.dataset.sala)); ajustarTiles(); };
+  barra.querySelector('.tile-cheia').onclick = e => {
+    e.stopPropagation();
+    const pedir = t.requestFullscreen || t.webkitRequestFullscreen;
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    else if (pedir) pedir.call(t).catch(() => {});
+  };
+  t.append(capa, barra);
+  return t;
+}
+// som: por padrão só a tela em destaque toca; cada uma pode ser ligada/desligada na mão
+function somLigado(sala) { return grupo.somManual.has(sala) ? grupo.somManual.get(sala) : sala === grupo.foco; }
+function ajustarTiles() {
+  const tiles = [...$('#grupo-telas').children].filter(t => !t.classList.contains('eu'));
+  const n = tiles.length;
+  for (const t of tiles) {
+    const f = t.querySelector('iframe');
+    if (!f || !f.contentWindow) continue;
+    const grande = grupo.layout === 'destaque' ? t.dataset.sala === grupo.foco : n <= 2;
+    // qualidade: a grande no automático; miniaturas leves (economiza a internet de quem compartilha)
+    const nivel = grande ? 'auto' : (grupo.layout === 'grade' && n <= 4 ? 3 : 4);
+    const ligado = somLigado(t.dataset.sala);
+    try { f.contentWindow.postMessage({ tvv: 'config', nivel, mudo: !ligado }, location.origin); } catch {}
+    const ico = t.querySelector('.tile-som use');
+    if (ico) ico.setAttribute('href', ligado ? '#i-som' : '#i-mudo');
+  }
+  for (const t of $('#grupo-telas').children) {
+    const v = t.querySelector('video');
+    if (v && v.srcObject !== streamTx) v.srcObject = streamTx;
+  }
+}
+setInterval(() => { if (grupo.ativo) ajustarTiles(); }, 3000); // reenvia (o player embutido pode ter recarregado)
+
+// ---------- player embutido (dentro do grupo): obedece o grupo
+const EMBED = new URLSearchParams(location.search).get('embed') === '1';
+let embedMudo = true;
+if (EMBED) {
+  document.body.classList.add('embed');
+  window.addEventListener('message', e => {
+    if (e.origin !== location.origin || !e.data || e.data.tvv !== 'config') return;
+    const d = e.data;
+    if (d.nivel === 'auto') { if (!qRx.auto) { qRx.auto = true; trocarNivelRx(TETO_AUTO); } }
+    else if (typeof d.nivel === 'number' && (qRx.auto || qRx.nivel !== d.nivel)) { qRx.auto = false; trocarNivelRx(d.nivel); }
+    if (embedMudo !== !!d.mudo) {
+      embedMudo = !!d.mudo;
+      if (reforcoAtivo()) { reforco.mudo = embedMudo; reforco.ganho.gain.value = embedMudo ? 0 : reforco.nivel; }
+      else { video.muted = embedMudo; if (!embedMudo) video.play().catch(() => {}); }
+      atualizarIconeSom();
+    }
+  });
+}
+
 // ============================================================ ligações da interface
 const selQual = $('#sel-qual');
 Object.entries(QUALIDADES).forEach(([k, q]) => selQual.add(new Option(q.nome, k)));
@@ -2465,6 +2890,7 @@ document.querySelectorAll('input[name="dica"]').forEach(i => i.onchange = trocar
 
 $('#bt-modo-tx').onclick = () => { mostrar('tx'); atualizarModoAudio(); mostrarOpcoesCamera(); if (!CELULAR_TX) verConexaoDireta(); };
 document.querySelectorAll('[data-voltar]').forEach(b => b.onclick = () => {
+  if (grupo.ativo) { mostrar('grupo'); renderGrupo(); return; } // no grupo: volta pro grupo e continua transmitindo
   pararTx();
   if (trilhaAudio) { trilhaAudio.stop(); trilhaAudio = null; }
   medir(null);
@@ -2571,6 +2997,22 @@ window.addEventListener('beforeunload', () => {
 if (typeof Peer === 'undefined') $('#erro-peer').classList.remove('hidden');
 
 // link de convite: ?c=codigo entra direto pra assistir
+// grupo: criar, entrar, compartilhar, layout
+$('#bt-criar-grupo').onclick = criarGrupo;
+$('#form-nome').onsubmit = e => { e.preventDefault(); entrarNoGrupo(); };
+$('#in-nome').addEventListener('input', () => $('#erro-nome').classList.add('hidden'));
+$('#bt-grupo-entrar-voltar').onclick = () => { history.replaceState(null, '', location.pathname); mostrar('home'); };
+$('#bt-sair-grupo').onclick = () => { if (streamTx) pararTx(); sairDoGrupo(); };
+$('#bt-grupo-link').onclick = () => copiar(linkGrupo(grupo.codigo), $('#bt-grupo-link'), 'Copiar link do grupo');
+$('#bt-grupo-compartilhar').onclick = () => {
+  mostrar('tx');
+  document.querySelector('#tx [data-voltar]').lastChild.textContent = 'Voltar pro grupo';
+  if (!streamTx) { atualizarModoAudio(); mostrarOpcoesCamera(); if (!CELULAR_TX) verConexaoDireta(); }
+};
+document.querySelectorAll('input[name="layout"]').forEach(i => i.onchange = () => { grupo.layout = radio('layout'); guardar.set('grupoLayout', grupo.layout); renderGrupo(); });
+const grupoLink = new URLSearchParams(location.search).get('g');
+if (grupoLink && !EMBED) abrirEntradaGrupo(grupoLink.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20), guardar.get('grupoDono') === grupoLink.toLowerCase());
+
 const convite = new URLSearchParams(location.search).get('c');
 if (convite) { $('#in-codigo').value = convite; iniciarAssistir(); }
 </script>
