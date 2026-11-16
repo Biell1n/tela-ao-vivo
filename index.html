@@ -345,6 +345,22 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
 #espera:not(.hidden)~#barra .ao-vivo-rx,#espera:not(.hidden)~#barra #info-rx{display:none}
 .rotulo-reforco{font:600 12px var(--mono);margin-left:-2px}
 #bt-reforco.ativo{color:var(--acento)}
+.menu-config{position:absolute;right:max(14px,env(safe-area-inset-right));bottom:calc(76px + env(safe-area-inset-bottom));z-index:6;width:min(300px,calc(100% - 28px));max-height:calc(100% - 100px);overflow:auto;
+  padding:6px 0;border-radius:14px;background:rgba(18,19,23,.94);backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.1);
+  box-shadow:0 18px 50px rgba(0,0,0,.55);color:#eceef2;font-size:14px;overscroll-behavior:contain}
+.menu-item{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;padding:0 16px;text-align:left;color:inherit;font:inherit}
+.menu-item:hover,.menu-item:focus-visible{background:rgba(255,255,255,.08);outline:none}
+.menu-item .mi-rot{flex:1}
+.menu-item .mi-val{color:#a7abb5;font-size:13px}
+.menu-item svg.i{width:16px;height:16px;color:#a7abb5}
+.menu-item.marcado{color:var(--acento);font-weight:600}
+.menu-item .mi-check{width:16px;text-align:center}
+.menu-cab{display:flex;align-items:center;gap:6px;min-height:44px;padding:0 10px;border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:4px;font-weight:600}
+.menu-cab button{display:grid;place-items:center;width:32px;height:32px;border-radius:8px;color:inherit}
+.menu-cab button:hover{background:rgba(255,255,255,.1)}
+.menu-cab svg.i{transform:rotate(180deg)}
+.menu-nota{padding:6px 16px 10px;color:#8e929c;font-size:12px;line-height:1.4}
+.selo-qrx{font:700 10px var(--mono);letter-spacing:.04em;padding:2px 5px;border-radius:5px;background:rgba(255,255,255,.14);margin-left:-2px}
 #toast-rx{position:absolute;left:50%;top:18px;transform:translateX(-50%);max-width:min(92%,420px);padding:12px 16px;border-radius:12px;
   background:rgba(13,14,16,.88);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.1);color:#eceef2;font-size:14px;line-height:1.45;text-align:center;
   padding-top:max(12px,env(safe-area-inset-top))}
@@ -352,6 +368,23 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
   border-radius:12px;padding:12px 14px;font:12px/1.8 var(--mono);color:#d6dae2;white-space:pre}
 
 /* ---------- responsivo ---------- */
+/* ---------- abertura ---------- */
+#abertura{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
+  background:radial-gradient(600px 300px at 50% 45%,rgba(255,91,55,.12),transparent 70%),var(--bg);animation:abSai .5s 1.75s cubic-bezier(.4,0,.2,1) forwards;cursor:pointer}
+#abertura.sai{animation:abSai .3s forwards}
+.ab-logo{display:flex;align-items:center;gap:18px}
+.ab-ponto{position:relative;width:22px;height:22px;flex:none;border-radius:50%;background:var(--acento);animation:abPonto .6s cubic-bezier(.2,1.4,.4,1) both}
+.ab-ponto i{position:absolute;inset:-2px;border-radius:50%;border:2px solid var(--acento);opacity:0;animation:abOnda 1.3s .35s cubic-bezier(.2,.8,.2,1) both}
+.ab-ponto i+i{animation-delay:.65s}
+.ab-texto{font:700 clamp(30px,7vw,52px)/1 var(--fonte);letter-spacing:-.04em;color:var(--texto);clip-path:inset(0 100% 0 0);animation:abTexto .7s .3s cubic-bezier(.65,0,.35,1) forwards}
+.ab-texto em{font-style:normal;color:var(--acento)}
+.ab-sub{font:500 12px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--fraco);opacity:0;transform:translateY(6px);animation:abSub .5s .85s ease-out forwards}
+@keyframes abPonto{from{transform:scale(0)}to{transform:scale(1)}}
+@keyframes abOnda{0%{opacity:.9;transform:scale(1)}100%{opacity:0;transform:scale(3.2)}}
+@keyframes abTexto{to{clip-path:inset(0 0 0 0)}}
+@keyframes abSub{to{opacity:1;transform:none}}
+@keyframes abSai{to{opacity:0;visibility:hidden;transform:scale(1.03)}}
+
 /* ---------- grupo ---------- */
 .acao-grupo{display:flex;flex-direction:column;gap:10px}
 .grupo-titulo{display:flex;align-items:center;gap:8px;font-size:15px}
@@ -399,7 +432,7 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
 .membro-expulsar:hover{background:rgba(255,107,120,.1)}
 /* player embutido no grupo: sem o cabeçalho e sem o "sair" */
 .embed .topo,.embed #bt-sair,.embed #bt-espera-sair,.embed #bt-qrx{display:none!important}
-@media (max-width:980px){.grupo-corpo{grid-template-columns:1fr}.grupo-membros{position:static;order:-1}.grupo-acoes{margin-left:0}}
+@media (max-width:980px){.grupo-corpo{grid-template-columns:minmax(0,1fr)}.grupo-membros{position:static;order:-1}.grupo-acoes{margin-left:0}}
 @media (max-width:980px){
   #home{grid-template-columns:minmax(0,1fr);gap:36px}
   .acao-rx{order:-1}
@@ -425,6 +458,23 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
 </style>
 </head>
 <body>
+<div id="abertura" aria-hidden="true">
+  <div class="ab-logo">
+    <span class="ab-ponto"><i></i><i></i></span>
+    <span class="ab-texto">Tela <em>ao Vivo</em></span>
+  </div>
+  <span class="ab-sub">compartilhamento de tela · ao vivo</span>
+</div>
+<script>
+// abertura: só uma vez por sessão, só na página inicial (link de assistir/grupo e player embutido vão direto)
+(function () {
+  var q = new URLSearchParams(location.search), a = document.getElementById('abertura');
+  var ja = false; try { ja = sessionStorage.getItem('abertura') === '1'; sessionStorage.setItem('abertura', '1'); } catch (e) {}
+  if (ja || q.get('c') || q.get('g') || q.get('embed') || matchMedia('(prefers-reduced-motion: reduce)').matches) { a.remove(); return; }
+  a.addEventListener('click', function () { a.classList.add('sai'); });
+  setTimeout(function () { a.remove(); }, 2300);
+})();
+</script>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="2.5" y="3.5" width="19" height="13" rx="2"/><path d="M8 20.5h8M12 16.5v4"/></symbol>
@@ -450,6 +500,8 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
   <symbol id="i-baixar" viewBox="0 0 24 24"><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/></symbol>
   <symbol id="i-girar" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.5M20 4v4.5h-4.5"/><rect x="8" y="10" width="8" height="10" rx="1.5" transform="rotate(-90 12 15)"/></symbol>
   <symbol id="i-camera" viewBox="0 0 24 24"><path d="M3 8a2 2 0 0 1 2-2h2l1.5-2h7L17 6h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><circle cx="12" cy="13" r="3.5"/></symbol>
+  <symbol id="i-config" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></symbol>
+  <symbol id="i-seta-dir" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
   <symbol id="i-celular" viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M11 18.5h2"/></symbol>
   <symbol id="i-usuarios" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14.2A6.5 6.5 0 0 1 21.5 20"/></symbol>
 </svg>
@@ -786,17 +838,14 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
       <button id="bt-espera-sair" class="btn">Voltar</button>
     </div>
     <button id="aviso-som" class="hidden"><svg class="i"><use href="#i-mudo"/></svg><span id="txt-aviso-som">Clique para ligar o som</span></button>
+    <div id="menu-config" class="menu-config hidden" role="menu"></div>
     <div id="barra">
       <button id="bt-som" class="bt-p" title="Mudo (M)" aria-label="Mudo"><svg class="i"><use id="ico-som" href="#i-som"/></svg></button>
       <input id="vol" type="range" min="0" max="1" step="0.02" title="Volume (↑↓)" aria-label="Volume">
       <span class="ao-vivo-rx">AO VIVO</span>
       <span id="info-rx"></span>
       <span class="flex"></span>
-      <button id="bt-girar" class="bt-p" title="Girar a imagem" aria-label="Girar a imagem"><svg class="i"><use href="#i-girar"/></svg></button>
-      <button id="bt-qrx" class="bt-p" title="Qualidade pra você" aria-label="Qualidade pra você"><svg class="i"><use href="#i-stats"/></svg><span id="txt-qrx" class="rotulo-reforco">AUTO</span></button>
-      <button id="bt-reforco" class="bt-p hidden" title="Volume extra" aria-label="Volume extra"><svg class="i"><use href="#i-som"/></svg><span id="txt-reforco" class="rotulo-reforco">1x</span></button>
-      <button id="bt-call" class="bt-p hidden" title="Ouvir junto da call" aria-label="Ouvir junto da call do Discord"><svg class="i"><use href="#i-fone"/></svg><span class="txt">Junto da call</span></button>
-      <button id="bt-stats" class="bt-p" title="Estatísticas (S)" aria-label="Estatísticas"><svg class="i"><use href="#i-stats"/></svg></button>
+      <button id="bt-config" class="bt-p" title="Configurações" aria-label="Configurações" aria-haspopup="menu"><svg class="i"><use href="#i-config"/></svg><span id="selo-qrx" class="selo-qrx">AUTO</span></button>
       <button id="bt-pip" class="bt-p" title="Janela flutuante (P)" aria-label="Janela flutuante"><svg class="i"><use href="#i-pip"/></svg></button>
       <button id="bt-full" class="bt-p" title="Tela cheia (F)"><svg class="i"><use id="ico-full" href="#i-cheia"/></svg><span class="txt" id="txt-full">Tela cheia</span></button>
       <button id="bt-sair" class="bt-p" title="Sair"><svg class="i"><use href="#i-x"/></svg><span class="txt">Sair</span></button>
@@ -1885,7 +1934,9 @@ async function aplicarParametros(pc, id) {
       p.encodings[0].networkPriority = 'high';
       p.encodings[0].maxFramerate = ped && ped.fps ? Math.min(qualAtual.fps, ped.fps) : qualAtual.fps;
       p.encodings[0].scaleResolutionDownBy = ped && ped.altura && alturaTela > ped.altura ? alturaTela / ped.altura : 1;
-      p.degradationPreference = dica === 'detail' ? 'maintain-resolution' : 'balanced';
+      // segura a resolução escolhida: se a rede apertar, perde uns quadros em vez de borrar.
+      // Baixar de verdade a qualidade é decisão do player de quem assiste (AUTO), e só se a rede ficar ruim por um tempo.
+      p.degradationPreference = 'maintain-resolution';
     } else {
       p.encodings[0].maxBitrate = 160000;
       p.encodings[0].priority = 'high';
@@ -2086,8 +2137,9 @@ function enviarPedido() {
   mostrarQualidadeRx();
 }
 function mostrarQualidadeRx() {
-  const b = $('#txt-qrx');
-  if (b) b.textContent = (qRx.auto ? 'AUTO ' : '') + NIVEIS_RX[qRx.nivel].rot;
+  const b = $('#selo-qrx');
+  if (b) b.textContent = qRx.auto ? 'AUTO' : NIVEIS_RX[qRx.nivel].rot;
+  if (!$('#menu-config').classList.contains('hidden')) renderMenu(menuVista);
 }
 function trocarNivelRx(n, motivo) {
   n = Math.min(NIVEIS_RX.length - 1, Math.max(0, n));
@@ -2113,20 +2165,23 @@ function ajustarQualidadeRx(st) {
   if (!qRx.auto) return;
   const h = qRx.historico.reduce((a, x) => ({ perdas: a.perdas + x.perdas, receb: a.receb + x.receb, trav: a.trav + x.trav }), { perdas: 0, receb: 0, trav: 0 });
   const perda = h.perdas / Math.max(1, h.perdas + h.receb);
-  const ruim = h.trav >= 2 || perda > 0.03;
+  // ruim de verdade: perda alta OU várias travadas na janela de 8 s. Uma oscilação rápida não conta.
+  const ruimAgora = h.trav >= 3 || perda > 0.05;
+  if (ruimAgora) { if (!qRx.ruimDesde) qRx.ruimDesde = Date.now(); } else qRx.ruimDesde = 0;
+  const ruim = ruimAgora && Date.now() - qRx.ruimDesde >= 5000; // precisa ficar ruim por 5 s seguidos
   const desdeTroca = Date.now() - qRx.ultimaTroca;
   // 1º remédio: a conexão nasceu ruim? reconecta (é o "reiniciar até ficar liso", só que sozinho)
   const longe = st.relay && st.ping != null && st.ping > 250 && qRx.reconexoes < 1;
-  if ((ruim || longe) && qRx.conectouEm && Date.now() - qRx.conectouEm > 4000 && Date.now() - qRx.conectouEm < 30000 && qRx.reconexoes < 2) {
+  if ((ruimAgora || longe) && qRx.conectouEm && Date.now() - qRx.conectouEm > 4000 && Date.now() - qRx.conectouEm < 30000 && qRx.reconexoes < 2) {
     reconectarPorTravar();
     return;
   }
   if (!ruim) { if (!qRx.estavelDesde) qRx.estavelDesde = Date.now(); if (Date.now() - qRx.estavelDesde > 90000) qRx.reconexoes = 0; }
   else qRx.estavelDesde = 0;
-  if (ruim && desdeTroca > 6000 && qRx.nivel < NIVEIS_RX.length - 1) {
+  if (ruim && desdeTroca > 15000 && qRx.nivel < NIVEIS_RX.length - 1) {
     trocarNivelRx(qRx.nivel + 1, `Conexão instável: baixei pra ${NIVEIS_RX[qRx.nivel + 1].nome} pra não travar.`);
     qRx.historico = [];
-  } else if (!ruim && ++qRx.calmo > 20 && qRx.nivel > TETO_AUTO) {
+  } else if (!ruimAgora && ++qRx.calmo > 15 && qRx.nivel > TETO_AUTO) {
     trocarNivelRx(qRx.nivel - 1, `Conexão estável: subi pra ${NIVEIS_RX[qRx.nivel - 1].nome}.`);
   }
 }
@@ -2156,6 +2211,67 @@ function girarRx() {
   giroManual = true;
   aplicarGiro();
   avisoRx(giroRx ? `Imagem girada ${giroRx}°. Toque de novo pra girar mais.` : 'Imagem na posição original.');
+}
+// ---------- menu de configurações (estilo YouTube)
+let menuVista = 'principal';
+const NIVEIS_REFORCO = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20];
+function abrirMenu(vista) { renderMenu(vista); $('#menu-config').classList.remove('hidden'); mexeu(); }
+function fecharMenu() { $('#menu-config').classList.add('hidden'); }
+function itemMenu(rot, val, fn, opts = {}) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'menu-item' + (opts.marcado ? ' marcado' : '');
+  b.setAttribute('role', opts.marcado != null ? 'menuitemradio' : 'menuitem');
+  if (opts.marcado != null) b.innerHTML = '<span class="mi-check">' + (opts.marcado ? '✓' : '') + '</span>';
+  const r = document.createElement('span'); r.className = 'mi-rot'; r.textContent = rot; b.append(r);
+  if (val != null) { const v = document.createElement('span'); v.className = 'mi-val'; v.textContent = val; b.append(v); }
+  if (opts.sub) b.insertAdjacentHTML('beforeend', '<svg class="i"><use href="#i-seta-dir"/></svg>');
+  b.onclick = e => { e.stopPropagation(); fn(); };
+  return b;
+}
+function cabMenu(titulo) {
+  const c = document.createElement('div'); c.className = 'menu-cab';
+  c.innerHTML = '<button type="button" aria-label="Voltar"><svg class="i"><use href="#i-seta-dir"/></svg></button><span></span>';
+  c.querySelector('span').textContent = titulo;
+  c.querySelector('button').onclick = e => { e.stopPropagation(); renderMenu('principal'); };
+  return c;
+}
+function textoQualidade() {
+  const n = NIVEIS_RX[qRx.nivel];
+  return qRx.auto ? `Automática (${n.rot === 'MÁX' ? 'máxima' : n.rot + 'p'})` : (n.rot === 'MÁX' ? 'Máxima' : n.rot + 'p');
+}
+function renderMenu(vista) {
+  menuVista = vista;
+  const m = $('#menu-config');
+  m.innerHTML = '';
+  if (vista === 'principal') {
+    if (!EMBED) m.append(itemMenu('Qualidade', textoQualidade(), () => renderMenu('qualidade'), { sub: true }));
+    m.append(itemMenu('Volume extra', reforco.nivel > 1 ? reforco.nivel + 'x' : 'Desligado', () => renderMenu('volume'), { sub: true }));
+    m.append(itemMenu('Girar imagem', giroRx ? giroRx + '°' : 'Normal', () => { girarRx(); renderMenu('principal'); }));
+    if (PODE_CALL) m.append(itemMenu('Som junto da call (iPhone)', modoCall ? 'Ligado' : 'Desligado', () => { alternarModoCall(); renderMenu('principal'); }));
+    m.append(itemMenu('Estatísticas', $('#stats-rx-box').classList.contains('hidden') ? 'Escondidas' : 'Na tela', () => { alternarStats(); renderMenu('principal'); }));
+  } else if (vista === 'qualidade') {
+    m.append(cabMenu('Qualidade'));
+    m.append(itemMenu('Automática', null, () => { escolherQualidadeRx('auto'); fecharMenu(); }, { marcado: qRx.auto }));
+    NIVEIS_RX.forEach((n, i) => m.append(itemMenu(n.rot === 'MÁX' ? 'Máxima' : n.rot + 'p', null, () => { escolherQualidadeRx(i); fecharMenu(); }, { marcado: !qRx.auto && qRx.nivel === i })));
+    const nota = document.createElement('p'); nota.className = 'menu-nota';
+    nota.textContent = 'Automática baixa só se a sua internet ficar ruim por um tempo, e volta sozinha. Escolhendo uma fixa, ela não muda.';
+    m.append(nota);
+  } else if (vista === 'volume') {
+    m.append(cabMenu('Volume extra'));
+    NIVEIS_REFORCO.forEach(n => m.append(itemMenu(n === 1 ? 'Desligado (1x)' : n + 'x', null, () => { definirReforco(n, true); fecharMenu(); }, { marcado: reforco.nivel === n })));
+    const nota = document.createElement('p'); nota.className = 'menu-nota';
+    nota.textContent = 'Aumenta o som da transmissão com um limitador que segura os picos. Bom no celular em call do Discord, que abaixa o som dos outros apps.';
+    m.append(nota);
+  }
+}
+function escolherQualidadeRx(v) {
+  if (v === 'auto') { qRx.auto = true; qRx.calmo = 0; trocarNivelRx(TETO_AUTO); }
+  else { qRx.auto = false; trocarNivelRx(v); }
+  if (!EMBED) { guardar.set('qRxAuto', qRx.auto ? '1' : '0'); if (!qRx.auto) guardar.set('qRxNivel', String(qRx.nivel)); }
+  enviarPedido();
+  mostrarQualidadeRx();
+  avisoRx(qRx.auto ? 'Qualidade automática.' : `Qualidade fixa em ${NIVEIS_RX[qRx.nivel].nome}.`);
 }
 function alternarQualidadeRx() {
   // AUTO → MÁX → 1080 → 720 → 540 → 360 → AUTO
@@ -2252,7 +2368,7 @@ function tocar(s) {
 // ============================================================ volume extra (celular)
 // Em call no Discord o iPhone abaixa o som dos outros apps. Aqui o som da transmissão passa por um
 // ganho (até 6x) e um limitador, que segura os picos: fica bem mais alto sem estourar.
-const REFORCO_MAX = 6;
+const REFORCO_MAX = 20;
 const reforco = { ctx: null, src: null, trilha: null, ganho: null, mudo: false, nivel: Math.min(REFORCO_MAX, Math.max(1, +(guardar.get('reforco') || 1) || 1)) };
 const reforcoAtivo = () => !!reforco.src;
 async function aplicarReforco() {
@@ -2265,8 +2381,12 @@ async function aplicarReforco() {
       reforco.ganho = reforco.ctx.createGain();
       const lim = reforco.ctx.createDynamicsCompressor();
       lim.threshold.value = -24; lim.knee.value = 12; lim.ratio.value = 12; lim.attack.value = 0.003; lim.release.value = 0.25;
+      // segundo estágio: limitador "parede" pra ganho alto (até 20x) não estourar
+      const parede = reforco.ctx.createDynamicsCompressor();
+      parede.threshold.value = -3; parede.knee.value = 0; parede.ratio.value = 20; parede.attack.value = 0.001; parede.release.value = 0.1;
       reforco.ganho.connect(lim);
-      lim.connect(reforco.ctx.destination);
+      lim.connect(parede);
+      parede.connect(reforco.ctx.destination);
     }
     if (reforco.ctx.state !== 'running') await Promise.race([reforco.ctx.resume(), new Promise(r => setTimeout(r, 600))]);
     if (reforco.ctx.state !== 'running') { desligarReforco(); pedirToqueSom(); return; } // precisa de um toque
@@ -2291,8 +2411,7 @@ function desligarReforco() {
   atualizarIconeSom();
 }
 function mostrarReforco() {
-  $('#txt-reforco').textContent = reforco.nivel + 'x';
-  $('#bt-reforco').classList.toggle('ativo', reforco.nivel > 1);
+  if (!$('#menu-config').classList.contains('hidden')) renderMenu(menuVista);
 }
 function definirReforco(n, aviso) {
   reforco.nivel = n;
@@ -2352,7 +2471,7 @@ let modoCall = PODE_CALL && guardar.get('modoCall') === '1';
 function aplicarModoCall() {
   if (!PODE_CALL) return;
   try { navigator.audioSession.type = modoCall ? 'ambient' : 'auto'; } catch {}
-  $('#bt-call').classList.toggle('ativo', modoCall);
+
 }
 function alternarModoCall() {
   modoCall = !modoCall;
@@ -2379,6 +2498,8 @@ function avisoRx(msg) {
   timerToast = setTimeout(() => t.classList.add('hidden'), 5000);
 }
 async function alternarTelaCheia() {
+  // no grupo, quem entra/sai da tela cheia é a janelinha (a tela do grupo): o player só pede
+  if (EMBED) { try { parent.postMessage({ tvv: 'tela-cheia' }, location.origin); } catch {} return; }
   if (elementoCheio()) {
     try { screen.orientation.unlock(); } catch {}
     (document.exitFullscreen || document.webkitExitFullscreen).call(document);
@@ -2420,20 +2541,23 @@ async function manterAcesa(ligar) {
 document.addEventListener('visibilitychange', () => { if (rxAtivo && document.visibilityState === 'visible') manterAcesa(true); });
 function alternarStats() {
   $('#stats-rx-box').classList.toggle('hidden');
-  $('#bt-stats').classList.toggle('ativo', !$('#stats-rx-box').classList.contains('hidden'));
 }
 
 let timerUI;
 function mexeu() {
   player.classList.add('ativo');
   clearTimeout(timerUI);
-  timerUI = setTimeout(() => { if (TOQUE || !$('#barra').matches(':hover')) player.classList.remove('ativo'); }, TOQUE ? 3500 : 2500);
+  timerUI = setTimeout(() => {
+    if (!$('#menu-config').classList.contains('hidden')) { mexeu(); return; } // menu aberto: barra fica
+    if (TOQUE || !$('#barra').matches(':hover')) player.classList.remove('ativo');
+  }, TOQUE ? 3500 : 2500);
 }
 // celular: um toque mostra/esconde a barra, dois toques = tela cheia
 let ultimoToque = 0;
 function tocouVideo(e) {
   if (!$('#aviso-som').classList.contains('hidden') && !e.target.closest('#barra')) { ligarSom(); mexeu(); return; }
-  if (e.target.closest('#barra, #aviso-som, #espera')) { mexeu(); return; }
+  if (e.target.closest('#barra, #aviso-som, #espera, #menu-config')) { mexeu(); return; }
+  if (!$('#menu-config').classList.contains('hidden')) { fecharMenu(); return; }
   const agora = Date.now();
   if (agora - ultimoToque < 300) { ultimoToque = 0; alternarTelaCheia(); return; }
   ultimoToque = agora;
@@ -2817,15 +2941,31 @@ function criarTile(m) {
     '<button class="tile-bt tile-cheia" title="Tela cheia"><svg class="i"><use href="#i-cheia"/></svg></button>';
   const som = barra.querySelector('.tile-som');
   if (som) som.onclick = e => { e.stopPropagation(); grupo.somManual.set(t.dataset.sala, !somLigado(t.dataset.sala)); ajustarTiles(); };
-  barra.querySelector('.tile-cheia').onclick = e => {
-    e.stopPropagation();
-    const pedir = t.requestFullscreen || t.webkitRequestFullscreen;
-    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-    else if (pedir) pedir.call(t).catch(() => {});
-  };
+  barra.querySelector('.tile-cheia').onclick = e => { e.stopPropagation(); telaCheiaTile(t); };
   t.append(capa, barra);
   return t;
 }
+// tela cheia de uma janelinha: um botão só manda (o do player embutido pede pra cá)
+function telaCheiaTile(t) {
+  const atual = document.fullscreenElement || document.webkitFullscreenElement;
+  if (atual) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); return; }
+  const pedir = t.requestFullscreen || t.webkitRequestFullscreen;
+  if (pedir) { const r = pedir.call(t); if (r && r.catch) r.catch(() => {}); }
+}
+window.addEventListener('message', e => {
+  if (e.origin !== location.origin || !e.data || e.data.tvv !== 'tela-cheia') return;
+  const t = [...document.querySelectorAll('#grupo-telas .tile')].find(x => { const f = x.querySelector('iframe'); return f && f.contentWindow === e.source; });
+  if (t) telaCheiaTile(t);
+});
+function iconesTelaCheia() {
+  const atual = document.fullscreenElement || document.webkitFullscreenElement;
+  for (const t of document.querySelectorAll('#grupo-telas .tile')) {
+    const u = t.querySelector('.tile-cheia use');
+    if (u) u.setAttribute('href', t === atual ? '#i-sair-cheia' : '#i-cheia');
+  }
+}
+document.addEventListener('fullscreenchange', iconesTelaCheia);
+document.addEventListener('webkitfullscreenchange', iconesTelaCheia);
 // som: por padrão só a tela em destaque toca; cada uma pode ser ligada/desligada na mão
 function somLigado(sala) { return grupo.somManual.has(sala) ? grupo.somManual.get(sala) : sala === grupo.foco; }
 function ajustarTiles() {
@@ -2945,19 +3085,13 @@ vol.oninput = () => mudarVolume(+vol.value);
 $('#bt-full').onclick = alternarTelaCheia;
 $('#bt-pip').onclick = alternarPip;
 if (!video.requestPictureInPicture && !video.webkitSetPresentationMode) $('#bt-pip').classList.add('hidden');
-$('#bt-stats').onclick = alternarStats;
-$('#bt-qrx').onclick = e => { e.stopPropagation(); alternarQualidadeRx(); };
-$('#bt-girar').onclick = e => { e.stopPropagation(); girarRx(); };
+$('#bt-config').onclick = e => { e.stopPropagation(); if ($('#menu-config').classList.contains('hidden')) abrirMenu('principal'); else fecharMenu(); };
+document.addEventListener('click', e => { if (!e.target.closest('#menu-config, #bt-config')) fecharMenu(); });
 window.addEventListener('resize', aplicarGiro);
 document.addEventListener('fullscreenchange', () => setTimeout(aplicarGiro, 50));
 document.addEventListener('webkitfullscreenchange', () => setTimeout(aplicarGiro, 50));
 mostrarQualidadeRx();
-if (TOQUE) {
-  $('#bt-reforco').classList.remove('hidden');
-  mostrarReforco();
-  $('#bt-reforco').onclick = e => { e.stopPropagation(); definirReforco(reforco.nivel >= REFORCO_MAX ? 1 : reforco.nivel + 1, true); };
-}
-if (PODE_CALL) { $('#bt-call').classList.remove('hidden'); $('#bt-call').onclick = e => { e.stopPropagation(); alternarModoCall(); }; aplicarModoCall(); }
+if (PODE_CALL) aplicarModoCall();
 $('#bt-sair').onclick = sairRx;
 $('#bt-espera-sair').onclick = sairRx;
 if (TOQUE) $('#txt-aviso-som').textContent = 'Toque aqui pra ligar o som';
