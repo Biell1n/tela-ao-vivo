@@ -436,10 +436,12 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
 .bt-luz[aria-pressed="true"]{color:var(--texto)}
 .bt-luz[aria-pressed="true"] .ponto{background:conic-gradient(#ff6a3d,#ffc83d,#5ef0a0,#4aa8ff,#b56bff,#ff6a3d);box-shadow:0 0 12px rgba(255,190,110,.55)}
 .grupo-telas{isolation:isolate}
+.grupo-telas:has(.tile-cheio){isolation:auto}
 #grupo{overflow-x:clip}
 #grupo.cinema{--gut:max(24px,calc((100vw - 1192px) / 2));max-width:none;padding-left:0;padding-right:0}
-#grupo.cinema .grupo-cab,#grupo.cinema #grupo-status,#grupo.cinema .grupo-ferramentas,#grupo.cinema .grupo-membros,#grupo.cinema #grupo-vazio{width:calc(100% - 2 * var(--gut));margin-left:auto;margin-right:auto}
-#grupo.cinema .grupo-corpo{grid-template-columns:minmax(0,1fr)}
+#grupo.cinema .grupo-cab,#grupo.cinema #grupo-status,#grupo.cinema .grupo-ferramentas,#grupo.cinema .grupo-membros,#grupo.cinema .grupo-chat,#grupo.cinema #grupo-vazio{width:calc(100% - 2 * var(--gut));margin-left:auto;margin-right:auto}
+#grupo.cinema .grupo-corpo{grid-template-columns:minmax(0,1fr);grid-template-areas:"palco" "chat" "membros";grid-template-rows:none}
+#grupo.cinema .grupo-chat{position:relative}
 #grupo.cinema .grupo-telas{padding:0 var(--gut)}
 #grupo.cinema .grupo-telas.destaque .tile.foco{margin:0 calc(-1 * var(--gut)) 6px;aspect-ratio:auto;height:min(56.25vw,calc(100vh - 150px));min-height:220px;border-radius:0;border:0}
 #grupo.cinema .tile.foco iframe,#grupo.cinema .tile.foco video,#grupo.cinema .tile.foco .tile-barra{border-radius:0}
@@ -463,14 +465,14 @@ html.transp body::before{display:none}
 .tile-capa{position:absolute;inset:0;background:transparent;cursor:pointer;z-index:1}
 .grupo-telas.destaque .tile.foco .tile-capa{display:none}
 .grupo-telas.destaque .tile.foco .tile-barra{pointer-events:auto}
-.tile-barra{position:absolute;left:0;right:0;bottom:0;z-index:2;display:flex;align-items:center;gap:6px;padding:18px 10px 8px;
-  background:linear-gradient(transparent,rgba(0,0,0,.75));font-size:13px;font-weight:500;color:#eceef2;border-radius:0 0 calc(var(--r-m) - 1px) calc(var(--r-m) - 1px)}
+.tile-barra{position:absolute;left:0;right:0;top:0;z-index:2;display:flex;align-items:center;gap:6px;padding:8px 10px 18px;
+  background:linear-gradient(rgba(0,0,0,.7),transparent);font-size:13px;font-weight:500;color:#eceef2;border-radius:calc(var(--r-m) - 1px) calc(var(--r-m) - 1px) 0 0}
 .grupo-telas.destaque .tile.foco .tile-barra{top:0;bottom:auto;padding:8px 10px 18px;background:linear-gradient(rgba(0,0,0,.7),transparent);border-radius:calc(var(--r-m) - 1px) calc(var(--r-m) - 1px) 0 0}
 .tile-nome{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tile-bt{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:8px;background:rgba(255,255,255,.12);color:#fff}
 .tile-bt:hover{background:rgba(255,255,255,.24)}
 .tile-bt svg.i{width:16px;height:16px}
-.tile.eu::after{content:"você";position:absolute;top:8px;right:8px;z-index:2;padding:2px 7px;border-radius:6px;background:var(--acento);color:var(--acento-tinta);font:700 10.5px var(--mono);letter-spacing:.06em}
+.tile.eu::after{content:"você";position:absolute;bottom:8px;left:8px;z-index:2;padding:2px 7px;border-radius:6px;background:var(--acento);color:var(--acento-tinta);font:700 10.5px var(--mono);letter-spacing:.06em}
 .tile:fullscreen{border:0;border-radius:0}
 .tile.tile-cheio{position:fixed;inset:0;z-index:90;border:0;border-radius:0;aspect-ratio:auto;width:auto}
 .tile.tile-cheio .tile-capa{display:none}
@@ -479,7 +481,40 @@ html.transp body::before{display:none}
 .sem-rolagem{overflow:hidden}
 .grupo-vazio{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:260px;border:1px dashed var(--linha-2);border-radius:var(--r-l);color:var(--fraco);text-align:center;font-size:14px;padding:24px}
 .grupo-vazio svg.i{width:30px;height:30px}
-.grupo-membros{padding:16px;border-radius:var(--r-l);background:var(--sup);border:1px solid var(--linha);position:sticky;top:20px}
+.grupo-membros{grid-area:membros;padding:16px;border-radius:var(--r-l);background:var(--sup);border:1px solid var(--linha)}
+.grupo-corpo{grid-template-areas:"palco membros" "palco chat";grid-template-rows:auto 1fr}
+.grupo-palco{grid-area:palco;min-width:0}
+.grupo-chat{grid-area:chat;align-self:start;position:sticky;top:20px;display:flex;flex-direction:column;gap:10px;padding:14px;border-radius:var(--r-l);background:var(--sup);border:1px solid var(--linha);min-width:0}
+.chat-cab{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.chat-cab .rotulo{margin:0}
+.chat-opcao{font-size:11.5px;color:var(--fraco);padding:3px 7px;border-radius:6px;border:1px solid var(--linha);white-space:nowrap}
+.chat-opcao b{font-weight:600;color:var(--sub)}
+.chat-opcao[aria-pressed="false"] b{color:var(--erro)}
+.chat-opcao:hover{border-color:var(--linha-2)}
+.chat-msgs{list-style:none;margin:0;padding:0 2px 0 0;height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;overscroll-behavior:contain;font-size:13.5px;line-height:1.4}
+.chat-msgs:empty::before{content:"Ninguém escreveu ainda. Manda um oi pro pessoal.";margin:auto;color:var(--fraco);font-size:13px;text-align:center;max-width:22ch}
+.chat-msgs li{overflow-wrap:anywhere}
+.chat-msgs b{font-weight:650;margin-right:6px;color:var(--b3)}
+.chat-msgs li.eu b{color:var(--acento)}
+.chat-msgs li.sis{color:var(--fraco);font-size:12px}
+.chat-reagir{display:flex;gap:2px;justify-content:space-between}
+.chat-reagir button,.tile-reagir button{font-size:21px;line-height:1;width:36px;height:36px;border-radius:9px;display:grid;place-items:center;transition:transform .12s,background .15s}
+.chat-reagir button:hover,.tile-reagir button:hover{background:var(--sup-3);transform:translateY(-2px)}
+.chat-reagir button:active,.tile-reagir button:active{transform:scale(.88)}
+.chat-form{display:flex;gap:6px}
+.chat-form input{flex:1;min-width:0;height:40px;border-radius:var(--r-m);background:var(--bg);border:1px solid var(--linha-2);padding:0 12px;outline:none;font-size:14px}
+.chat-form input:focus{border-color:var(--acento)}
+/* reações subindo na tela (como nas lives) e mensagens por cima da tela em tela cheia */
+.reacoes-camada{position:absolute;inset:0;z-index:3;pointer-events:none;overflow:hidden;border-radius:inherit}
+.reacao{position:absolute;bottom:56px;right:7%;font-size:34px;line-height:1;will-change:transform,opacity;filter:drop-shadow(0 2px 6px rgba(0,0,0,.45))}
+.tile-toasts{position:absolute;left:14px;bottom:64px;z-index:3;display:none;flex-direction:column;gap:6px;max-width:min(380px,70%);pointer-events:none}
+.tile:fullscreen .tile-toasts,.tile.tile-cheio .tile-toasts,#grupo.cinema .tile.foco .tile-toasts{display:flex}
+.tile-toast{padding:6px 10px;border-radius:10px;background:rgba(10,12,16,.72);backdrop-filter:blur(8px);color:#eef0f4;font-size:13.5px;line-height:1.35;overflow-wrap:anywhere;animation:toastEntra .25s ease-out}
+.tile-toast b{color:var(--b3);margin-right:6px}
+.tile-toast.sai{opacity:0;transition:opacity .5s}
+@keyframes toastEntra{from{opacity:0;transform:translateY(6px)}}
+.tile-reagir{position:absolute;right:10px;top:50px;z-index:4;display:flex;gap:2px;padding:4px;border-radius:12px;background:rgba(10,12,16,.82);backdrop-filter:blur(8px)}
+.grupo-chat .reacoes-camada{border-radius:var(--r-l)}
 .grupo-membros ul{list-style:none;margin:10px 0 0;padding:0}
 .membro{display:flex;align-items:center;gap:6px;padding:8px 0;border-top:1px solid var(--linha);font-size:14px}
 .membro:first-child{border-top:0}
@@ -490,7 +525,7 @@ html.transp body::before{display:none}
 /* player embutido no grupo: sem o cabeçalho e sem o "sair" */
 .embed .topo,.embed #bt-sair,.embed #bt-espera-sair,.embed #bt-qrx,.embed #info-rx,.embed .bt-p .txt{display:none!important}
 .embed #barra{gap:4px;padding:30px 10px 8px}
-@media (max-width:980px){.grupo-corpo{grid-template-columns:minmax(0,1fr)}.grupo-membros{position:static;order:-1}.grupo-acoes{margin-left:0}}
+@media (max-width:980px){.grupo-corpo{grid-template-columns:minmax(0,1fr);grid-template-areas:"membros" "palco" "chat";grid-template-rows:none}.grupo-chat{position:relative}.chat-msgs{height:240px}.grupo-acoes{margin-left:0}}
 @media (max-width:980px){
   #home{grid-template-columns:minmax(0,1fr);gap:36px}
   .acao-rx{order:-1}
@@ -549,6 +584,8 @@ html.transp body::before{display:none}
   <symbol id="i-mudo" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="m16 9.5 5 5M21 9.5l-5 5"/></symbol>
   <symbol id="i-stats" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
   <symbol id="i-pip" viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="16" rx="2"/><rect x="12" y="12" width="7" height="5" rx="1"/></symbol>
+  <symbol id="i-reagir" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0M9 9.5h.01M15 9.5h.01"/></symbol>
+  <symbol id="i-enviar" viewBox="0 0 24 24"><path d="M4 12h14M13 6l6 6-6 6"/></symbol>
   <symbol id="i-cinema" viewBox="0 0 24 24"><rect x="2.5" y="6.5" width="19" height="11" rx="2"/></symbol>
   <symbol id="i-sair-cinema" viewBox="0 0 24 24"><rect x="5.5" y="7.5" width="13" height="9" rx="2"/></symbol>
   <symbol id="i-cheia" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
@@ -892,6 +929,18 @@ html.transp body::before{display:none}
       <ul id="lista-membros"></ul>
       <p class="dica">Quem tem o link pode entrar. O grupo continua aberto enquanto tiver alguém nele, mesmo que quem criou saia. Fechar o site não tira você do grupo: ao voltar, você entra de novo.</p>
     </aside>
+    <section class="grupo-chat" aria-label="Chat do grupo">
+      <div class="chat-cab">
+        <span class="rotulo">Chat</span>
+        <button id="bt-ver-reacoes" class="chat-opcao" type="button" aria-pressed="true" title="Mostrar na tela as reações de quem está no grupo">Reações dos outros: <b>visíveis</b></button>
+      </div>
+      <ol id="chat-msgs" class="chat-msgs" aria-live="polite"></ol>
+      <div class="chat-reagir" role="group" aria-label="Reagir"></div>
+      <form id="form-chat" class="chat-form" autocomplete="off">
+        <input id="in-chat" maxlength="300" placeholder="Mensagem pro grupo" aria-label="Mensagem pro grupo" enterkeyhint="send">
+        <button class="btn primario icone" type="submit" aria-label="Enviar mensagem"><svg class="i"><use href="#i-enviar"/></svg></button>
+      </form>
+    </section>
   </div>
 </section>
 
@@ -3353,6 +3402,7 @@ function entrarNoGrupo() {
 }
 function iniciarGrupo(codigo, nome) {
   if (typeof Peer === 'undefined') { $('#erro-peer').classList.remove('hidden'); return; }
+  if (grupo.codigo !== codigo || !grupo.ativo) limparChat();
   desligarGrupo(); // estava em outro grupo (ou reentrando): fecha as conexões antigas antes
   guardar.set('meuNome', nome);
   Object.assign(grupo, { ativo: true, codigo, nome: nomeLimpo(nome), expulso: false, membros: [], foco: null, host: false });
@@ -3409,6 +3459,9 @@ function conectarAoHost() {
       renderGrupo();
     }
     if (d.tipo === 'expulso') foiExpulso();
+    if (d.tipo === 'chat') receberChat(d);
+    else if (d.tipo === 'reacao') receberReacao(d);
+    else if (d.tipo === 'historico' && Array.isArray(d.msgs)) receberHistorico(d.msgs);
   });
   con.on('close', () => {
     clearTimeout(limite);
@@ -3488,6 +3541,7 @@ function conexaoDoMembro(conn) {
       if (banido(conn.peer, nome)) { try { conn.send({ tipo: 'expulso' }); } catch {} setTimeout(() => conn.close(), 300); return; }
       if (!m) { m = { id: conn.peer, nome, sala: null, dono: false }; grupo.membros.push(m); }
       m.nome = nome; m.visto = Date.now();
+      if (chatGrupo.msgs.length) try { conn.send({ tipo: 'historico', msgs: chatGrupo.msgs.slice(-60) }); } catch {}
       if (d.sala !== undefined) m.sala = typeof d.sala === 'string' ? d.sala.slice(0, 40) : null;
       // quem criou prova com a chave; o primeiro a provar define a chave do grupo
       if (typeof d.chave === 'string' && d.chave) {
@@ -3501,6 +3555,10 @@ function conexaoDoMembro(conn) {
       difundir();
     } else if (d.tipo === 'expulsar' && typeof d.chave === 'string') {
       if (grupo.donoHash && await hashChave(d.chave) === grupo.donoHash) expulsarAqui(d.id);
+    } else if (d.tipo === 'chat' && m) {
+      chatNoHost(m, d);
+    } else if (d.tipo === 'reacao' && m) {
+      reacaoNoHost(m, d);
     }
   });
   conn.on('close', () => {
@@ -3553,6 +3611,162 @@ function avisarSala(sala) {
   if (grupo.con && grupo.con.open) try { grupo.con.send({ tipo: 'sala', sala }); } catch {}
   renderGrupo();
 }
+// ============================================================ chat e reações do grupo
+// Vai tudo pela mesma conexão do grupo: quem segura a sala repassa pra todo mundo (com limite contra spam)
+// e guarda as últimas mensagens pra quem entrar depois.
+const EMOJIS = ['😂', '😮', '🔥', '👏', '❤️', '💀', '😭'];
+const chatGrupo = { msgs: [], vistos: new Set(), ultimaReacao: 0, ultimaMsg: 0 };
+let verReacoes = guardar.get('verReacoes') !== '0';
+function novoIdMsg() { return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4); }
+function limiteTaxa(m, campo, max, janelaMs) {
+  const agora = Date.now(); m[campo] = (m[campo] || []).filter(t => agora - t < janelaMs);
+  if (m[campo].length >= max) return false;
+  m[campo].push(agora); return true;
+}
+function chatNoHost(m, d) {
+  const texto = typeof d.texto === 'string' ? d.texto.replace(/\s+/g, ' ').trim().slice(0, 300) : '';
+  if (!texto || !limiteTaxa(m, 'taxaChat', 5, 6000)) return;
+  difundirChat({ tipo: 'chat', id: String(d.id || novoIdMsg()).slice(0, 24), de: m.id, nome: m.nome, texto, ts: Date.now() });
+}
+function difundirChat(msg) {
+  for (const c of grupo.conns.values()) if (c.open) try { c.send(msg); } catch {}
+  receberChat(msg);
+}
+function reacaoNoHost(m, d) {
+  if (!EMOJIS.includes(d.emoji) || !limiteTaxa(m, 'taxaReacao', 8, 3000)) return;
+  const msg = { tipo: 'reacao', de: m.id, nome: m.nome, emoji: d.emoji };
+  for (const c of grupo.conns.values()) if (c.open && c.peer !== m.id) try { c.send(msg); } catch {}
+  receberReacao(msg);
+}
+function enviarChat(texto) {
+  texto = texto.replace(/\s+/g, ' ').trim().slice(0, 300);
+  if (!texto || !grupo.ativo) return false;
+  if (Date.now() - chatGrupo.ultimaMsg < 400) return false;
+  chatGrupo.ultimaMsg = Date.now();
+  const id = novoIdMsg();
+  if (grupo.host) { const eu = grupo.membros.find(x => x.id === grupo.meuId) || { id: grupo.meuId, nome: grupo.nome }; chatNoHost(eu, { texto, id }); return true; }
+  if (!(grupo.con && grupo.con.open)) { statusGrupo('Sem conexão com o grupo agora: a mensagem não foi. Tente de novo em alguns segundos.', 'aviso'); return false; }
+  try { grupo.con.send({ tipo: 'chat', texto, id }); } catch { return false; }
+  receberChat({ tipo: 'chat', id, de: grupo.meuId, nome: grupo.nome, texto, ts: Date.now() }); // aparece na hora pra quem mandou
+  return true;
+}
+function receberChat(d) {
+  if (!d || typeof d.texto !== 'string' || !d.id || chatGrupo.vistos.has(d.id)) return;
+  chatGrupo.vistos.add(d.id);
+  const msg = { id: String(d.id), de: String(d.de || ''), nome: nomeLimpo(d.nome || '?'), texto: String(d.texto).slice(0, 300), ts: +d.ts || Date.now() };
+  chatGrupo.msgs.push(msg);
+  if (chatGrupo.msgs.length > 150) chatGrupo.msgs.splice(0, chatGrupo.msgs.length - 150);
+  desenharMsg(msg);
+  toastNaTela(msg);
+}
+function receberHistorico(lista) {
+  for (const d of lista.slice(-60)) {
+    if (!d || chatGrupo.vistos.has(d.id)) continue;
+    chatGrupo.vistos.add(d.id);
+    const msg = { id: String(d.id), de: String(d.de || ''), nome: nomeLimpo(d.nome || '?'), texto: String(d.texto || '').slice(0, 300), ts: +d.ts || 0 };
+    if (!msg.texto) continue;
+    chatGrupo.msgs.push(msg);
+  }
+  chatGrupo.msgs.sort((a, b) => a.ts - b.ts);
+  const ol = $('#chat-msgs'); ol.innerHTML = '';
+  for (const m of chatGrupo.msgs) desenharMsg(m, true);
+  ol.scrollTop = ol.scrollHeight;
+}
+function desenharMsg(m, emLote) {
+  const ol = $('#chat-msgs');
+  const noFim = ol.scrollHeight - ol.scrollTop - ol.clientHeight < 40;
+  const li = document.createElement('li');
+  if (m.de === grupo.meuId) li.className = 'eu';
+  const b = document.createElement('b'); b.textContent = m.de === grupo.meuId ? 'Você' : m.nome;
+  li.append(b, document.createTextNode(m.texto));
+  li.title = new Date(m.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  ol.append(li);
+  while (ol.children.length > 150) ol.firstChild.remove();
+  if (!emLote && (noFim || m.de === grupo.meuId)) ol.scrollTop = ol.scrollHeight;
+}
+// em tela cheia / modo cinema o chat não aparece: a mensagem passa por cima da tela uns segundos
+function telaDasReacoes() {
+  const cheia = document.fullscreenElement || document.webkitFullscreenElement;
+  if (cheia && cheia.classList && cheia.classList.contains('tile')) return cheia;
+  return $('#grupo-telas .tile.tile-cheio') || $('#grupo-telas .tile.foco') || $('#grupo-telas .tile');
+}
+function toastNaTela(m) {
+  const t = telaDasReacoes(); if (!t) return;
+  const box = t.querySelector('.tile-toasts'); if (!box) return;
+  const el = document.createElement('div'); el.className = 'tile-toast';
+  const b = document.createElement('b'); b.textContent = m.de === grupo.meuId ? 'Você' : m.nome;
+  el.append(b, document.createTextNode(m.texto));
+  box.append(el);
+  while (box.children.length > 4) box.firstChild.remove();
+  setTimeout(() => { el.classList.add('sai'); setTimeout(() => el.remove(), 600); }, 7000);
+}
+function reagir(emoji) {
+  if (!grupo.ativo || !EMOJIS.includes(emoji)) return;
+  if (Date.now() - chatGrupo.ultimaReacao < 120) return;
+  chatGrupo.ultimaReacao = Date.now();
+  if (grupo.host) { const eu = grupo.membros.find(x => x.id === grupo.meuId) || { id: grupo.meuId, nome: grupo.nome }; reacaoNoHost(eu, { emoji }); return; }
+  if (grupo.con && grupo.con.open) try { grupo.con.send({ tipo: 'reacao', emoji }); } catch {}
+  soltarEmoji(emoji); // a sua aparece na hora
+}
+function receberReacao(d) {
+  if (!d || !EMOJIS.includes(d.emoji)) return;
+  if (d.de === grupo.meuId && !grupo.host) return; // a própria já apareceu
+  if (d.de !== grupo.meuId && !verReacoes) return; // escolheu não ver as dos outros
+  soltarEmoji(d.emoji);
+}
+const MENOS_MOVIMENTO = matchMedia('(prefers-reduced-motion: reduce)').matches;
+function soltarEmoji(emoji) {
+  const t = telaDasReacoes();
+  const camada = t ? t.querySelector('.reacoes-camada') : document.querySelector('.grupo-chat .reacoes-camada');
+  if (!camada || document.hidden) return;
+  if (camada.childElementCount > 40) return; // chuva de cliques: não acumula
+  const el = document.createElement('span'); el.className = 'reacao'; el.textContent = emoji;
+  el.style.right = (4 + Math.random() * 10) + '%';
+  camada.append(el);
+  const altura = Math.max(160, camada.clientHeight * (0.55 + Math.random() * 0.25));
+  const deriva = (Math.random() - 0.5) * 70, giro = (Math.random() - 0.5) * 30, dur = 2200 + Math.random() * 900;
+  const a = MENOS_MOVIMENTO
+    ? el.animate([{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0 }], { duration: 1600 })
+    : el.animate([
+        { transform: 'translate(0,0) scale(.4)', opacity: 0 },
+        { transform: `translate(${deriva * 0.2}px,-${altura * 0.12}px) scale(1.15)`, opacity: 1, offset: 0.12 },
+        { transform: `translate(${-deriva * 0.4}px,-${altura * 0.5}px) scale(1) rotate(${giro}deg)`, opacity: 1, offset: 0.55 },
+        { transform: `translate(${deriva}px,-${altura}px) scale(.9) rotate(${-giro}deg)`, opacity: 0 },
+      ], { duration: dur, easing: 'cubic-bezier(.25,.6,.35,1)' });
+  a.onfinish = () => el.remove();
+}
+function alternarReagirTile(t) {
+  const aberto = t.querySelector('.tile-reagir');
+  if (aberto) { aberto.remove(); return; }
+  const box = document.createElement('div'); box.className = 'tile-reagir';
+  for (const e of EMOJIS) {
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = e; b.setAttribute('aria-label', 'Reagir com ' + e);
+    b.onclick = ev => { ev.stopPropagation(); reagir(e); };
+    box.append(b);
+  }
+  box.onclick = ev => ev.stopPropagation();
+  t.append(box);
+}
+function aplicarVerReacoes() {
+  const b = $('#bt-ver-reacoes');
+  b.setAttribute('aria-pressed', String(verReacoes));
+  b.querySelector('b').textContent = verReacoes ? 'visíveis' : 'escondidas';
+}
+(function iniciarChat() {
+  const box = $('.chat-reagir');
+  for (const e of EMOJIS) {
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = e; b.setAttribute('aria-label', 'Reagir com ' + e);
+    b.onclick = () => reagir(e);
+    box.append(b);
+  }
+  const camada = document.createElement('div'); camada.className = 'reacoes-camada';
+  $('.grupo-chat').append(camada);
+  $('#form-chat').onsubmit = e => { e.preventDefault(); const i = $('#in-chat'); if (enviarChat(i.value)) i.value = ''; };
+  $('#bt-ver-reacoes').onclick = () => { verReacoes = !verReacoes; guardar.set('verReacoes', verReacoes ? '1' : '0'); aplicarVerReacoes(); };
+  aplicarVerReacoes();
+})();
+function limparChat() { chatGrupo.msgs = []; chatGrupo.vistos.clear(); $('#chat-msgs').innerHTML = ''; }
+
 // sair de verdade (botão "Sair do grupo" ou expulso): esquece o grupo. Fechar o site NÃO sai: ao voltar, reentra.
 function desligarGrupo() {
   clearTimeout(grupo.recon);
@@ -3572,6 +3786,7 @@ function sairDoGrupo() {
   grupo.conns.clear();
   for (const p of [grupo.peer, grupo.peerHost]) if (p) try { p.destroy(); } catch {}
   Object.assign(grupo, { con: null, peer: null, peerHost: null, membros: [], host: false, assumindo: false, banidos: [], donoHash: '' });
+  limparChat();
   for (const t of [...$('#grupo-telas').children]) t.remove();
   document.querySelector('#tx [data-voltar]').lastChild.textContent = 'Início';
   history.replaceState(null, '', location.pathname);
@@ -3654,13 +3869,17 @@ function criarTile(m) {
   barra.className = 'tile-barra';
   barra.innerHTML = '<span class="tile-nome"></span><span class="flex"></span>' +
     (eu ? '' : '<button class="tile-bt tile-som" title="Som desta tela"><svg class="i"><use href="#i-mudo"/></svg></button>') +
+    '<button class="tile-bt tile-reage" title="Reagir"><svg class="i"><use href="#i-reagir"/></svg></button>' +
     '<button class="tile-bt tile-cinema" title="Modo cinema (T): expande pros lados"><svg class="i"><use href="#i-cinema"/></svg></button>' +
     '<button class="tile-bt tile-cheia" title="Tela cheia"><svg class="i"><use href="#i-cheia"/></svg></button>';
   const som = barra.querySelector('.tile-som');
   if (som) som.onclick = e => { e.stopPropagation(); grupo.somManual.set(t.dataset.sala, !somLigado(t.dataset.sala)); ajustarTiles(true); };
   barra.querySelector('.tile-cheia').onclick = e => { e.stopPropagation(); telaCheiaTile(t); };
   barra.querySelector('.tile-cinema').onclick = e => { e.stopPropagation(); alternarCinema(t); };
-  t.append(capa, barra);
+  barra.querySelector('.tile-reage').onclick = e => { e.stopPropagation(); alternarReagirTile(t); };
+  const camada = document.createElement('div'); camada.className = 'reacoes-camada';
+  const toasts = document.createElement('div'); toasts.className = 'tile-toasts';
+  t.append(capa, barra, camada, toasts);
   return t;
 }
 // tela cheia de uma janelinha: um botão só manda (o do player embutido pede pra cá)
