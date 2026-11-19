@@ -3051,7 +3051,7 @@ function criarTile(m) {
     (eu ? '' : '<button class="tile-bt tile-som" title="Som desta tela"><svg class="i"><use href="#i-mudo"/></svg></button>') +
     '<button class="tile-bt tile-cheia" title="Tela cheia"><svg class="i"><use href="#i-cheia"/></svg></button>';
   const som = barra.querySelector('.tile-som');
-  if (som) som.onclick = e => { e.stopPropagation(); grupo.somManual.set(t.dataset.sala, !somLigado(t.dataset.sala)); ajustarTiles(); };
+  if (som) som.onclick = e => { e.stopPropagation(); grupo.somManual.set(t.dataset.sala, !somLigado(t.dataset.sala)); ajustarTiles(true); };
   barra.querySelector('.tile-cheia').onclick = e => { e.stopPropagation(); telaCheiaTile(t); };
   t.append(capa, barra);
   return t;
@@ -3089,7 +3089,7 @@ document.addEventListener('fullscreenchange', iconesTelaCheia);
 document.addEventListener('webkitfullscreenchange', iconesTelaCheia);
 // som: por padrão só a tela em destaque toca; cada uma pode ser ligada/desligada na mão
 function somLigado(sala) { return grupo.somManual.has(sala) ? grupo.somManual.get(sala) : sala === grupo.foco; }
-function ajustarTiles() {
+function ajustarTiles(toque) {
   const tiles = [...$('#grupo-telas').children].filter(t => !t.classList.contains('eu'));
   const n = tiles.length;
   for (const t of tiles) {
@@ -3099,7 +3099,8 @@ function ajustarTiles() {
     // qualidade: a grande no automático; miniaturas leves (economiza a internet de quem compartilha)
     const nivel = grande ? 'auto' : (grupo.layout === 'grade' && n <= 4 ? 3 : 4);
     const ligado = somLigado(t.dataset.sala);
-    try { f.contentWindow.postMessage({ tvv: 'config', nivel, mudo: !ligado }, location.origin); } catch {}
+    const cfg = { tvv: 'config', nivel, mudo: !ligado, toque: toque === true };
+    try { if (f.contentWindow.__tvvConfig) f.contentWindow.__tvvConfig(cfg); else f.contentWindow.postMessage(cfg, location.origin); } catch {}
     const ico = t.querySelector('.tile-som use');
     if (ico) ico.setAttribute('href', ligado ? '#i-som' : '#i-mudo');
   }
@@ -3109,26 +3110,53 @@ function ajustarTiles() {
   }
 }
 setInterval(() => { if (grupo.ativo) ajustarTiles(); }, 3000); // reenvia (o player embutido pode ter recarregado)
+// celular: o som só pode ligar dentro de um toque. Qualquer toque na tela do grupo tenta de novo nas janelinhas.
+for (const ev of ['touchend', 'click']) document.addEventListener(ev, () => { if (grupo.ativo && !EMBED) ajustarTiles(true); }, true);
 
 // ---------- player embutido (dentro do grupo): obedece o grupo
 const EMBED = new URLSearchParams(location.search).get('embed') === '1';
 let embedMudo = true;
 let embedManual = false; // a pessoa escolheu a qualidade nesta janelinha: o grupo não mexe mais nela
+// liga/desliga o som da janelinha. Sem toque, o iPhone não deixa: aí toca mudo e mostra "toque pra ligar o som"
+function aplicarSomEmbed() {
+  const aviso = $('#aviso-som');
+  if (embedMudo) {
+    aviso.classList.add('hidden');
+    if (reforcoAtivo()) { reforco.mudo = true; reforco.ganho.gain.value = 0; } else video.muted = true;
+    atualizarIconeSom();
+    return;
+  }
+  if (reforco.nivel > 1) {
+    reforco.mudo = false;
+    if (reforco.ctx && reforco.ctx.state !== 'running') reforco.ctx.resume().catch(() => {});
+    if (reforcoAtivo()) reforco.ganho.gain.value = reforco.nivel;
+    aplicarReforco();
+    video.play().catch(() => {});
+    return;
+  }
+  aviso.classList.add('hidden');
+  const falhou = () => { video.muted = true; video.play().catch(() => {}); pedirToqueSom(); };
+  video.muted = false;
+  if (video.volume === 0) video.volume = 1;
+  const p = video.play();
+  if (p && p.catch) p.catch(falhou);
+  // o Safari às vezes só pausa o vídeo em vez de recusar: confere logo depois
+  setTimeout(() => { if (!embedMudo && video.srcObject && (video.paused || video.muted) && !reforcoAtivo()) falhou(); }, 500);
+  atualizarIconeSom();
+}
+function configEmbed(d) {
+  if (!d || d.tvv !== 'config') return;
+  if (embedManual) { /* escolha da pessoa vale */ }
+  else if (d.nivel === 'auto') { if (!qRx.auto) { qRx.auto = true; trocarNivelRx(TETO_AUTO); } }
+  else if (typeof d.nivel === 'number' && (qRx.auto || qRx.nivel !== d.nivel)) { qRx.auto = false; trocarNivelRx(d.nivel); }
+  const mudo = !!d.mudo;
+  const travado = !mudo && d.toque && (!$('#aviso-som').classList.contains('hidden') || (reforco.nivel > 1 && !reforcoAtivo()));
+  if (embedMudo !== mudo || travado) { embedMudo = mudo; aplicarSomEmbed(); }
+}
 if (EMBED) {
   document.body.classList.add('embed');
-  window.addEventListener('message', e => {
-    if (e.origin !== location.origin || !e.data || e.data.tvv !== 'config') return;
-    const d = e.data;
-    if (embedManual) { /* escolha da pessoa vale */ }
-    else if (d.nivel === 'auto') { if (!qRx.auto) { qRx.auto = true; trocarNivelRx(TETO_AUTO); } }
-    else if (typeof d.nivel === 'number' && (qRx.auto || qRx.nivel !== d.nivel)) { qRx.auto = false; trocarNivelRx(d.nivel); }
-    if (embedMudo !== !!d.mudo) {
-      embedMudo = !!d.mudo;
-      if (reforcoAtivo()) { reforco.mudo = embedMudo; reforco.ganho.gain.value = embedMudo ? 0 : reforco.nivel; }
-      else { video.muted = embedMudo; if (!embedMudo) video.play().catch(() => {}); }
-      atualizarIconeSom();
-    }
-  });
+  window.__tvvConfig = configEmbed; // a tela do grupo chama direto (dentro do toque)
+  window.addEventListener('message', e => { if (e.origin === location.origin) configEmbed(e.data); });
 }
 
 // ============================================================ ligações da interface
