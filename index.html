@@ -3240,7 +3240,7 @@ setInterval(async () => {
           (it && it.encoder ? `\nEncoder dele ${it.encoder}` : '') +
           (it && it.dica === 'detail' ? `\nOtimizado   pra nitidez (texto): em vídeo/jogo, ele deve escolher "Movimento"` : '') +
           (it && st.mbps < 4 && (/software|CPU/i.test(it.encoder || '') || /leve/.test(it.qualidade || ''))
-            ? `\nTroca cena  borra um instante: pouca taxa${/software|CPU/i.test(it.encoder || '') ? ' + encoder no processador' : ''}. Pra melhorar, ele escolhe "720p · 60 fps · recomendado" ou liga o Turbo${/software|CPU/i.test(it.encoder || '') ? ', e ativa "aceleração de hardware" nas configurações do navegador' : ''}` : '');
+            ? `\nTroca cena  borra um instante: pouca taxa${/software|CPU/i.test(it.encoder || '') ? ' + encoder no processador' : ''}. Pra melhorar, ele liga o Turbo (e mantém 30 fps: mais dados por quadro)${/software|CPU/i.test(it.encoder || '') ? ', e ativa "aceleração de hardware" nas configurações do navegador' : ''}` : '');
       }
     }
   } catch (e) { console.warn(e); }
