@@ -318,7 +318,7 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
 #player{position:fixed;inset:0;z-index:10;background:#000;overflow:hidden}
 #player:not(.ativo){cursor:none}
 #video{width:100%;height:100%;object-fit:contain;background:#000;display:block;touch-action:manipulation}
-#sr-canvas,#sr-ia{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none;background:#000}
+#sr-canvas,#sr-ia{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none;background:transparent}
 #video.girado{position:absolute;top:50%;left:50%;max-width:none}
 .giro-tx{display:grid;grid-template-columns:repeat(3,1fr);padding:3px;border-radius:var(--r-m);background:var(--bg-2);border:1px solid var(--linha);margin-top:12px}
 .giro-tx label{position:relative;cursor:pointer}
@@ -409,19 +409,31 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
 #grupo-status{margin-bottom:14px}
 .grupo-corpo{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:20px;align-items:start}
 .grupo-modos{max-width:320px;margin:0 0 12px}
+.grupo-ferramentas{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 14px}
+.grupo-ferramentas .grupo-modos{margin:0;flex:1 1 240px}
+.bt-luz{display:inline-flex;align-items:center;gap:9px;height:44px;padding:0 15px;border-radius:var(--r-m);background:var(--bg-2);border:1px solid var(--linha);color:var(--sub);font-size:13.5px;font-weight:500;cursor:pointer}
+.bt-luz .ponto{width:10px;height:10px;border-radius:50%;background:var(--linha);transition:box-shadow .3s}
+.bt-luz[aria-pressed="true"]{color:var(--texto)}
+.bt-luz[aria-pressed="true"] .ponto{background:conic-gradient(#ff6a3d,#ffc83d,#5ef0a0,#4aa8ff,#b56bff,#ff6a3d);box-shadow:0 0 12px rgba(255,190,110,.55)}
+.grupo-telas{isolation:isolate}
+.tile-luz{position:absolute;left:-6%;top:-9%;width:112%;height:118%;z-index:-1;pointer-events:none;border-radius:24px;
+  filter:blur(34px) saturate(1.6) brightness(1.05);opacity:0;transition:opacity .9s}
+.luz-on .tile-luz.viva{opacity:.8}
+.tile:fullscreen .tile-luz,.tile.tile-cheio .tile-luz{display:none}
 .grupo-telas{display:grid;gap:10px}
 .grupo-telas.grade{grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr))}
 .grupo-telas.destaque{grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}
 .grupo-telas.destaque .tile.foco{grid-column:1/-1;order:-1}
-.tile{position:relative;aspect-ratio:16/9;background:#000;border-radius:var(--r-m);overflow:hidden;border:1px solid var(--linha)}
+.tile{position:relative;aspect-ratio:16/9;background:#000;border-radius:var(--r-m);border:1px solid var(--linha)}
 .tile.foco{border-color:var(--acento)}
-.tile iframe,.tile video{position:absolute;inset:0;width:100%;height:100%;border:0;object-fit:contain;background:#000}
+.tile iframe,.tile video{position:absolute;inset:0;width:100%;height:100%;border:0;object-fit:contain;background:#000;border-radius:calc(var(--r-m) - 1px)}
+.tile:fullscreen iframe,.tile:fullscreen video,.tile.tile-cheio iframe{border-radius:0}
 .tile-capa{position:absolute;inset:0;background:transparent;cursor:pointer;z-index:1}
 .grupo-telas.destaque .tile.foco .tile-capa{display:none}
 .grupo-telas.destaque .tile.foco .tile-barra{pointer-events:auto}
 .tile-barra{position:absolute;left:0;right:0;bottom:0;z-index:2;display:flex;align-items:center;gap:6px;padding:18px 10px 8px;
-  background:linear-gradient(transparent,rgba(0,0,0,.75));font-size:13px;font-weight:500;color:#eceef2}
-.grupo-telas.destaque .tile.foco .tile-barra{top:0;bottom:auto;padding:8px 10px 18px;background:linear-gradient(rgba(0,0,0,.7),transparent)}
+  background:linear-gradient(transparent,rgba(0,0,0,.75));font-size:13px;font-weight:500;color:#eceef2;border-radius:0 0 calc(var(--r-m) - 1px) calc(var(--r-m) - 1px)}
+.grupo-telas.destaque .tile.foco .tile-barra{top:0;bottom:auto;padding:8px 10px 18px;background:linear-gradient(rgba(0,0,0,.7),transparent);border-radius:calc(var(--r-m) - 1px) calc(var(--r-m) - 1px) 0 0}
 .tile-nome{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tile-bt{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:8px;background:rgba(255,255,255,.12);color:#fff}
 .tile-bt:hover{background:rgba(255,255,255,.24)}
@@ -826,9 +838,12 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
   <div id="grupo-status" class="status"></div>
   <div class="grupo-corpo">
     <div class="grupo-palco">
-      <div class="seg grupo-modos" role="radiogroup" aria-label="Como mostrar as telas">
-        <label><input type="radio" name="layout" value="grade"><span>Grade<small>todas iguais</small></span></label>
-        <label><input type="radio" name="layout" value="destaque"><span>Destaque<small>uma grande</small></span></label>
+      <div class="grupo-ferramentas">
+        <div class="seg grupo-modos" role="radiogroup" aria-label="Como mostrar as telas">
+          <label><input type="radio" name="layout" value="grade"><span>Grade<small>todas iguais</small></span></label>
+          <label><input type="radio" name="layout" value="destaque"><span>Destaque<small>uma grande</small></span></label>
+        </div>
+        <button id="bt-luz" class="bt-luz" type="button" aria-pressed="true" title="Luz em volta das telas com as cores da imagem (como a iluminação cinematográfica do YouTube)"><span class="ponto"></span>Luz ambiente</button>
       </div>
       <div id="grupo-telas" class="grupo-telas grade"></div>
       <div id="grupo-vazio" class="grupo-vazio"><svg class="i"><use href="#i-monitor"/></svg>Ninguém compartilhando ainda.<br>Clique em "Compartilhar minha tela" ou espere alguém começar.</div>
@@ -2351,19 +2366,28 @@ const SR_REDUZ = `#version 300 es
 precision highp float;
 uniform sampler2D tex; uniform vec2 inSize; uniform vec2 outSize; uniform vec2 orig;
 out vec4 cor;
+float lz(float x){ x = abs(x); if (x < 1e-5) return 1.0; if (x >= 2.0) return 0.0; float p = 3.14159265 * x; return 2.0 * sin(p) * sin(p * 0.5) / (p * p); }
 void main(){
   vec2 pos = gl_FragCoord.xy - orig;
   pos.y = outSize.y - pos.y;
-  vec2 r = inSize / outSize;
-  int n = int(clamp(ceil(max(r.x, r.y)), 1.0, 4.0));
-  vec3 acc = vec3(0.0); float w = 0.0;
-  for (int y = 0; y < 4; y++) for (int x = 0; x < 4; x++) {
-    if (x >= n || y >= n) continue;
-    vec2 off = (vec2(float(x), float(y)) + 0.5) / float(n) - 0.5;
-    acc += texture(tex, (pos * r + off * r) / inSize).rgb; w += 1.0;
+  vec2 r = max(inSize / outSize, vec2(1.0));
+  vec2 c = pos * (inSize / outSize);
+  ivec2 i0 = ivec2(floor(c - 2.0 * r)), i1 = ivec2(ceil(c + 2.0 * r));
+  vec3 acc = vec3(0.0); float ws = 0.0;
+  for (int y = i0.y; y <= i1.y; y++) {
+    float wy = lz((float(y) + 0.5 - c.y) / r.y);
+    if (wy == 0.0) continue;
+    for (int x = i0.x; x <= i1.x; x++) {
+      float wx = lz((float(x) + 0.5 - c.x) / r.x);
+      if (wx == 0.0) continue;
+      acc += texelFetch(tex, clamp(ivec2(x, y), ivec2(0), ivec2(inSize) - 1), 0).rgb * (wx * wy);
+      ws += wx * wy;
+    }
   }
-  cor = vec4(acc / w, 1.0);
+  cor = vec4(clamp(acc / ws, 0.0, 1.0), 1.0);
 }`;
+// celular/tablet: desligada (placa fraca + vídeo do iPhone não gosta de ser copiado). Tela cheia nativa/aba escondida: pausa.
+const srBloqueado = () => TOQUE || !!video.webkitDisplayingFullscreen || document.hidden;
 function srCompilar(gl, fonte) {
   const prog = gl.createProgram();
   for (const [tipo, src] of [[gl.VERTEX_SHADER, SR_VERT], [gl.FRAGMENT_SHADER, fonte]]) {
@@ -2381,7 +2405,7 @@ function srIniciar() {
   try {
     const cv = document.createElement('canvas');
     cv.id = 'sr-canvas'; cv.className = 'hidden';
-    const gl = cv.getContext('webgl2', { alpha: false, antialias: false, depth: false, powerPreference: 'high-performance', desynchronized: true });
+    const gl = cv.getContext('webgl2', { alpha: true, premultipliedAlpha: true, antialias: false, depth: false, powerPreference: 'high-performance' });
     if (!gl) throw new Error('sem WebGL2');
     SR.progE = srCompilar(gl, SR_EASU);
     SR.progR = srCompilar(gl, SR_RCAS);
@@ -2416,7 +2440,7 @@ function srParar() {
 }
 function srQuadro() {
   SR.laco = 0;
-  if (!SR.modo || giroRx || $('#rx-player').classList.contains('hidden')) { srParar(); iaParar(); return; }
+  if (!SR.modo || srBloqueado() || giroRx || $('#rx-player').classList.contains('hidden') || (EMBED && !embedGrande)) { srParar(); iaParar(); if (SR.modo && !TOQUE) srAgendar(); return; }
   if (SR.motor === 'ia' && IA.estado !== 'erro') { srParar(); return; } // a IA tem o laço dela
   if (!SR.ok) { srParar(); return; }
   iaParar();
@@ -2430,10 +2454,10 @@ function srQuadro() {
   const ow = Math.round(vw * esc), oh = Math.round(vh * esc);
   // resolução-alvo: a escolhida (1080p/2K/4K) ou a da tela; nunca menor que a tela
   let ih = Math.max(oh, srAlvo());
-  ih = Math.min(ih, 2160, Math.round(oh * 4));
+  ih = Math.min(ih, 2160, Math.round(oh * 2.5));
   let iw = Math.round(vw * ih / vh);
   if (iw > 3840 * 1.34) { iw = Math.round(3840 * 1.34); ih = Math.round(vh * iw / vw); }
-  if (ih < vh * 1.08) { srParar(); srAgendar(); return; } // já chega do tamanho (ou maior): nada a ampliar
+  if (ih < vh * 1.08 || oh < vh * 0.9) { srParar(); srAgendar(); return; } // já chega do tamanho (ou a tela é menor): nada a ampliar
   const reduz = ih > oh + 1; // ampliou acima da tela: depois reduz (fica mais liso, como resolução 200% nos jogos)
   if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
   const ox = Math.floor((W - ow) / 2), oy = Math.floor((H - oh) / 2);
@@ -2476,7 +2500,7 @@ function srQuadro() {
     }
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, W, H);
-    gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
     gl.viewport(ox, H - oy - oh, ow, oh);
     if (reduz) {
       // passo 3: reduzir pro tamanho da tela
@@ -2525,24 +2549,29 @@ struct U { pe: vec2f, n: f32, pad: f32 };
 struct VO { @builtin(position) pos: vec4f, @location(0) uv: vec2f };
 @vertex fn vs(@builtin(vertex_index) i: u32) -> VO {
   var p = array<vec2f, 3>(vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0));
-  var o: VO;
-  o.pos = vec4f(p[i], 0.0, 1.0);
-  o.uv = vec2f((p[i].x + 1.0) * 0.5, (1.0 - p[i].y) * 0.5);
-  return o;
+  var o: VO; o.pos = vec4f(p[i], 0.0, 1.0); o.uv = vec2f((p[i].x + 1.0) * 0.5, (1.0 - p[i].y) * 0.5); return o;
 }
+fn lz(x0: f32) -> f32 { let x = abs(x0); if (x < 1e-5) { return 1.0; } if (x >= 2.0) { return 0.0; } let p = 3.14159265 * x; return 2.0 * sin(p) * sin(p * 0.5) / (p * p); }
 @fragment fn fs(v: VO) -> @location(0) vec4f {
-  // reduz da resolução da IA pro tamanho da tela tirando a média (como "resolução 200%" nos jogos)
-  var acc = vec3f(0.0);
-  let n = i32(u.n);
-  for (var y = 0; y < 4; y++) {
-    for (var x = 0; x < 4; x++) {
-      if (x < n && y < n) {
-        let off = (vec2f(f32(x), f32(y)) + 0.5) / u.n - 0.5;
-        acc += textureSampleLevel(tex, samp, v.uv + off * u.pe, 0.0).rgb;
-      }
+  let tam = vec2f(textureDimensions(tex));
+  let saida = 1.0 / u.pe;
+  let r = max(tam / saida, vec2f(1.0));
+  let c = v.uv * tam;
+  let i0 = vec2i(floor(c - 2.0 * r)); let i1 = vec2i(ceil(c + 2.0 * r));
+  let lim = vec2i(tam) - 1;
+  var acc = vec3f(0.0); var ws = 0.0;
+  for (var y = i0.y; y <= i1.y; y++) {
+    let wy = lz((f32(y) + 0.5 - c.y) / r.y);
+    if (wy == 0.0) { continue; }
+    for (var x = i0.x; x <= i1.x; x++) {
+      let wx = lz((f32(x) + 0.5 - c.x) / r.x);
+      if (wx == 0.0) { continue; }
+      acc += textureLoad(tex, clamp(vec2i(x, y), vec2i(0), lim), 0).rgb * (wx * wy);
+      ws += wx * wy;
     }
   }
-  return vec4f(clamp(acc / (u.n * u.n), vec3f(0.0), vec3f(1.0)), 1.0);
+  let base = textureSampleLevel(tex, samp, v.uv, 0.0).rgb; // usa o sampler (o layout automático exige)
+  return vec4f(clamp(acc / ws + base * 0.0, vec3f(0.0), vec3f(1.0)), 1.0);
 }`;
 function iaCarregarLib() {
   if (window['anime4k-webgpu']) return Promise.resolve(window['anime4k-webgpu']);
@@ -2571,7 +2600,7 @@ async function iaIniciar() {
     IA.ctx = cv.getContext('webgpu');
     if (!IA.ctx) throw new Error('sem canvas WebGPU');
     IA.formato = navigator.gpu.getPreferredCanvasFormat();
-    IA.ctx.configure({ device: dev, format: IA.formato, alphaMode: 'opaque' });
+    IA.ctx.configure({ device: dev, format: IA.formato, alphaMode: 'premultiplied' });
     const mod = dev.createShaderModule({ code: IA_WGSL });
     IA.render = dev.createRenderPipeline({ layout: 'auto', vertex: { module: mod, entryPoint: 'vs' },
       fragment: { module: mod, entryPoint: 'fs', targets: [{ format: IA.formato }] }, primitive: { topology: 'triangle-list' } });
@@ -2624,7 +2653,7 @@ function iaAgendar() {
 }
 function iaQuadro() {
   IA.laco = 0;
-  if (!SR.modo || SR.motor !== 'ia' || IA.estado !== 'pronto' || giroRx || $('#rx-player').classList.contains('hidden')) { iaParar(); return; }
+  if (!SR.modo || srBloqueado() || SR.motor !== 'ia' || IA.estado !== 'pronto' || giroRx || $('#rx-player').classList.contains('hidden') || (EMBED && !embedGrande)) { iaParar(); if (SR.modo && !TOQUE && SR.motor === 'ia' && IA.estado === 'pronto') iaAgendar(); return; }
   const vw = video.videoWidth, vh = video.videoHeight;
   if (!vw || !vh) { iaAgendar(); return; }
   if (IA.ocupado) { iaAgendar(); return; } // a placa ainda está no quadro anterior: pula este (sem acumular atraso)
@@ -2632,10 +2661,10 @@ function iaQuadro() {
   const W = Math.round(r.width * dpr), H = Math.round(r.height * dpr);
   const esc = Math.min(W / vw, H / vh);
   const ow = Math.round(vw * esc), oh = Math.round(vh * esc);
-  let ih = Math.min(Math.max(oh, srAlvo()), 2160);
+  let ih = Math.min(Math.max(oh, srAlvo()), 2160, Math.round(oh * 2.5));
   let iw = Math.round(vw * ih / vh);
   if (iw > 5120) { iw = 5120; ih = Math.round(vh * iw / vw); }
-  if (ih < vh * 1.08) { iaParar(); SR.info = ''; iaAgendar(); return; } // já chega do tamanho: nada a ampliar
+  if (ih < vh * 1.08 || oh < vh * 0.9) { iaParar(); SR.info = ''; iaAgendar(); return; } // já chega do tamanho (ou a tela é menor): nada a ampliar
   const dev = IA.device, cv = IA.cv;
   try {
     const chave = `${vw}x${vh}>${iw}x${ih}`;
@@ -2647,7 +2676,7 @@ function iaQuadro() {
     dev.queue.writeBuffer(IA.unif, 0, new Float32Array([1 / ow, 1 / oh, Math.min(4, Math.max(1, Math.ceil(sw / ow - 0.01))), 0]));
     const enc = dev.createCommandEncoder();
     for (const p of IA.pipes) p.pass(enc);
-    const pass = enc.beginRenderPass({ colorAttachments: [{ view: IA.ctx.getCurrentTexture().createView(), clearValue: { r: 0, g: 0, b: 0, a: 1 }, loadOp: 'clear', storeOp: 'store' }] });
+    const pass = enc.beginRenderPass({ colorAttachments: [{ view: IA.ctx.getCurrentTexture().createView(), clearValue: { r: 0, g: 0, b: 0, a: 0 }, loadOp: 'clear', storeOp: 'store' }] });
     pass.setViewport(Math.floor((W - ow) / 2), Math.floor((H - oh) / 2), ow, oh, 0, 1);
     pass.setPipeline(IA.render);
     pass.setBindGroup(0, IA.bind);
@@ -2713,6 +2742,8 @@ function definirSuperRes(m, quieto) {
 }
 video.addEventListener('playing', () => { if (SR.modo) srReiniciar(); });
 addEventListener('resize', () => { if (SR.modo) srReiniciar(); });
+document.addEventListener('visibilitychange', () => { if (SR.modo && !document.hidden) srReiniciar(); });
+video.addEventListener('webkitendfullscreen', () => { if (SR.modo) srReiniciar(); });
 
 // ---------- menu de configurações (estilo YouTube)
 let menuVista = 'principal';
@@ -2750,7 +2781,9 @@ function renderMenu(vista) {
   if (vista === 'principal') {
     m.append(itemMenu('Qualidade', textoQualidade(), () => renderMenu('qualidade'), { sub: true }));
     m.append(itemMenu('Volume extra', reforco.nivel > 1 ? reforco.nivel + 'x' : 'Desligado', () => renderMenu('volume'), { sub: true }));
-    m.append(itemMenu('Super resolução (beta)', textoSR(), () => renderMenu('superres'), { sub: true }));
+    if (TOQUE) m.append(itemMenu('Super resolução (beta)', 'Só no PC', () => avisoRx('A super resolução pesa demais pro celular (o vídeo pode ficar preto). Ela funciona no PC.')));
+    else m.append(itemMenu('Super resolução (beta)', textoSR(), () => renderMenu('superres'), { sub: true }));
+    if (IOS && video.webkitEnterFullscreen) m.append(itemMenu('Tela cheia do iPhone', 'sem controles', () => { fecharMenu(); try { video.webkitEnterFullscreen(); } catch {} }));
     m.append(itemMenu('Girar imagem', giroRx ? giroRx + '°' : 'Normal', () => { girarRx(); renderMenu('principal'); }));
     if (PODE_CALL) m.append(itemMenu('Som junto da call (iPhone)', modoCall ? 'Ligado' : 'Desligado', () => { alternarModoCall(); renderMenu('principal'); }));
     m.append(itemMenu('Estatísticas', $('#stats-rx-box').classList.contains('hidden') ? 'Escondidas' : 'Na tela', () => { alternarStats(); renderMenu('principal'); }));
@@ -2765,11 +2798,11 @@ function renderMenu(vista) {
     m.append(cabMenu('Super resolução (beta)'));
     m.append(itemMenu('Desligada', null, () => { definirSuperRes(0); fecharMenu(); }, { marcado: !SR.modo }));
     SR_ALVOS.forEach(([alvo, rot]) => m.append(itemMenu(rot, null, () => { escolherAlvoSR(alvo); fecharMenu(); }, { marcado: !!SR.modo && SR.alvo === alvo })));
-    m.append(itemMenu('Tipo', SR.motor === 'ia' ? 'IA (reconstrói)' : 'Rápida (nitidez)', () => { alternarMotorSR(); renderMenu('superres'); }));
+    m.append(itemMenu('Tipo', SR.motor === 'ia' ? 'IA (melhor em desenho)' : 'Rápida (jogos e filmes)', () => { alternarMotorSR(); renderMenu('superres'); }));
     if (SR.motor !== 'ia') m.append(itemMenu('Mais nitidez', SR.forte ? 'Ligada' : 'Desligada', () => { alternarForteSR(); renderMenu('superres'); }));
     const nota = document.createElement('p'); nota.className = 'menu-nota';
     nota.textContent = SR.motor === 'ia'
-      ? 'IA (Anime4K): redes neurais na sua placa de vídeo reconstroem o traço e as bordas e tiram o borrão da compressão, até a resolução escolhida; depois reduz pra sua tela, como a "resolução 200%" dos jogos. Melhor em desenho e animação. Pesa: se a placa não der conta, volta sozinha pra rápida.'
+      ? 'IA (Anime4K): redes neurais na sua placa de vídeo reconstroem o traço e as bordas e tiram o borrão da compressão, até a resolução escolhida; depois reduz pra sua tela, como a "resolução 200%" dos jogos. Melhor em desenho, anime e animação 3D (nos testes ficou quase tão nítido quanto um 1080p de verdade). Em jogo realista e filme, use a Rápida. Pesa: se a placa não der conta, volta sozinha pra rápida.'
       : 'Rápida: amplia seguindo as bordas e deixa nítido, até a resolução escolhida, e reduz pra sua tela. Leve, funciona em qualquer PC.';
     m.append(nota);
   } else if (vista === 'volume') {
@@ -3017,7 +3050,6 @@ async function alternarTelaCheia() {
   // no grupo, quem entra/sai da tela cheia é a janelinha (a tela do grupo): o player só pede
   if (EMBED) {
     const podeElemento = document.fullscreenEnabled || document.webkitFullscreenEnabled;
-    if (!podeElemento && video.webkitEnterFullscreen) { try { video.webkitEnterFullscreen(); } catch {} return; }
     try { parent.postMessage({ tvv: 'tela-cheia' }, location.origin); } catch {}
     return;
   }
@@ -3588,7 +3620,7 @@ function iconesTelaCheia() {
     if (u) u.setAttribute('href', t === atual || t.classList.contains('tile-cheio') ? '#i-sair-cheia' : '#i-cheia');
   }
 }
-document.addEventListener('fullscreenchange', iconesTelaCheia);
+document.addEventListener('fullscreenchange', () => { iconesTelaCheia(); if (grupo.ativo) setTimeout(ajustarTiles, 50); });
 document.addEventListener('webkitfullscreenchange', iconesTelaCheia);
 // som: por padrão só a tela em destaque toca; cada uma pode ser ligada/desligada na mão
 function somLigado(sala) { return grupo.somManual.has(sala) ? grupo.somManual.get(sala) : sala === grupo.foco; }
@@ -3602,7 +3634,8 @@ function ajustarTiles(toque) {
     // qualidade: a grande no automático; miniaturas leves (economiza a internet de quem compartilha)
     const nivel = grande ? 'auto' : nivelPorRot(grupo.layout === 'grade' && n <= 4 ? '540' : '360');
     const ligado = somLigado(t.dataset.sala);
-    const cfg = { tvv: 'config', nivel, mudo: !ligado, toque: toque === true };
+    const cheia = t.classList.contains('tile-cheio') || t === (document.fullscreenElement || document.webkitFullscreenElement);
+    const cfg = { tvv: 'config', nivel, mudo: !ligado, toque: toque === true, grande: grande || cheia };
     try { if (f.contentWindow.__tvvConfig) f.contentWindow.__tvvConfig(cfg); else f.contentWindow.postMessage(cfg, location.origin); } catch {}
     const ico = t.querySelector('.tile-som use');
     if (ico) ico.setAttribute('href', ligado ? '#i-som' : '#i-mudo');
@@ -3613,6 +3646,30 @@ function ajustarTiles(toque) {
   }
 }
 setInterval(() => { if (grupo.ativo) ajustarTiles(); }, 3000); // reenvia (o player embutido pode ter recarregado)
+// ---------- luz ambiente (como a "iluminação cinematográfica" do YouTube): as cores da imagem brilham atrás de cada tela
+let luzAmbiente = guardar.get('luzAmbiente') ? guardar.get('luzAmbiente') === '1' : !TOQUE;
+function aplicarLuz() {
+  $('#bt-luz').setAttribute('aria-pressed', String(luzAmbiente));
+  $('.grupo-palco').classList.toggle('luz-on', luzAmbiente);
+}
+$('#bt-luz').onclick = () => { luzAmbiente = !luzAmbiente; guardar.set('luzAmbiente', luzAmbiente ? '1' : '0'); aplicarLuz(); };
+aplicarLuz();
+function atualizarLuz() {
+  if (!grupo.ativo || !luzAmbiente || document.hidden) return;
+  for (const t of document.querySelectorAll('#grupo-telas .tile')) {
+    let v = null;
+    if (t.classList.contains('eu')) v = t.querySelector('video');
+    else try { const f = t.querySelector('iframe'); v = f && f.contentDocument && f.contentDocument.getElementById('video'); } catch {}
+    let c = t.querySelector('.tile-luz');
+    if (!v || v.readyState < 2 || !v.videoWidth || v.webkitDisplayingFullscreen) { if (c) c.classList.remove('viva'); continue; }
+    if (!c) { c = document.createElement('canvas'); c.className = 'tile-luz'; c.width = 32; c.height = 18; t.prepend(c); }
+    const x = c.getContext('2d');
+    // mistura com o quadro anterior: a cor muda devagar, sem piscar
+    x.globalAlpha = c.classList.contains('viva') ? 0.25 : 1;
+    try { x.drawImage(v, 0, 0, 32, 18); c.classList.add('viva'); } catch {}
+  }
+}
+setInterval(atualizarLuz, 200);
 // celular: o som só pode ligar dentro de um toque. Qualquer toque na tela do grupo tenta de novo nas janelinhas.
 for (const ev of ['touchend', 'click']) document.addEventListener(ev, () => { if (grupo.ativo && !EMBED) ajustarTiles(true); }, true);
 
@@ -3620,6 +3677,7 @@ for (const ev of ['touchend', 'click']) document.addEventListener(ev, () => { if
 const EMBED = new URLSearchParams(location.search).get('embed') === '1';
 let embedMudo = true;
 let embedManual = false; // a pessoa escolheu a qualidade nesta janelinha: o grupo não mexe mais nela
+let embedGrande = true; // no grupo, a super resolução só roda na tela grande (as miniaturas não precisam)
 // liga/desliga o som da janelinha. Sem toque, o iPhone não deixa: aí toca mudo e mostra "toque pra ligar o som"
 function aplicarSomEmbed() {
   const aviso = $('#aviso-som');
@@ -3652,6 +3710,8 @@ function configEmbed(d) {
   if (embedManual) { /* escolha da pessoa vale */ }
   else if (d.nivel === 'auto') { if (!qRx.auto) { qRx.auto = true; trocarNivelRx(TETO_AUTO); } }
   else if (typeof d.nivel === 'number' && (qRx.auto || qRx.nivel !== d.nivel)) { qRx.auto = false; trocarNivelRx(d.nivel); }
+  const grandeAgora = d.grande !== false;
+  if (grandeAgora !== embedGrande) { embedGrande = grandeAgora; if (SR.modo) srReiniciar(); }
   const mudo = !!d.mudo;
   const travado = !mudo && d.toque && (!$('#aviso-som').classList.contains('hidden') || (reforco.nivel > 1 && !reforcoAtivo()));
   if (embedMudo !== mudo || travado) { embedMudo = mudo; aplicarSomEmbed(); }
