@@ -5,27 +5,29 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Tela ao Vivo</title>
 <meta name="description" content="Compartilhe a tela inteira ou uma janela, com ou sem áudio, e deixe a voz da call de fora. Direto do Chrome, P2P.">
-<meta name="theme-color" content="#0d0e10">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23141518'/%3E%3Ccircle cx='16' cy='16' r='6' fill='%23ff5b37'/%3E%3C/svg%3E">
+<meta name="theme-color" content="#101218">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23181b23'/%3E%3Ccircle cx='16' cy='16' r='6' fill='%23ff4545'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#0d0e10;--bg-2:#111215;--sup:#16171b;--sup-2:#1c1e23;--sup-3:#23252b;
-  --linha:#25272e;--linha-2:#31343c;--texto:#ecedf0;--sub:#9296a1;--fraco:#62666f;
-  --acento:#ff5b37;--acento-h:#ff7656;--acento-tinta:#170804;--acento-suave:rgba(255,91,55,.12);
+  --bg:#101218;--bg-2:#14171e;--sup:#191c24;--sup-2:#1f232c;--sup-3:#272b35;
+  --linha:#2a2f3a;--linha-2:#363c48;--texto:#eef0f4;--sub:#9ba2b1;--fraco:#687081;
+  --acento:#ffd23f;--acento-h:#ffdd6b;--acento-tinta:#1c1602;--acento-suave:rgba(255,210,63,.12);
+  --vivo:#ff4545;--vivo-suave:rgba(255,69,69,.14);
+  --b1:#e8e8e3;--b2:#ffd23f;--b3:#3fd3e0;--b4:#45cf78;--b5:#e256c6;--b6:#ff4545;--b7:#4d6bff;
   --ok:#3fd884;--aviso:#f4b53f;--erro:#ff6b78;
   --r-s:8px;--r-m:12px;--r-l:18px;
   --sombra:0 1px 0 rgba(255,255,255,.04) inset,0 18px 40px -18px rgba(0,0,0,.7);
-  --fonte:"Geist",ui-sans-serif,system-ui,"Segoe UI",sans-serif;
-  --mono:"Geist Mono",ui-monospace,Consolas,monospace;
+  --fonte:"Archivo",ui-sans-serif,system-ui,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
   --ease:cubic-bezier(.2,.8,.2,1);
 }
 *{box-sizing:border-box}
 html,body{margin:0;min-height:100%;background:var(--bg);color:var(--texto);font:15px/1.55 var(--fonte);-webkit-font-smoothing:antialiased}
 body{min-height:100dvh;display:flex;flex-direction:column;
-  background:radial-gradient(1100px 520px at 85% -10%,rgba(255,91,55,.07),transparent 60%),radial-gradient(800px 500px at -10% 110%,rgba(120,130,160,.06),transparent 60%),var(--bg)}
+  background:radial-gradient(900px 480px at 80% -12%,rgba(77,107,255,.07),transparent 62%),var(--bg)}
 body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.035;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
 .hidden{display:none!important}
@@ -53,8 +55,8 @@ svg.i{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-widt
 /* ---------- topo ---------- */
 .topo{position:relative;z-index:2;display:flex;align-items:center;justify-content:space-between;
   max-width:1240px;width:100%;margin:0 auto;padding:22px 24px 0}
-.logo{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:-.01em;font-size:16px}
-.tally{width:10px;height:10px;border-radius:50%;background:var(--acento);box-shadow:0 0 0 4px var(--acento-suave)}
+.logo{display:flex;align-items:center;gap:10px;font-weight:800;font-stretch:118%;letter-spacing:-.01em;font-size:16px}
+.tally{width:10px;height:10px;border-radius:50%;background:var(--vivo);box-shadow:0 0 0 4px var(--vivo-suave)}
 .topo-dir{display:flex;align-items:center;gap:10px}
 .link-baixar{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 13px;border-radius:10px;background:var(--sup-2);border:1px solid var(--linha-2);
   color:var(--texto);font-size:13px;font-weight:500;text-decoration:none;transition:background .2s,border-color .2s}
@@ -71,36 +73,38 @@ svg.i{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-widt
 .link-rebaixar svg.i{width:14px;height:14px}
 @media (max-width:560px){.link-baixar span{display:none}.link-baixar{width:34px;padding:0;justify-content:center}.cartao-prog{flex-wrap:wrap}.cartao-prog .btn{margin-left:0;width:100%}}
 .pill{display:inline-flex;align-items:center;gap:8px;height:30px;padding:0 12px;border-radius:999px;font:600 12px/1 var(--mono);
-  letter-spacing:.06em;background:var(--acento-suave);color:var(--acento);border:1px solid rgba(255,91,55,.25)}
-.pill .ponto{width:7px;height:7px;border-radius:50%;background:var(--acento);animation:pulsa 1.6s infinite}
+  letter-spacing:.06em;background:var(--vivo-suave);color:#ff8a8a;border:1px solid rgba(255,69,69,.3)}
+.pill .ponto{width:7px;height:7px;border-radius:50%;background:var(--vivo);animation:pulsa 1.6s infinite}
 @keyframes pulsa{0%,100%{opacity:1}50%{opacity:.25}}
 main{position:relative;flex:1;display:flex;flex-direction:column}
 .tela{flex:1;width:100%;max-width:1240px;margin:0 auto;padding:24px}
 
 /* ---------- home ---------- */
 #home{display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center;padding-top:clamp(32px,8vh,96px);padding-bottom:64px}
-.sobretitulo{font:500 12.5px/1 var(--mono);color:var(--sub);letter-spacing:.04em;margin:0 0 22px;display:flex;align-items:center;gap:10px}
-.sobretitulo::before{content:"";width:22px;height:1px;background:var(--linha-2)}
-h1{font-size:clamp(40px,5.6vw,68px);line-height:.98;letter-spacing:-.045em;font-weight:700;margin:0;text-wrap:balance}
+h1{font-size:clamp(34px,4.6vw,58px);line-height:1.02;letter-spacing:-.025em;font-weight:800;font-stretch:120%;margin:0;text-wrap:balance}
 h1 em{font-style:normal;color:var(--acento)}
+h2,.acao-tx b,.ab-texto{font-stretch:116%}
+.barras{display:flex;width:154px;height:7px;margin:0 0 26px;border-radius:2px;overflow:hidden}
+.barras i{flex:1}
+.barras i:nth-child(1){background:var(--b1)}.barras i:nth-child(2){background:var(--b2)}.barras i:nth-child(3){background:var(--b3)}
+.barras i:nth-child(4){background:var(--b4)}.barras i:nth-child(5){background:var(--b5)}.barras i:nth-child(6){background:var(--b6)}.barras i:nth-child(7){background:var(--b7)}
+.fatos{list-style:none;padding:0;margin:30px 0 0;display:flex;flex-direction:column;gap:9px;color:var(--sub);font-size:14.5px}
+.fatos li{display:flex;gap:10px;align-items:baseline}
+.fatos li::before{content:"";flex:none;width:6px;height:6px;border-radius:1px;background:var(--acento);transform:translateY(-2px)}
 .lead{color:var(--sub);font-size:17px;max-width:46ch;margin:22px 0 0;text-wrap:pretty}
-.specs{list-style:none;padding:0;margin:40px 0 0;display:grid;grid-template-columns:repeat(4,auto);gap:0;justify-content:start;
-  border-top:1px solid var(--linha);max-width:560px}
-.specs li{padding:14px 22px 0 0;font-size:13px;color:var(--fraco)}
-.specs b{display:block;color:var(--texto);font:600 13.5px/1.3 var(--mono);letter-spacing:-.01em}
 
 .acoes{display:flex;flex-direction:column;gap:14px}
-.acao{position:relative;display:block;width:100%;text-align:left;background:linear-gradient(180deg,var(--sup-2),var(--sup));border:1px solid var(--linha);
+.acao{position:relative;display:block;width:100%;text-align:left;background:var(--sup);border:1px solid var(--linha);
   border-radius:var(--r-l);padding:26px;box-shadow:var(--sombra);overflow:hidden;transition:border-color .25s var(--ease),transform .25s var(--ease)}
 .acao-tx{cursor:pointer}
-.acao-tx:hover{border-color:rgba(255,91,55,.45);transform:translateY(-2px)}
+.acao-tx:hover{border-color:rgba(255,210,63,.5);transform:translateY(-2px)}
 .acao-tx:active{transform:translateY(0) scale(.995)}
 .acao-tx .topo-acao{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
-.acao-tx b{display:block;font-size:24px;letter-spacing:-.025em;font-weight:650}
+.acao-tx b{display:block;font-size:24px;letter-spacing:-.02em;font-weight:800}
 .acao-tx small{display:block;color:var(--sub);font-size:14px;margin-top:4px}
 .seta{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:var(--acento);color:var(--acento-tinta);flex:none;
   transition:transform .3s var(--ease)}
-.acao-tx:hover .seta{transform:translateX(3px) rotate(-45deg)}
+.acao-tx:hover .seta{transform:translateX(3px)}
 .fontes-mini{display:flex;gap:8px;margin-top:24px;flex-wrap:wrap}
 .fontes-mini span{display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 11px;border-radius:8px;background:var(--bg-2);border:1px solid var(--linha);font-size:12.5px;color:var(--sub)}
 .fontes-mini svg.i{width:15px;height:15px}
@@ -263,12 +267,21 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
 .seg input:focus-visible+span{outline:2px solid var(--acento)}
 .dica{font-size:12.5px;color:var(--fraco);margin:10px 0 0;text-wrap:pretty}
 .dica.aviso{color:var(--aviso)}
-.turbo{display:flex;gap:12px;align-items:flex-start;margin-top:10px;padding:12px 14px;border-radius:var(--r-m);background:var(--bg-2);border:1px solid var(--linha);cursor:pointer;transition:border-color .2s}
-.turbo:hover{border-color:var(--linha-2)}
-.turbo:has(input:checked){border-color:var(--acento);background:linear-gradient(180deg,var(--acento-suave),transparent 80%),var(--bg-2)}
-.turbo input{width:18px;height:18px;margin:2px 0 0;accent-color:var(--acento);flex:none;cursor:pointer}
-.turbo b{font-size:14px;font-weight:600}
-.turbo small{display:block;color:var(--fraco);font-size:12.5px;line-height:1.4;margin-top:2px}
+.niveis{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:6px}
+.nivel{position:relative;cursor:pointer;min-width:0}
+.nivel input{position:absolute;opacity:0;pointer-events:none}
+.nivel>span{display:flex;flex-direction:column;gap:4px;height:100%;padding:10px 11px 11px;border-radius:var(--r-m);background:var(--bg-2);border:1px solid var(--linha);transition:border-color .15s,background .15s}
+.nivel b{font-size:14px;font-weight:650;letter-spacing:-.01em}
+.nivel small{font:11.5px/1.4 var(--mono);color:var(--fraco)}
+.nivel:hover>span{border-color:var(--linha-2)}
+.nivel input:checked+span{border-color:var(--acento);background:linear-gradient(180deg,var(--acento-suave),transparent 85%),var(--bg-2)}
+.nivel input:checked+span small{color:var(--sub)}
+.nivel input:focus-visible+span{outline:2px solid var(--acento);outline-offset:2px}
+.qual-custom{margin-top:8px;padding:14px;border-radius:var(--r-m);background:var(--bg-2);border:1px solid var(--linha)}
+.qc-grade{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.qc-grade select{width:100%}
+.qc-mbps-txt{min-width:64px}
+.qc-dica{margin:8px 0 0}
 
 /* monitor (lado direito) */
 .monitor{position:sticky;top:20px;display:flex;flex-direction:column;gap:14px}
@@ -348,7 +361,7 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
 .bt-p.ativo{color:var(--acento)}
 #vol{width:100px;accent-color:var(--acento);margin-right:8px}
 #info-rx{font:500 12px var(--mono);color:#b9bdc6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
-.ao-vivo-rx{white-space:nowrap;flex:none;display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 8px;border-radius:6px;background:var(--acento);color:var(--acento-tinta);font:700 10.5px/1 var(--mono);letter-spacing:.08em;margin:0 6px}
+.ao-vivo-rx{white-space:nowrap;flex:none;display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 8px;border-radius:6px;background:var(--vivo);color:#fff;font:700 10.5px/1 var(--mono);letter-spacing:.08em;margin:0 6px}
 .flex{flex:1}
 #espera:not(.hidden)~#barra .ao-vivo-rx,#espera:not(.hidden)~#barra #info-rx{display:none}
 .rotulo-reforco{font:600 12px var(--mono);margin-left:-2px}
@@ -378,14 +391,21 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
 /* ---------- responsivo ---------- */
 /* ---------- abertura ---------- */
 #abertura{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
-  background:radial-gradient(600px 300px at 50% 45%,rgba(255,91,55,.12),transparent 70%),var(--bg);animation:abSai .5s 1.75s cubic-bezier(.4,0,.2,1) forwards;cursor:pointer}
+  background:var(--bg);animation:abSai .5s 1.75s cubic-bezier(.4,0,.2,1) forwards;cursor:pointer}
+.ab-barras{display:flex;width:220px;height:6px;overflow:hidden;border-radius:2px}
+.ab-barras i{flex:1;transform:scaleY(0);transform-origin:bottom;animation:abBarra .35s cubic-bezier(.2,.8,.2,1) forwards}
+.ab-barras i:nth-child(1){background:var(--b1);animation-delay:.55s}.ab-barras i:nth-child(2){background:var(--b2);animation-delay:.6s}
+.ab-barras i:nth-child(3){background:var(--b3);animation-delay:.65s}.ab-barras i:nth-child(4){background:var(--b4);animation-delay:.7s}
+.ab-barras i:nth-child(5){background:var(--b5);animation-delay:.75s}.ab-barras i:nth-child(6){background:var(--b6);animation-delay:.8s}
+.ab-barras i:nth-child(7){background:var(--b7);animation-delay:.85s}
+@keyframes abBarra{to{transform:none}}
 #abertura.sai{animation:abSai .3s forwards}
 .ab-logo{display:flex;align-items:center;gap:18px}
-.ab-ponto{position:relative;width:22px;height:22px;flex:none;border-radius:50%;background:var(--acento);animation:abPonto .6s cubic-bezier(.2,1.4,.4,1) both}
-.ab-ponto i{position:absolute;inset:-2px;border-radius:50%;border:2px solid var(--acento);opacity:0;animation:abOnda 1.3s .35s cubic-bezier(.2,.8,.2,1) both}
+.ab-ponto{position:relative;width:22px;height:22px;flex:none;border-radius:50%;background:var(--vivo);animation:abPonto .6s cubic-bezier(.2,1.4,.4,1) both}
+.ab-ponto i{position:absolute;inset:-2px;border-radius:50%;border:2px solid var(--vivo);opacity:0;animation:abOnda 1.3s .35s cubic-bezier(.2,.8,.2,1) both}
 .ab-ponto i+i{animation-delay:.65s}
-.ab-texto{font:700 clamp(30px,7vw,52px)/1 var(--fonte);letter-spacing:-.04em;color:var(--texto);clip-path:inset(0 100% 0 0);animation:abTexto .7s .3s cubic-bezier(.65,0,.35,1) forwards}
-.ab-texto em{font-style:normal;color:var(--acento)}
+.ab-texto{font:800 clamp(30px,7vw,52px)/1 var(--fonte);letter-spacing:-.025em;color:var(--texto);clip-path:inset(0 100% 0 0);animation:abTexto .7s .3s cubic-bezier(.65,0,.35,1) forwards}
+.ab-texto em{font-style:normal;color:var(--texto)}
 .ab-sub{font:500 12px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--fraco);opacity:0;transform:translateY(6px);animation:abSub .5s .85s ease-out forwards}
 @keyframes abPonto{from{transform:scale(0)}to{transform:scale(1)}}
 @keyframes abOnda{0%{opacity:.9;transform:scale(1)}100%{opacity:0;transform:scale(3.2)}}
@@ -464,7 +484,7 @@ html.transp body::before{display:none}
 .membro{display:flex;align-items:center;gap:6px;padding:8px 0;border-top:1px solid var(--linha);font-size:14px}
 .membro:first-child{border-top:0}
 .membro-nome{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.etq.vivo{background:var(--acento);color:var(--acento-tinta)}
+.etq.vivo{background:var(--vivo);color:#fff}
 .membro-expulsar{font-size:12px;color:var(--erro);padding:3px 7px;border-radius:6px;border:1px solid rgba(255,107,120,.3)}
 .membro-expulsar:hover{background:rgba(255,107,120,.1)}
 /* player embutido no grupo: sem o cabeçalho e sem o "sair" */
@@ -480,8 +500,7 @@ html.transp body::before{display:none}
 @media (max-width:560px){
   .tela{padding:16px}
   .topo{padding:16px 16px 0}
-  .specs{grid-template-columns:repeat(2,auto)}
-  .fontes{grid-template-columns:1fr 1fr}
+    .fontes{grid-template-columns:1fr 1fr}
   .op-caixa{flex-direction:row;align-items:center}
   .sala{grid-template-columns:1fr}
   .sala-bt{flex-direction:row}
@@ -501,7 +520,7 @@ html.transp body::before{display:none}
     <span class="ab-ponto"><i></i><i></i></span>
     <span class="ab-texto">Tela <em>ao Vivo</em></span>
   </div>
-  <span class="ab-sub">compartilhamento de tela · ao vivo</span>
+  <span class="ab-barras"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
 </div>
 <script>
 // abertura: só uma vez por sessão, só na página inicial (link de assistir/grupo e player embutido vão direto)
@@ -558,14 +577,13 @@ html.transp body::before{display:none}
 <!-- ============ HOME ============ -->
 <section id="home" class="tela">
   <div>
-    <p class="sobretitulo">compartilhamento de tela · P2P · sem instalar nada</p>
-    <h1>Sua tela, lisa<br>e com o <em>som certo</em>.</h1>
-    <p class="lead">Tela inteira ou só uma janela, com ou sem áudio. A voz da call fica de fora. Direto do Chrome, de você pros seus amigos.</p>
-    <ul class="specs">
-      <li><b>até 4K</b>60 fps</li>
-      <li><b>Opus estéreo</b>160 kbps</li>
-      <li><b>H.265</b>pela placa</li>
-      <li><b>P2P</b>sem servidor no meio</li>
+    <div class="barras" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <h1>Bota sua tela no ar pros amigos.</h1>
+    <p class="lead">Tela inteira, uma janela ou uma aba, com o som do jogo e sem a voz da call. Abre no navegador e você manda o link.</p>
+    <ul class="fatos">
+      <li>Vai direto do seu PC pro deles, sem servidor no meio.</li>
+      <li>Até 4K a 60 fps, com o som em estéreo.</li>
+      <li>Grupo com várias telas ao mesmo tempo, no PC ou no celular.</li>
     </ul>
   </div>
 
@@ -763,13 +781,20 @@ html.transp body::before{display:none}
 
       <fieldset class="bloco">
         <legend><span class="num">3</span>Qualidade</legend>
-        <select id="sel-qual" aria-label="Qualidade"></select>
+        <div id="niveis-tx" class="niveis" role="radiogroup" aria-label="Nível de qualidade"></div>
+        <div id="qual-custom" class="qual-custom hidden">
+          <div class="qc-grade">
+            <label><span class="rotulo-campo">Resolução</span><select id="qc-res"></select></label>
+            <label><span class="rotulo-campo">FPS</span><select id="qc-fps"></select></label>
+          </div>
+          <div class="cam-linha"><span class="rotulo-campo">Taxa de dados</span><input type="range" id="qc-mbps" min="1" max="50" step="0.5" aria-label="Taxa de dados em Mbps"><span id="qc-mbps-txt" class="cam-tam-txt qc-mbps-txt">8 Mbps</span></div>
+          <p class="dica qc-dica" id="qc-dica"></p>
+        </div>
         <div class="seg" role="radiogroup" aria-label="Otimizar para">
           <label><input type="radio" name="dica" value="motion"><span>Movimento<small>jogos, vídeo</small></span></label>
           <label><input type="radio" name="dica" value="detail"><span>Nitidez<small>texto, código</small></span></label>
         </div>
-        <label class="turbo"><input type="checkbox" id="turbo"><span><b>Turbo</b><span class="etq rec">+60% DE INTERNET</span>
-          <small>Libera mais dados pro vídeo. Fica mais nítido em jogo com muito movimento (tiro, corrida). Só use se sua internet de upload for boa.</small></span></label>
+
         <details class="guia" id="guia-fps">
           <summary><svg class="i"><use href="#i-stats"/></svg>Como não cair fps sem perder qualidade<svg class="i mais"><use href="#i-mais"/></svg></summary>
           <div class="guia-corpo">
@@ -925,27 +950,52 @@ async function opcoesPeer() {
   if (!iceCache) return OPCOES_PEER;
   return { ...OPCOES_PEER, config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, ...iceCache] } };
 }
-const QUALIDADES = {
-  leve:  { nome: '720p · 30 fps · leve (internet fraca)', w: 1280, h: 720,  fps: 30, kbps: 2500 },
-  hd60:  { nome: '720p · 60 fps · recomendado',           w: 1280, h: 720,  fps: 60, kbps: 4500 },
-  fhd60: { nome: '1080p · 60 fps',                        w: 1920, h: 1080, fps: 60, kbps: 8000 },
-  max:   { nome: '1080p · 60 fps · máxima',               w: 1920, h: 1080, fps: 60, kbps: 14000 },
-  qhd:   { nome: '1440p (2K) · 60 fps · internet forte',  w: 2560, h: 1440, fps: 60, kbps: 20000 },
-  uhd30: { nome: '4K · 30 fps',                           w: 3840, h: 2160, fps: 30, kbps: 25000 },
-  uhd60: { nome: '4K · 60 fps · máxima',                  w: 3840, h: 2160, fps: 60, kbps: 40000 },
+// níveis prontos de quem transmite; "Personalizado" deixa escolher resolução, fps e taxa (até 50 Mbps)
+const NIVEIS_TX = {
+  leve:     { rot: 'Leve',     w: 1280, h: 720,  fps: 30, kbps: 3000 },
+  moderado: { rot: 'Moderado', w: 1920, h: 1080, fps: 60, kbps: 8000 },
+  alto:     { rot: 'Alto',     w: 2560, h: 1440, fps: 60, kbps: 18000 },
+  maximo:   { rot: 'Máximo',   w: 3840, h: 2160, fps: 60, kbps: 35000 },
 };
-// Turbo: aumenta o teto de dados do vídeo (o WebRTC só usa se a internet aguentar)
-const turboLigado = () => { const t = document.getElementById('turbo'); return !!(t && t.checked); };
-const kbpsDe = q => Math.round(q.kbps * (turboLigado() ? 1.6 : 1));
+const RES_TX = [[720, 1280, '720p'], [900, 1600, '900p'], [1080, 1920, '1080p'], [1440, 2560, '1440p (2K)'], [2160, 3840, '2160p (4K)'], [0, 7680, 'A da tela (nativa)']];
+const FPS_TX = [24, 30, 45, 60, 75, 90, 120, 144];
+const rotRes = h => h === 0 ? 'nativa' : h === 2160 ? '4K' : h === 1440 ? '2K' : h + 'p';
+const fmtMbps = k => (Math.round(k / 100) / 10).toString().replace('.', ',');
+function lerCustom() {
+  try {
+    const c = JSON.parse(guardar.get('qualCustom') || '{}');
+    return { h: RES_TX.some(r => r[0] === c.h) ? c.h : 1080, fps: FPS_TX.includes(c.fps) ? c.fps : 60, mbps: Math.min(50, Math.max(1, +c.mbps || 8)) };
+  } catch { return { h: 1080, fps: 60, mbps: 8 }; }
+}
+function qualidadeEscolhida() {
+  const n = (document.querySelector('input[name="qnivel"]:checked') || {}).value || 'moderado';
+  if (n !== 'custom' && NIVEIS_TX[n]) {
+    const q = NIVEIS_TX[n];
+    return { ...q, chave: n, nome: `${rotRes(q.h)} · ${q.fps} fps · ${fmtMbps(q.kbps)} Mbps (${q.rot.toLowerCase()})` };
+  }
+  const c = lerCustom(), r = RES_TX.find(x => x[0] === c.h);
+  return { chave: 'custom', rot: 'Personalizado', w: r[1], h: c.h || 4320, fps: c.fps, kbps: Math.round(c.mbps * 1000),
+    nome: `${rotRes(c.h)} · ${c.fps} fps · ${fmtMbps(c.mbps * 1000)} Mbps (personalizado)` };
+}
+// taxa que costuma bastar pra cada resolução/fps (H.264; os formatos modernos precisam de menos)
+const sugestaoMbps = (w, h, fps) => Math.min(50, Math.max(2, Math.round(w * h * Math.min(fps, 120) * 0.09 / 1e6 * 2) / 2));
+const kbpsDe = q => q.kbps;
 // o vídeo vai direto do seu PC pra cada pessoa: a internet de upload precisa aguentar isso vezes quem assiste
 function dicaQualidade() {
-  const q = QUALIDADES[$('#sel-qual').value];
-  const mbps = Math.round(kbpsDe(q) / 1000);
-  let t = `Precisa de uns ${mbps} Mbps de upload por pessoa assistindo.`;
-  if (q.w > 1920) t += ` Sua tela tem que ter ${q.h === 2160 ? '4K' : '1440p ou mais'} pra sair nessa resolução; se for menor, sai na resolução da tela.`;
-  if (q.w === 3840) t += ' Se travar, use 1440p: a diferença quase não aparece e fica bem mais leve.';
-  else t += ' Se travar, escolha uma mais leve. Dá pra trocar com a transmissão rolando.';
+  const q = qualidadeEscolhida();
+  let t = `Precisa de uns ${fmtMbps(q.kbps)} Mbps de upload por pessoa assistindo.`;
+  if (q.h > 1080 && q.h <= 2160) t += ` Sua tela tem que ter ${q.h === 2160 ? '4K' : '1440p ou mais'} pra sair nessa resolução; se for menor, sai na resolução da tela.`;
+  t += ' Se travar, escolha um nível mais leve. Dá pra trocar com a transmissão rolando.';
   $('#dica-qual').textContent = t;
+  if (q.chave === 'custom') {
+    const c = lerCustom(), w = (RES_TX.find(x => x[0] === c.h) || [0, 1920])[1], h = c.h || 1080;
+    const sug = sugestaoMbps(w, h, c.fps);
+    let d = `Pra ${rotRes(c.h)} a ${c.fps} fps, uns ${String(sug).replace('.', ',')} Mbps já ficam bons.`;
+    if (c.mbps < sug * 0.6) d += ' Com menos que isso, a imagem borra no movimento e na troca de cena.';
+    else if (c.mbps > sug * 2.5) d += ' Bem acima disso a diferença fica pequena e pesa na internet.';
+    if (c.fps > 60) d += ' Acima de 60 fps, só quem assiste num monitor rápido percebe.';
+    $('#qc-dica').textContent = d;
+  }
 }
 const TEXTO_CAPTURA = {
   monitor: { titulo: 'Som do Windows inteiro', etq: 'INCLUI A CALL',
@@ -1788,7 +1838,7 @@ function mostrarOpcoesCamera() {
 
 async function comecar() {
   if (typeof Peer === 'undefined') { statusTx('O componente de conexão não carregou. Confira a internet e aperte F5.', 'erro'); return; }
-  qualAtual = QUALIDADES[$('#sel-qual').value];
+  qualAtual = qualidadeEscolhida();
   const fonte = radio('fonte'), modo = radio('audio'), dica = radio('dica');
   const pedeAudio = modo === 'captura';
   const opcoes = {
@@ -1979,7 +2029,9 @@ async function aplicarParametros(pc, id) {
       p.encodings[0].priority = 'high';
       p.encodings[0].networkPriority = 'high';
       p.encodings[0].maxFramerate = ped && ped.fps ? Math.min(qualAtual.fps, ped.fps) : qualAtual.fps;
-      p.encodings[0].scaleResolutionDownBy = ped && ped.altura && alturaTela > ped.altura ? alturaTela / ped.altura : 1;
+      // teto: o nível escolhido por quem transmite e o que a pessoa pediu (o que for menor). Vale até no iPhone, que ignora o limite na captura
+      const tetoAltura = Math.min(qualAtual && qualAtual.h ? qualAtual.h : alturaTela, ped && ped.altura ? ped.altura : Infinity);
+      p.encodings[0].scaleResolutionDownBy = alturaTela > tetoAltura ? alturaTela / tetoAltura : 1;
       // segura a resolução escolhida: se a rede apertar, perde uns quadros em vez de borrar.
       // Baixar de verdade a qualidade é decisão do player de quem assiste (AUTO), e só se a rede ficar ruim por um tempo.
       p.degradationPreference = 'maintain-resolution';
@@ -1993,10 +2045,9 @@ async function aplicarParametros(pc, id) {
 }
 
 async function trocarQualidade() {
-  guardar.set('qualidade', $('#sel-qual').value);
   dicaQualidade();
   guardar.set('dica', radio('dica'));
-  qualAtual = QUALIDADES[$('#sel-qual').value];
+  qualAtual = qualidadeEscolhida();
   if (!streamTx) return;
   const vt = streamTx.getVideoTracks()[0];
   try { vt.contentHint = radio('dica'); } catch {}
@@ -3168,7 +3219,7 @@ setInterval(async () => {
         const conn = conexoes.get(id);
         if (conn && conn.open) try {
           conn.send({ tipo: 'info', capW: vs ? vs.width : 0, capH: vs ? vs.height : 0, w: s.w, h: s.h, limite: s.limite,
-                      qualidade: qualAtual ? qualAtual.nome : '', dica: radio('dica'), turbo: turboLigado(), encoder: (tipoEncoder(s.encoder) || [''])[0], codec: s.codec,
+                      qualidade: qualAtual ? qualAtual.nome : '', dica: radio('dica'), encoder: (tipoEncoder(s.encoder) || [''])[0], codec: s.codec,
                       fps: s.fps, fpsCaptura: s.fpsCaptura, fpsAlvo: qualAtual ? qualAtual.fps : 0,
                       giro: CELULAR_TX ? +(radio('giro') || 0) : null });
         } catch {}
@@ -3240,7 +3291,7 @@ setInterval(async () => {
           (it && it.encoder ? `\nEncoder dele ${it.encoder}` : '') +
           (it && it.dica === 'detail' ? `\nOtimizado   pra nitidez (texto): em vídeo/jogo, ele deve escolher "Movimento"` : '') +
           (it && st.mbps < 4 && (/software|CPU/i.test(it.encoder || '') || /leve/.test(it.qualidade || ''))
-            ? `\nTroca cena  borra um instante: pouca taxa${/software|CPU/i.test(it.encoder || '') ? ' + encoder no processador' : ''}. Pra melhorar, ele liga o Turbo (e mantém 30 fps: mais dados por quadro)${/software|CPU/i.test(it.encoder || '') ? ', e ativa "aceleração de hardware" nas configurações do navegador' : ''}` : '');
+            ? `\nTroca cena  borra um instante: pouca taxa${/software|CPU/i.test(it.encoder || '') ? ' + encoder no processador' : ''}. Pra melhorar, ele escolhe Personalizado e sobe a taxa (ex.: 720p, 30 fps, 5 Mbps)${/software|CPU/i.test(it.encoder || '') ? ', e ativa "aceleração de hardware" nas configurações do navegador' : ''}` : '');
       }
     }
   } catch (e) { console.warn(e); }
@@ -3779,13 +3830,42 @@ if (EMBED) {
 }
 
 // ============================================================ ligações da interface
-const selQual = $('#sel-qual');
-Object.entries(QUALIDADES).forEach(([k, q]) => selQual.add(new Option(q.nome, k)));
-selQual.value = QUALIDADES[guardar.get('qualidade')] ? guardar.get('qualidade') : 'hd60';
-selQual.onchange = () => { dicaQualidade(); trocarQualidade(); };
-$('#turbo').checked = guardar.get('turbo') === '1';
-$('#turbo').onchange = () => { guardar.set('turbo', $('#turbo').checked ? '1' : '0'); dicaQualidade(); trocarQualidade(); };
-dicaQualidade();
+(function iniciarQualidade() {
+  const box = $('#niveis-tx');
+  for (const [k, q] of Object.entries(NIVEIS_TX))
+    box.insertAdjacentHTML('beforeend', `<label class="nivel"><input type="radio" name="qnivel" value="${k}"><span><b>${q.rot}</b><small>${rotRes(q.h)} · ${q.fps} fps<br>${fmtMbps(q.kbps)} Mbps</small></span></label>`);
+  box.insertAdjacentHTML('beforeend', '<label class="nivel"><input type="radio" name="qnivel" value="custom"><span><b>Personalizado</b><small id="qc-resumo"></small></span></label>');
+  RES_TX.forEach(([h, , rot]) => $('#qc-res').add(new Option(rot, h)));
+  FPS_TX.forEach(f => $('#qc-fps').add(new Option(f + ' fps', f)));
+  let n = guardar.get('qualNivel');
+  if (!n) { // quem já usava o site: converte a escolha antiga (e o Turbo) pro nível novo
+    const velho = guardar.get('qualidade');
+    n = { leve: 'leve', hd60: 'moderado', fhd60: 'moderado', max: 'alto', qhd: 'alto', uhd30: 'maximo', uhd60: 'maximo' }[velho] || (CELULAR_TX ? 'leve' : 'moderado');
+    if (guardar.get('turbo') === '1' && velho) {
+      const v = { leve: [720, 30, 4], hd60: [720, 60, 7], fhd60: [1080, 60, 13], max: [1080, 60, 22], qhd: [1440, 60, 32], uhd30: [2160, 30, 40], uhd60: [2160, 60, 50] }[velho];
+      if (v) { n = 'custom'; guardar.set('qualCustom', JSON.stringify({ h: v[0], fps: v[1], mbps: v[2] })); }
+    }
+    guardar.set('qualNivel', n);
+  }
+  if (n !== 'custom' && !NIVEIS_TX[n]) n = 'moderado';
+  marcar('qnivel', n);
+  const c = lerCustom();
+  $('#qc-res').value = String(c.h); $('#qc-fps').value = String(c.fps); $('#qc-mbps').value = String(c.mbps);
+  mostrarCustom();
+})();
+function salvarCustom() { guardar.set('qualCustom', JSON.stringify({ h: +$('#qc-res').value, fps: +$('#qc-fps').value, mbps: +$('#qc-mbps').value })); }
+function mostrarCustom() {
+  $('#qual-custom').classList.toggle('hidden', radio('qnivel') !== 'custom');
+  const c = lerCustom();
+  $('#qc-mbps-txt').textContent = fmtMbps(c.mbps * 1000) + ' Mbps';
+  $('#qc-resumo').innerHTML = '';
+  $('#qc-resumo').append(`${rotRes(c.h)} · ${c.fps} fps`, document.createElement('br'), `${fmtMbps(c.mbps * 1000)} Mbps`);
+  dicaQualidade();
+}
+document.querySelectorAll('input[name="qnivel"]').forEach(i => i.onchange = () => { guardar.set('qualNivel', radio('qnivel')); mostrarCustom(); trocarQualidade(); });
+for (const id of ['#qc-res', '#qc-fps']) $(id).onchange = () => { salvarCustom(); mostrarCustom(); trocarQualidade(); };
+$('#qc-mbps').oninput = () => { salvarCustom(); mostrarCustom(); };
+$('#qc-mbps').onchange = () => trocarQualidade();
 
 marcar('fonte', ['monitor', 'window', 'browser', 'camera'].includes(guardar.get('fonte')) ? guardar.get('fonte') : 'monitor');
 marcar('audio', ['app', 'device', 'captura', 'none'].includes(guardar.get('modoAudio')) ? guardar.get('modoAudio') : 'app');
@@ -3818,9 +3898,8 @@ function resumoTx() {
   const modo = radio('audio');
   let som = { captura: radio('fonte') === 'browser' ? 'Som da aba' : CELULAR_TX ? 'Som do celular' : 'Som do Windows', device: radio('fonte') === 'camera' ? 'Microfone' : 'Cabo virtual', none: 'Sem som' }[modo] || '';
   if (modo === 'app') som = 'Programa: ' + ({ excluir: 'sem o Discord', incluir: 'apps marcados', tudo: 'tudo do PC' }[prog.modo] || '');
-  const q = QUALIDADES[$('#sel-qual').value];
-  const chips = [['', fonte], ['', som], ['', q ? q.nome.split(' · ').slice(0, 2).join(' · ') : '']];
-  if ($('#turbo').checked) chips.push(['', 'Turbo']);
+  const q = qualidadeEscolhida();
+  const chips = [['', fonte], ['', som], ['', `${rotRes(q.chave === 'custom' ? lerCustom().h : q.h)} · ${q.fps} fps · ${fmtMbps(q.kbps)} Mbps`]];
   if (radio('fonte') !== 'camera' && $('#cam-junto').checked && !CELULAR_TX) chips.push(['+', 'câmera']);
   if (micLigado()) chips.push(['+', 'microfone']);
   r.innerHTML = '';
