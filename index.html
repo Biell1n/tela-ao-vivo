@@ -318,6 +318,7 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
 #player{position:fixed;inset:0;z-index:10;background:#000;overflow:hidden}
 #player:not(.ativo){cursor:none}
 #video{width:100%;height:100%;object-fit:contain;background:#000;display:block;touch-action:manipulation}
+#sr-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none;background:#000}
 #video.girado{position:absolute;top:50%;left:50%;max-width:none}
 .giro-tx{display:grid;grid-template-columns:repeat(3,1fr);padding:3px;border-radius:var(--r-m);background:var(--bg-2);border:1px solid var(--linha);margin-top:12px}
 .giro-tx label{position:relative;cursor:pointer}
@@ -2228,6 +2229,234 @@ function girarRx() {
   aplicarGiro();
   avisoRx(giroRx ? `Imagem girada ${giroRx}°. Toque de novo pra girar mais.` : 'Imagem na posição original.');
 }
+// ---------- super resolução (beta): aumenta a imagem pela placa de vídeo, no estilo do FSR 1 da AMD
+// 1º passo (EASU): amplia seguindo a direção das bordas (sem serrilhado nem borrão).
+// 2º passo (RCAS): nitidez com limite, pra não criar contorno branco nos personagens.
+const SR = { modo: Math.min(2, Math.max(0, +(guardar.get('superRes') || 0) || 0)), gl: null, cv: null, ok: true,
+  progE: null, progR: null, texV: null, texM: null, fbo: null, mw: 0, mh: 0, laco: 0, gen: 0, ativo: false, info: '' };
+const SR_VERT = `#version 300 es
+in vec2 p; void main(){ gl_Position = vec4(p, 0.0, 1.0); }`;
+const SR_COMUM = `#version 300 es
+precision highp float; precision highp int;
+uniform sampler2D tex; uniform vec2 inSize; uniform vec2 outSize; uniform vec2 orig;
+out vec4 cor;
+vec3 F(ivec2 q){ return texelFetch(tex, clamp(q, ivec2(0), ivec2(inSize) - 1), 0).rgb; }
+float rcpA(float a){ return uintBitsToFloat(uint(0x7ef07ebb) - floatBitsToUint(a)); }
+float rsqA(float a){ return uintBitsToFloat(uint(0x5f347d74) - (floatBitsToUint(a) >> uint(1))); }
+float L(vec3 c){ return c.b * 0.5 + (c.r * 0.5 + c.g); }
+`;
+const SR_EASU = SR_COMUM + `
+void tap(inout vec3 aC, inout float aW, vec2 off, vec2 dir, vec2 len, float lob, float clp, vec3 c){
+  vec2 v = vec2(off.x * dir.x + off.y * dir.y, off.x * -dir.y + off.y * dir.x) * len;
+  float d2 = min(v.x * v.x + v.y * v.y, clp);
+  float wB = 0.4 * d2 - 1.0, wA = lob * d2 - 1.0;
+  wB *= wB; wA *= wA;
+  wB = 1.5625 * wB - 0.5625;
+  float w = wB * wA;
+  aC += c * w; aW += w;
+}
+void setD(inout vec2 dir, inout float len, vec2 pp, int q, float lA, float lB, float lC, float lD, float lE){
+  float w = q == 0 ? (1.0 - pp.x) * (1.0 - pp.y) : q == 1 ? pp.x * (1.0 - pp.y) : q == 2 ? (1.0 - pp.x) * pp.y : pp.x * pp.y;
+  float dc = lD - lC, cb = lC - lB;
+  float lenX = rcpA(max(max(abs(dc), abs(cb)), 1e-8));
+  float dirX = lD - lB;
+  lenX = clamp(abs(dirX) * lenX, 0.0, 1.0); lenX *= lenX;
+  float ec = lE - lC, ca = lC - lA;
+  float lenY = rcpA(max(max(abs(ec), abs(ca)), 1e-8));
+  float dirY = lE - lA;
+  lenY = clamp(abs(dirY) * lenY, 0.0, 1.0); lenY *= lenY;
+  dir += vec2(dirX, dirY) * w;
+  len += w * (lenX + lenY);
+}
+void main(){
+  vec2 pos = gl_FragCoord.xy - orig;
+  vec2 pp = pos * (inSize / outSize) - 0.5;
+  vec2 fp = floor(pp); pp -= fp;
+  ivec2 f0 = ivec2(fp);
+  vec3 b = F(f0 + ivec2(0,-1)), c = F(f0 + ivec2(1,-1));
+  vec3 e = F(f0 + ivec2(-1,0)), f = F(f0), g = F(f0 + ivec2(1,0)), h = F(f0 + ivec2(2,0));
+  vec3 i = F(f0 + ivec2(-1,1)), j = F(f0 + ivec2(0,1)), k = F(f0 + ivec2(1,1)), l = F(f0 + ivec2(2,1));
+  vec3 n = F(f0 + ivec2(0,2)), o = F(f0 + ivec2(1,2));
+  float bL = L(b), cL = L(c), eL = L(e), fL = L(f), gL = L(g), hL = L(h), iL = L(i), jL = L(j), kL = L(k), lL = L(l), nL = L(n), oL = L(o);
+  vec2 dir = vec2(0.0); float len = 0.0;
+  setD(dir, len, pp, 0, bL, eL, fL, gL, jL);
+  setD(dir, len, pp, 1, cL, fL, gL, hL, kL);
+  setD(dir, len, pp, 2, fL, iL, jL, kL, nL);
+  setD(dir, len, pp, 3, gL, jL, kL, lL, oL);
+  vec2 dir2 = dir * dir;
+  float dirR = dir2.x + dir2.y;
+  bool zro = dirR < 1.0 / 32768.0;
+  dirR = zro ? 1.0 : rsqA(dirR);
+  dir.x = zro ? 1.0 : dir.x;
+  dir *= dirR;
+  len = len * 0.5; len *= len;
+  float stretch = (dir.x * dir.x + dir.y * dir.y) * rcpA(max(abs(dir.x), abs(dir.y)));
+  vec2 len2 = vec2(1.0 + (stretch - 1.0) * len, 1.0 - 0.5 * len);
+  float lob = 0.5 + ((1.0 / 4.0 - 0.04) - 0.5) * len;
+  float clp = rcpA(lob);
+  vec3 aC = vec3(0.0); float aW = 0.0;
+  tap(aC, aW, vec2( 0.0,-1.0) - pp, dir, len2, lob, clp, b);
+  tap(aC, aW, vec2( 1.0,-1.0) - pp, dir, len2, lob, clp, c);
+  tap(aC, aW, vec2(-1.0, 1.0) - pp, dir, len2, lob, clp, i);
+  tap(aC, aW, vec2( 0.0, 1.0) - pp, dir, len2, lob, clp, j);
+  tap(aC, aW, vec2( 0.0, 0.0) - pp, dir, len2, lob, clp, f);
+  tap(aC, aW, vec2(-1.0, 0.0) - pp, dir, len2, lob, clp, e);
+  tap(aC, aW, vec2( 1.0, 1.0) - pp, dir, len2, lob, clp, k);
+  tap(aC, aW, vec2( 2.0, 1.0) - pp, dir, len2, lob, clp, l);
+  tap(aC, aW, vec2( 2.0, 0.0) - pp, dir, len2, lob, clp, h);
+  tap(aC, aW, vec2( 1.0, 0.0) - pp, dir, len2, lob, clp, g);
+  tap(aC, aW, vec2( 1.0, 2.0) - pp, dir, len2, lob, clp, o);
+  tap(aC, aW, vec2( 0.0, 2.0) - pp, dir, len2, lob, clp, n);
+  vec3 mn = min(min(f, g), min(j, k)), mx = max(max(f, g), max(j, k));
+  cor = vec4(clamp(aC / aW, mn, mx), 1.0);
+}`;
+const SR_RCAS = SR_COMUM + `
+uniform float nitidez;
+void main(){
+  // a imagem intermediária está de cima pra baixo; o canvas, de baixo pra cima
+  ivec2 q = ivec2(int(gl_FragCoord.x - orig.x), int(outSize.y - (gl_FragCoord.y - orig.y)));
+  vec3 b = F(q + ivec2(0,-1)), d = F(q + ivec2(-1,0)), e = F(q), f = F(q + ivec2(1,0)), h = F(q + ivec2(0,1));
+  vec3 mn4 = min(min(b, d), min(f, h)), mx4 = max(max(b, d), max(f, h));
+  vec3 hitMin = min(mn4, e) / (4.0 * max(mx4, vec3(1e-4)));
+  vec3 hitMax = (1.0 - max(mx4, e)) / min(4.0 * mn4 - 4.0, vec3(-1e-4));
+  vec3 lobeC = max(-hitMin, hitMax);
+  float lobe = max(-(0.25 - 1.0 / 16.0), min(max(lobeC.r, max(lobeC.g, lobeC.b)), 0.0)) * nitidez;
+  // menos nitidez onde é só ruído da compressão
+  float bL = L(b), dL = L(d), eL = L(e), fL = L(f), hL = L(h);
+  float nz = 0.25 * (bL + dL + fL + hL) - eL;
+  float faixa = max(max(max(bL, dL), max(eL, fL)), hL) - min(min(min(bL, dL), min(eL, fL)), hL);
+  nz = clamp(abs(nz) / max(faixa, 1e-4), 0.0, 1.0);
+  lobe *= -0.5 * nz + 1.0;
+  cor = vec4((lobe * (b + d + f + h) + e) / (4.0 * lobe + 1.0), 1.0);
+}`;
+function srCompilar(gl, fonte) {
+  const prog = gl.createProgram();
+  for (const [tipo, src] of [[gl.VERTEX_SHADER, SR_VERT], [gl.FRAGMENT_SHADER, fonte]]) {
+    const s = gl.createShader(tipo); gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    gl.attachShader(prog, s);
+  }
+  gl.bindAttribLocation(prog, 0, 'p');
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+  return prog;
+}
+function srIniciar() {
+  if (SR.gl) return true;
+  try {
+    const cv = document.createElement('canvas');
+    cv.id = 'sr-canvas'; cv.className = 'hidden';
+    const gl = cv.getContext('webgl2', { alpha: false, antialias: false, depth: false, powerPreference: 'high-performance', desynchronized: true });
+    if (!gl) throw new Error('sem WebGL2');
+    SR.progE = srCompilar(gl, SR_EASU);
+    SR.progR = srCompilar(gl, SR_RCAS);
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    const novaTex = () => {
+      const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+      for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.NEAREST], [gl.TEXTURE_MAG_FILTER, gl.NEAREST], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
+      return t;
+    };
+    SR.texV = novaTex(); SR.texM = novaTex();
+    SR.fbo = gl.createFramebuffer();
+    cv.addEventListener('webglcontextlost', e => { e.preventDefault(); SR.ok = false; srParar(); });
+    video.after(cv);
+    SR.gl = gl; SR.cv = cv;
+    return true;
+  } catch (e) {
+    console.warn('super resolução indisponível', e);
+    SR.ok = false;
+    return false;
+  }
+}
+function srParar() {
+  SR.ativo = false;
+  if (SR.cv) SR.cv.classList.add('hidden');
+  SR.info = '';
+}
+function srQuadro() {
+  SR.laco = 0;
+  if (!SR.modo || !SR.ok || giroRx || $('#rx-player').classList.contains('hidden')) { srParar(); return; }
+  const vw = video.videoWidth, vh = video.videoHeight;
+  const gl = SR.gl, cv = SR.cv;
+  if (!vw || !vh || !gl) { srAgendar(); return; }
+  // tamanho real na tela (em pixels do monitor), com a imagem inteira cabendo
+  const r = player.getBoundingClientRect(), dpr = Math.min(devicePixelRatio || 1, 3);
+  const W = Math.round(r.width * dpr), H = Math.round(r.height * dpr);
+  const esc = Math.min(W / vw, H / vh);
+  const ow = Math.round(vw * esc), oh = Math.round(vh * esc);
+  if (esc < 1.08 || ow * oh > 3840 * 2400) { srParar(); srAgendar(); return; } // já está do tamanho da tela (ou maior)
+  if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+  const ox = Math.floor((W - ow) / 2), oy = Math.floor((H - oh) / 2);
+  try {
+    gl.bindTexture(gl.TEXTURE_2D, SR.texV);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
+    if (SR.mw !== ow || SR.mh !== oh) {
+      gl.bindTexture(gl.TEXTURE_2D, SR.texM);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, ow, oh, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, SR.fbo);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, SR.texM, 0);
+      SR.mw = ow; SR.mh = oh;
+    }
+    // passo 1: ampliar
+    gl.bindFramebuffer(gl.FRAMEBUFFER, SR.fbo);
+    gl.viewport(0, 0, ow, oh);
+    gl.useProgram(SR.progE);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, SR.texV);
+    gl.uniform1i(gl.getUniformLocation(SR.progE, 'tex'), 0);
+    gl.uniform2f(gl.getUniformLocation(SR.progE, 'inSize'), vw, vh);
+    gl.uniform2f(gl.getUniformLocation(SR.progE, 'outSize'), ow, oh);
+    gl.uniform2f(gl.getUniformLocation(SR.progE, 'orig'), 0, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    // passo 2: nitidez, direto na tela
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, W, H);
+    gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.viewport(ox, H - oy - oh, ow, oh);
+    gl.useProgram(SR.progR);
+    gl.bindTexture(gl.TEXTURE_2D, SR.texM);
+    gl.uniform1i(gl.getUniformLocation(SR.progR, 'tex'), 0);
+    gl.uniform2f(gl.getUniformLocation(SR.progR, 'inSize'), ow, oh);
+    gl.uniform2f(gl.getUniformLocation(SR.progR, 'outSize'), ow, oh);
+    gl.uniform2f(gl.getUniformLocation(SR.progR, 'orig'), ox, H - oy - oh);
+    gl.uniform1f(gl.getUniformLocation(SR.progR, 'nitidez'), SR.modo === 2 ? Math.pow(2, -0.1) : Math.pow(2, -0.6));
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    if (!SR.ativo) { SR.ativo = true; cv.classList.remove('hidden'); }
+    SR.info = `${vw}×${vh} → ${ow}×${oh}`;
+  } catch (e) {
+    console.warn('super resolução falhou', e);
+    SR.ok = false; srParar(); return;
+  }
+  srAgendar();
+}
+function srAgendar() {
+  if (SR.laco || !SR.modo || !SR.ok) return;
+  SR.laco = 1;
+  const g = SR.gen, vai = () => { if (g === SR.gen) srQuadro(); };
+  // só desenha quando chega quadro novo (não gasta placa de vídeo à toa)
+  if (video.requestVideoFrameCallback && !video.paused) video.requestVideoFrameCallback(vai);
+  else setTimeout(() => requestAnimationFrame(vai), 100);
+}
+function srReiniciar() { SR.gen++; SR.laco = 0; srLigar(); }
+function srLigar() {
+  if (!SR.modo) { srParar(); return; }
+  if (!srIniciar()) return;
+  if (!SR.laco) srQuadro();
+}
+function definirSuperRes(m) {
+  SR.modo = m;
+  guardar.set('superRes', String(m));
+  if (m && !SR.ok && !SR.gl) SR.ok = true;
+  srReiniciar();
+  if (m && !SR.ok) avisoRx('Super resolução não funciona neste navegador (precisa de WebGL2).');
+  else avisoRx(m ? 'Super resolução ligada (beta). Ela aparece quando a imagem que chega é menor que a sua tela.' : 'Super resolução desligada.');
+}
+video.addEventListener('playing', () => { if (SR.modo) srReiniciar(); });
+addEventListener('resize', () => { if (SR.modo) srReiniciar(); });
+
 // ---------- menu de configurações (estilo YouTube)
 let menuVista = 'principal';
 const NIVEIS_REFORCO = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20];
@@ -2263,6 +2492,7 @@ function renderMenu(vista) {
   if (vista === 'principal') {
     m.append(itemMenu('Qualidade', textoQualidade(), () => renderMenu('qualidade'), { sub: true }));
     m.append(itemMenu('Volume extra', reforco.nivel > 1 ? reforco.nivel + 'x' : 'Desligado', () => renderMenu('volume'), { sub: true }));
+    m.append(itemMenu('Super resolução (beta)', ['Desligada', 'Ligada', 'Ligada + nítida'][SR.modo], () => renderMenu('superres'), { sub: true }));
     m.append(itemMenu('Girar imagem', giroRx ? giroRx + '°' : 'Normal', () => { girarRx(); renderMenu('principal'); }));
     if (PODE_CALL) m.append(itemMenu('Som junto da call (iPhone)', modoCall ? 'Ligado' : 'Desligado', () => { alternarModoCall(); renderMenu('principal'); }));
     m.append(itemMenu('Estatísticas', $('#stats-rx-box').classList.contains('hidden') ? 'Escondidas' : 'Na tela', () => { alternarStats(); renderMenu('principal'); }));
@@ -2272,6 +2502,12 @@ function renderMenu(vista) {
     NIVEIS_RX.forEach((n, i) => m.append(itemMenu(n.rot === 'MÁX' ? 'Máxima (até 4K)' : n.rot + 'p', null, () => { escolherQualidadeRx(i); fecharMenu(); }, { marcado: !qRx.auto && qRx.nivel === i })));
     const nota = document.createElement('p'); nota.className = 'menu-nota';
     nota.textContent = 'Automática baixa só se a sua internet ficar ruim por um tempo, e volta sozinha. Escolhendo uma fixa, ela não muda.';
+    m.append(nota);
+  } else if (vista === 'superres') {
+    m.append(cabMenu('Super resolução (beta)'));
+    ['Desligada', 'Ligada', 'Ligada + mais nitidez'].forEach((rot, i) => m.append(itemMenu(rot, null, () => { definirSuperRes(i); fecharMenu(); }, { marcado: SR.modo === i })));
+    const nota = document.createElement('p'); nota.className = 'menu-nota';
+    nota.textContent = 'Quando a imagem que chega é menor que a sua tela (ex.: 720p num monitor 1080p ou 4K), a placa de vídeo amplia seguindo as bordas e deixa nítido, sem serrilhado nem contorno. Não cria detalhe que não veio: pra ter 1080p de verdade, quem transmite precisa escolher 1080p.';
     m.append(nota);
   } else if (vista === 'volume') {
     m.append(cabMenu('Volume extra'));
@@ -2684,7 +2920,11 @@ setInterval(async () => {
           `Perdidos    ${st.perdidos} pacotes${st.recebidos ? ` (${(100 * st.perdidos / (st.perdidos + st.recebidos)).toFixed(1)}%)` : ''}\n` +
           `Travadas    ${st.travadas}${st.jitter != null ? ` · variação ${st.jitter} ms` : ''}\n` +
           `Folga       ${FOLGAS[folgaNivel] == null ? 'automática' : FOLGAS[folgaNivel] + ' ms'}\n` +
-          `Pra você    ${qRx.auto ? 'AUTO · ' : ''}${NIVEIS_RX[qRx.nivel].nome}\n` +
+          `Você pediu  ${qRx.auto ? 'AUTO · ' : ''}${NIVEIS_RX[qRx.nivel].nome}\n` +
+          (it && it.capH && NIVEIS_RX[qRx.nivel].altura > it.capH ? `Limite      a tela dele está em ${it.capH}p (só ele pode subir, lá na transmissão)
+` : '') +
+          (SR.modo ? `Super res.  ${SR.info || 'ligada (a imagem já está do tamanho da tela)'}
+` : '') +
           `Som         ${somRx.texto}\n` +
           `Descartados ${st.descartados} quadros\nDecoder     ${st.decoder || '?'}` +
           (it && it.encoder ? `\nEncoder dele ${it.encoder}` : '');
