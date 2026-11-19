@@ -416,6 +416,13 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
 .bt-luz[aria-pressed="true"]{color:var(--texto)}
 .bt-luz[aria-pressed="true"] .ponto{background:conic-gradient(#ff6a3d,#ffc83d,#5ef0a0,#4aa8ff,#b56bff,#ff6a3d);box-shadow:0 0 12px rgba(255,190,110,.55)}
 .grupo-telas{isolation:isolate}
+#grupo{overflow-x:clip}
+#grupo.cinema{--gut:max(24px,calc((100vw - 1192px) / 2));max-width:none;padding-left:0;padding-right:0}
+#grupo.cinema .grupo-cab,#grupo.cinema #grupo-status,#grupo.cinema .grupo-ferramentas,#grupo.cinema .grupo-membros,#grupo.cinema #grupo-vazio{width:calc(100% - 2 * var(--gut));margin-left:auto;margin-right:auto}
+#grupo.cinema .grupo-corpo{grid-template-columns:minmax(0,1fr)}
+#grupo.cinema .grupo-telas{padding:0 var(--gut)}
+#grupo.cinema .grupo-telas.destaque .tile.foco{margin:0 calc(-1 * var(--gut)) 6px;aspect-ratio:auto;height:min(56.25vw,calc(100vh - 150px));min-height:220px;border-radius:0;border-left:0;border-right:0}
+#grupo.cinema .tile.foco iframe,#grupo.cinema .tile.foco video,#grupo.cinema .tile.foco .tile-barra{border-radius:0}
 .tile-luz{position:absolute;left:-6%;top:-9%;width:112%;height:118%;z-index:-1;pointer-events:none;border-radius:24px;
   filter:blur(34px) saturate(1.6) brightness(1.05);opacity:0;transition:opacity .9s}
 .luz-on .tile-luz.viva{opacity:.8}
@@ -518,6 +525,8 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
   <symbol id="i-mudo" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="m16 9.5 5 5M21 9.5l-5 5"/></symbol>
   <symbol id="i-stats" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
   <symbol id="i-pip" viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="16" rx="2"/><rect x="12" y="12" width="7" height="5" rx="1"/></symbol>
+  <symbol id="i-cinema" viewBox="0 0 24 24"><rect x="2.5" y="6.5" width="19" height="11" rx="2"/></symbol>
+  <symbol id="i-sair-cinema" viewBox="0 0 24 24"><rect x="5.5" y="7.5" width="13" height="9" rx="2"/></symbol>
   <symbol id="i-cheia" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
   <symbol id="i-sair-cheia" viewBox="0 0 24 24"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></symbol>
   <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
@@ -878,6 +887,7 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
       <span class="flex"></span>
       <button id="bt-config" class="bt-p" title="Configurações" aria-label="Configurações" aria-haspopup="menu"><svg class="i"><use href="#i-config"/></svg><span id="selo-qrx" class="selo-qrx">AUTO</span></button>
       <button id="bt-pip" class="bt-p" title="Janela flutuante (P)" aria-label="Janela flutuante"><svg class="i"><use href="#i-pip"/></svg></button>
+      <button id="bt-cinema" class="bt-p hidden" title="Modo cinema (T)" aria-label="Modo cinema"><svg class="i"><use id="ico-cinema" href="#i-cinema"/></svg></button>
       <button id="bt-full" class="bt-p" title="Tela cheia (F)"><svg class="i"><use id="ico-full" href="#i-cheia"/></svg><span class="txt" id="txt-full">Tela cheia</span></button>
       <button id="bt-sair" class="bt-p" title="Sair"><svg class="i"><use href="#i-x"/></svg><span class="txt">Sair</span></button>
     </div>
@@ -3552,6 +3562,7 @@ function renderGrupo() {
   for (const t of box.children) t.classList.toggle('foco', t.dataset.sala === grupo.foco);
   $('#grupo-vazio').classList.toggle('hidden', compart.length > 0);
   marcar('layout', grupo.layout);
+  aplicarCinema();
   // botão de compartilhar
   const b = $('#bt-grupo-compartilhar span');
   b.textContent = salaTx ? 'Minha transmissão' : 'Compartilhar minha tela';
@@ -3584,10 +3595,12 @@ function criarTile(m) {
   barra.className = 'tile-barra';
   barra.innerHTML = '<span class="tile-nome"></span><span class="flex"></span>' +
     (eu ? '' : '<button class="tile-bt tile-som" title="Som desta tela"><svg class="i"><use href="#i-mudo"/></svg></button>') +
+    '<button class="tile-bt tile-cinema" title="Modo cinema (T): expande pros lados"><svg class="i"><use href="#i-cinema"/></svg></button>' +
     '<button class="tile-bt tile-cheia" title="Tela cheia"><svg class="i"><use href="#i-cheia"/></svg></button>';
   const som = barra.querySelector('.tile-som');
   if (som) som.onclick = e => { e.stopPropagation(); grupo.somManual.set(t.dataset.sala, !somLigado(t.dataset.sala)); ajustarTiles(true); };
   barra.querySelector('.tile-cheia').onclick = e => { e.stopPropagation(); telaCheiaTile(t); };
+  barra.querySelector('.tile-cinema').onclick = e => { e.stopPropagation(); alternarCinema(t); };
   t.append(capa, barra);
   return t;
 }
@@ -3608,6 +3621,36 @@ function telaCheiaTile(t) {
   const pedir = t.requestFullscreen || t.webkitRequestFullscreen;
   if (pedir) { const r = pedir.call(t); if (r && r.catch) r.catch(() => {}); }
 }
+// modo cinema (como o do YouTube): a tela em destaque ocupa a largura toda da janela, sem ser tela cheia
+var cinemaGrupo = guardar.get('grupoCinema') === '1';
+function aplicarCinema() {
+  $('#grupo').classList.toggle('cinema', cinemaGrupo && grupo.layout === 'destaque');
+  for (const t of document.querySelectorAll('#grupo-telas .tile')) {
+    const u = t.querySelector('.tile-cinema use');
+    if (u) u.setAttribute('href', cinemaGrupo && t.dataset.sala === grupo.foco ? '#i-sair-cinema' : '#i-cinema');
+  }
+}
+function alternarCinema(t) {
+  const ligar = !(cinemaGrupo && (!t || t.dataset.sala === grupo.foco));
+  cinemaGrupo = ligar;
+  if (ligar) {
+    if (t) grupo.foco = t.dataset.sala;
+    grupo.layout = 'destaque'; guardar.set('grupoLayout', 'destaque');
+  }
+  guardar.set('grupoCinema', ligar ? '1' : '0');
+  renderGrupo();
+  if (ligar) setTimeout(() => { const f = $('#grupo-telas .tile.foco'); if (f) f.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 60);
+  setTimeout(ajustarTiles, 120);
+}
+document.addEventListener('keydown', e => {
+  if (!grupo.ativo || $('#grupo').classList.contains('hidden') || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+  if (e.key.toLowerCase() === 't' && !e.ctrlKey && !e.metaKey && !e.altKey) alternarCinema($('#grupo-telas .tile.foco'));
+});
+window.addEventListener('message', e => {
+  if (e.origin !== location.origin || !e.data || e.data.tvv !== 'cinema') return;
+  const t = [...document.querySelectorAll('#grupo-telas .tile')].find(x => { const f = x.querySelector('iframe'); return f && f.contentWindow === e.source; });
+  if (t) alternarCinema(t);
+});
 window.addEventListener('message', e => {
   if (e.origin !== location.origin || !e.data || e.data.tvv !== 'tela-cheia') return;
   const t = [...document.querySelectorAll('#grupo-telas .tile')].find(x => { const f = x.querySelector('iframe'); return f && f.contentWindow === e.source; });
@@ -3635,7 +3678,7 @@ function ajustarTiles(toque) {
     const nivel = grande ? 'auto' : nivelPorRot(grupo.layout === 'grade' && n <= 4 ? '540' : '360');
     const ligado = somLigado(t.dataset.sala);
     const cheia = t.classList.contains('tile-cheio') || t === (document.fullscreenElement || document.webkitFullscreenElement);
-    const cfg = { tvv: 'config', nivel, mudo: !ligado, toque: toque === true, grande: grande || cheia };
+    const cfg = { tvv: 'config', nivel, mudo: !ligado, toque: toque === true, grande: grande || cheia, cinema: cinemaGrupo && grupo.layout === 'destaque' && t.dataset.sala === grupo.foco };
     try { if (f.contentWindow.__tvvConfig) f.contentWindow.__tvvConfig(cfg); else f.contentWindow.postMessage(cfg, location.origin); } catch {}
     const ico = t.querySelector('.tile-som use');
     if (ico) ico.setAttribute('href', ligado ? '#i-som' : '#i-mudo');
@@ -3710,6 +3753,7 @@ function configEmbed(d) {
   if (embedManual) { /* escolha da pessoa vale */ }
   else if (d.nivel === 'auto') { if (!qRx.auto) { qRx.auto = true; trocarNivelRx(TETO_AUTO); } }
   else if (typeof d.nivel === 'number' && (qRx.auto || qRx.nivel !== d.nivel)) { qRx.auto = false; trocarNivelRx(d.nivel); }
+  const ic = $('#ico-cinema'); if (ic) ic.setAttribute('href', d.cinema ? '#i-sair-cinema' : '#i-cinema');
   const grandeAgora = d.grande !== false;
   if (grandeAgora !== embedGrande) { embedGrande = grandeAgora; if (SR.modo) srReiniciar(); }
   const mudo = !!d.mudo;
@@ -3718,6 +3762,8 @@ function configEmbed(d) {
 }
 if (EMBED) {
   document.body.classList.add('embed');
+  $('#bt-cinema').classList.remove('hidden');
+  $('#bt-cinema').onclick = e => { e.stopPropagation(); try { parent.postMessage({ tvv: 'cinema' }, location.origin); } catch {} };
   window.__tvvConfig = configEmbed; // a tela do grupo chama direto (dentro do toque)
   window.addEventListener('message', e => { if (e.origin === location.origin) configEmbed(e.data); });
 }
@@ -3855,6 +3901,7 @@ document.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' && e.target.type === 'text') return;
   const k = e.key.toLowerCase();
   if (k === 'f') alternarTelaCheia();
+  else if (k === 't' && EMBED) { try { parent.postMessage({ tvv: 'cinema' }, location.origin); } catch {} }
   else if (k === 'm') alternarMudo();
   else if (k === 's') alternarStats();
   else if (k === 'p') alternarPip();
@@ -3887,7 +3934,11 @@ $('#bt-grupo-compartilhar').onclick = () => {
   document.querySelector('#tx [data-voltar]').lastChild.textContent = 'Voltar pro grupo';
   if (!streamTx) { atualizarModoAudio(); mostrarOpcoesCamera(); if (!CELULAR_TX) verConexaoDireta(); }
 };
-document.querySelectorAll('input[name="layout"]').forEach(i => i.onchange = () => { grupo.layout = radio('layout'); guardar.set('grupoLayout', grupo.layout); renderGrupo(); });
+document.querySelectorAll('input[name="layout"]').forEach(i => i.onchange = () => {
+  grupo.layout = radio('layout'); guardar.set('grupoLayout', grupo.layout);
+  if (grupo.layout === 'grade' && cinemaGrupo) { cinemaGrupo = false; guardar.set('grupoCinema', '0'); }
+  renderGrupo();
+});
 (function () {
   const q = new URLSearchParams(location.search);
   if (EMBED || q.get('c')) return;
