@@ -427,6 +427,11 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
 .tile-bt svg.i{width:16px;height:16px}
 .tile.eu::after{content:"você";position:absolute;top:8px;right:8px;z-index:2;padding:2px 7px;border-radius:6px;background:var(--acento);color:var(--acento-tinta);font:700 10.5px var(--mono);letter-spacing:.06em}
 .tile:fullscreen{border:0;border-radius:0}
+.tile.tile-cheio{position:fixed;inset:0;z-index:90;border:0;border-radius:0;aspect-ratio:auto;width:auto}
+.tile.tile-cheio .tile-capa{display:none}
+.tile.tile-cheio .tile-barra{top:0;bottom:auto;padding:max(10px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) 18px max(12px,env(safe-area-inset-left));background:linear-gradient(rgba(0,0,0,.7),transparent);pointer-events:auto}
+.tile.tile-cheio .tile-bt{width:40px;height:40px}
+.sem-rolagem{overflow:hidden}
 .grupo-vazio{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:260px;border:1px dashed var(--linha-2);border-radius:var(--r-l);color:var(--fraco);text-align:center;font-size:14px;padding:24px}
 .grupo-vazio svg.i{width:30px;height:30px}
 .grupo-membros{padding:16px;border-radius:var(--r-l);background:var(--sup);border:1px solid var(--linha);position:sticky;top:20px}
@@ -438,7 +443,8 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
 .membro-expulsar{font-size:12px;color:var(--erro);padding:3px 7px;border-radius:6px;border:1px solid rgba(255,107,120,.3)}
 .membro-expulsar:hover{background:rgba(255,107,120,.1)}
 /* player embutido no grupo: sem o cabeçalho e sem o "sair" */
-.embed .topo,.embed #bt-sair,.embed #bt-espera-sair,.embed #bt-qrx{display:none!important}
+.embed .topo,.embed #bt-sair,.embed #bt-espera-sair,.embed #bt-qrx,.embed #info-rx,.embed .bt-p .txt{display:none!important}
+.embed #barra{gap:4px;padding:30px 10px 8px}
 @media (max-width:980px){.grupo-corpo{grid-template-columns:minmax(0,1fr)}.grupo-membros{position:static;order:-1}.grupo-acoes{margin-left:0}}
 @media (max-width:980px){
   #home{grid-template-columns:minmax(0,1fr);gap:36px}
@@ -2138,6 +2144,7 @@ const qRx = {
   ruimDesde: 0, calmo: 0, ultimaTroca: 0, perdasAntes: 0, recebAntes: 0, travAntes: 0, historico: [],
   conectouEm: 0, reconexoes: 0, estavelDesde: 0,
 };
+if (new URLSearchParams(location.search).get('embed') === '1') qRx.auto = true; // grupo: sempre começa na automática
 if (qRx.auto) qRx.nivel = TETO_AUTO;
 function enviarPedido() {
   if (!conRx || !conRx.open) return;
@@ -2254,7 +2261,7 @@ function renderMenu(vista) {
   const m = $('#menu-config');
   m.innerHTML = '';
   if (vista === 'principal') {
-    if (!EMBED) m.append(itemMenu('Qualidade', textoQualidade(), () => renderMenu('qualidade'), { sub: true }));
+    m.append(itemMenu('Qualidade', textoQualidade(), () => renderMenu('qualidade'), { sub: true }));
     m.append(itemMenu('Volume extra', reforco.nivel > 1 ? reforco.nivel + 'x' : 'Desligado', () => renderMenu('volume'), { sub: true }));
     m.append(itemMenu('Girar imagem', giroRx ? giroRx + '°' : 'Normal', () => { girarRx(); renderMenu('principal'); }));
     if (PODE_CALL) m.append(itemMenu('Som junto da call (iPhone)', modoCall ? 'Ligado' : 'Desligado', () => { alternarModoCall(); renderMenu('principal'); }));
@@ -2275,6 +2282,7 @@ function renderMenu(vista) {
   }
 }
 function escolherQualidadeRx(v) {
+  if (EMBED) embedManual = v !== 'auto';
   if (v === 'auto') { qRx.auto = true; qRx.calmo = 0; trocarNivelRx(TETO_AUTO); }
   else { qRx.auto = false; trocarNivelRx(v); }
   if (!EMBED) { guardar.set('qRxAuto', qRx.auto ? '1' : '0'); if (!qRx.auto) guardar.set('qRxNivel', String(qRx.nivel)); }
@@ -2508,7 +2516,12 @@ function avisoRx(msg) {
 }
 async function alternarTelaCheia() {
   // no grupo, quem entra/sai da tela cheia é a janelinha (a tela do grupo): o player só pede
-  if (EMBED) { try { parent.postMessage({ tvv: 'tela-cheia' }, location.origin); } catch {} return; }
+  if (EMBED) {
+    const podeElemento = document.fullscreenEnabled || document.webkitFullscreenEnabled;
+    if (!podeElemento && video.webkitEnterFullscreen) { try { video.webkitEnterFullscreen(); } catch {} return; }
+    try { parent.postMessage({ tvv: 'tela-cheia' }, location.origin); } catch {}
+    return;
+  }
   if (elementoCheio()) {
     try { screen.orientation.unlock(); } catch {}
     (document.exitFullscreen || document.webkitExitFullscreen).call(document);
@@ -3045,6 +3058,16 @@ function criarTile(m) {
 }
 // tela cheia de uma janelinha: um botão só manda (o do player embutido pede pra cá)
 function telaCheiaTile(t) {
+  const podeElemento = document.fullscreenEnabled || document.webkitFullscreenEnabled;
+  if (!podeElemento || t.classList.contains('tile-cheio')) {
+    const cheio = !t.classList.contains('tile-cheio');
+    document.querySelectorAll('.tile-cheio').forEach(x => x.classList.remove('tile-cheio'));
+    t.classList.toggle('tile-cheio', cheio);
+    document.body.classList.toggle('sem-rolagem', cheio);
+    iconesTelaCheia();
+    setTimeout(ajustarTiles, 100);
+    return;
+  }
   const atual = document.fullscreenElement || document.webkitFullscreenElement;
   if (atual) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); return; }
   const pedir = t.requestFullscreen || t.webkitRequestFullscreen;
@@ -3059,7 +3082,7 @@ function iconesTelaCheia() {
   const atual = document.fullscreenElement || document.webkitFullscreenElement;
   for (const t of document.querySelectorAll('#grupo-telas .tile')) {
     const u = t.querySelector('.tile-cheia use');
-    if (u) u.setAttribute('href', t === atual ? '#i-sair-cheia' : '#i-cheia');
+    if (u) u.setAttribute('href', t === atual || t.classList.contains('tile-cheio') ? '#i-sair-cheia' : '#i-cheia');
   }
 }
 document.addEventListener('fullscreenchange', iconesTelaCheia);
@@ -3090,12 +3113,14 @@ setInterval(() => { if (grupo.ativo) ajustarTiles(); }, 3000); // reenvia (o pla
 // ---------- player embutido (dentro do grupo): obedece o grupo
 const EMBED = new URLSearchParams(location.search).get('embed') === '1';
 let embedMudo = true;
+let embedManual = false; // a pessoa escolheu a qualidade nesta janelinha: o grupo não mexe mais nela
 if (EMBED) {
   document.body.classList.add('embed');
   window.addEventListener('message', e => {
     if (e.origin !== location.origin || !e.data || e.data.tvv !== 'config') return;
     const d = e.data;
-    if (d.nivel === 'auto') { if (!qRx.auto) { qRx.auto = true; trocarNivelRx(TETO_AUTO); } }
+    if (embedManual) { /* escolha da pessoa vale */ }
+    else if (d.nivel === 'auto') { if (!qRx.auto) { qRx.auto = true; trocarNivelRx(TETO_AUTO); } }
     else if (typeof d.nivel === 'number' && (qRx.auto || qRx.nivel !== d.nivel)) { qRx.auto = false; trocarNivelRx(d.nivel); }
     if (embedMudo !== !!d.mudo) {
       embedMudo = !!d.mudo;
