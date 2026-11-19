@@ -496,7 +496,10 @@ html.transp body::before{display:none}
 .chat-msgs li{overflow-wrap:anywhere}
 .chat-msgs b{font-weight:650;margin-right:6px;color:var(--b3)}
 .chat-msgs li.eu b{color:var(--acento)}
-.chat-msgs li.sis{color:var(--fraco);font-size:12px}
+.chat-msgs li.sis{color:var(--aviso);font-size:12px;line-height:1.4;padding:6px 8px;border-radius:8px;background:rgba(244,181,63,.08)}
+.chat-msgs li.enviando{opacity:.55}
+.chat-msgs li.falhou{opacity:.7}
+.chat-msgs li.falhou::after{content:" · não chegou";color:var(--erro);font-size:11.5px}
 .chat-reagir{display:flex;gap:2px;justify-content:space-between}
 .chat-reagir button,.tile-reagir button{font-size:21px;line-height:1;width:36px;height:36px;border-radius:9px;display:grid;place-items:center;transition:transform .12s,background .15s}
 .chat-reagir button:hover,.tile-reagir button:hover{background:var(--sup-3);transform:translateY(-2px)}
@@ -3446,7 +3449,7 @@ function conectarAoHost() {
     // a conexão pode falhar por baixo sem o PeerJS avisar (aba fechada sem despedida): escuta direto
     const pc = con.peerConnection;
     if (pc) pc.addEventListener('connectionstatechange', () => { if (['failed', 'closed'].includes(pc.connectionState) && grupo.con === con) try { con.close(); } catch {} });
-    con.send({ tipo: 'entrar', nome: grupo.nome, sala: salaTx, chave: chaveDono(grupo.codigo) || undefined });
+    con.send({ tipo: 'entrar', nome: grupo.nome, sala: salaTx, chave: chaveDono(grupo.codigo) || undefined, versao: VERSAO_GRUPO });
     statusGrupo('Você está no grupo. Clique em "Compartilhar minha tela" pra todos verem a sua.', 'ok');
   });
   con.on('data', d => {
@@ -3456,6 +3459,7 @@ function conectarAoHost() {
       grupo.membros = d.lista.slice(0, 500);
       if (Array.isArray(d.banidos)) grupo.banidos = d.banidos.slice(0, 500);
       if (typeof d.donoHash === 'string') grupo.donoHash = d.donoHash;
+      conferirVersaoHost(+d.versao || 0, d.host);
       renderGrupo();
     }
     if (d.tipo === 'expulso') foiExpulso();
@@ -3541,6 +3545,7 @@ function conexaoDoMembro(conn) {
       if (banido(conn.peer, nome)) { try { conn.send({ tipo: 'expulso' }); } catch {} setTimeout(() => conn.close(), 300); return; }
       if (!m) { m = { id: conn.peer, nome, sala: null, dono: false }; grupo.membros.push(m); }
       m.nome = nome; m.visto = Date.now();
+      if ((+d.versao || 0) > VERSAO_GRUPO) avisarSiteNovo();
       if (chatGrupo.msgs.length) try { conn.send({ tipo: 'historico', msgs: chatGrupo.msgs.slice(-60) }); } catch {}
       if (d.sala !== undefined) m.sala = typeof d.sala === 'string' ? d.sala.slice(0, 40) : null;
       // quem criou prova com a chave; o primeiro a provar define a chave do grupo
@@ -3571,7 +3576,7 @@ function conexaoDoMembro(conn) {
 function difundir() {
   if (grupo.host) {
     garantirEu();
-    const msg = { tipo: 'estado', lista: grupo.membros.map(m => ({ id: m.id, nome: m.nome, sala: m.sala, dono: !!m.dono })), banidos: grupo.banidos, donoHash: grupo.donoHash };
+    const msg = { tipo: 'estado', lista: grupo.membros.map(m => ({ id: m.id, nome: m.nome, sala: m.sala, dono: !!m.dono })), banidos: grupo.banidos, donoHash: grupo.donoHash, versao: VERSAO_GRUPO, host: grupo.meuId };
     for (const c of grupo.conns.values()) if (c.open) try { c.send(msg); } catch {}
   }
   renderGrupo();
@@ -3612,6 +3617,7 @@ function avisarSala(sala) {
   renderGrupo();
 }
 // ============================================================ chat e reações do grupo
+const VERSAO_GRUPO = 2; // sobe quando o grupo ganha mensagens novas (2 = chat e reações)
 // Vai tudo pela mesma conexão do grupo: quem segura a sala repassa pra todo mundo (com limite contra spam)
 // e guarda as últimas mensagens pra quem entrar depois.
 const EMOJIS = ['😂', '😮', '🔥', '👏', '❤️', '💀', '😭'];
@@ -3647,16 +3653,25 @@ function enviarChat(texto) {
   if (grupo.host) { const eu = grupo.membros.find(x => x.id === grupo.meuId) || { id: grupo.meuId, nome: grupo.nome }; chatNoHost(eu, { texto, id }); return true; }
   if (!(grupo.con && grupo.con.open)) { statusGrupo('Sem conexão com o grupo agora: a mensagem não foi. Tente de novo em alguns segundos.', 'aviso'); return false; }
   try { grupo.con.send({ tipo: 'chat', texto, id }); } catch { return false; }
-  receberChat({ tipo: 'chat', id, de: grupo.meuId, nome: grupo.nome, texto, ts: Date.now() }); // aparece na hora pra quem mandou
+  receberChat({ tipo: 'chat', id, de: grupo.meuId, nome: grupo.nome, texto, ts: Date.now() }, true); // aparece na hora pra quem mandou
+  setTimeout(() => {
+    const li = document.querySelector(`#chat-msgs li[data-id="${id}"]`);
+    if (li && li.classList.contains('enviando')) { li.classList.remove('enviando'); li.classList.add('falhou'); li.title = 'Não chegou pros outros'; }
+  }, 5000);
   return true;
 }
-function receberChat(d) {
-  if (!d || typeof d.texto !== 'string' || !d.id || chatGrupo.vistos.has(d.id)) return;
+function receberChat(d, local) {
+  if (!d || typeof d.texto !== 'string' || !d.id) return;
+  if (chatGrupo.vistos.has(d.id)) { // voltou de quem segura a sala: chegou pra todo mundo
+    const li = document.querySelector(`#chat-msgs li[data-id="${CSS.escape(String(d.id))}"]`);
+    if (li) li.classList.remove('enviando', 'falhou');
+    return;
+  }
   chatGrupo.vistos.add(d.id);
   const msg = { id: String(d.id), de: String(d.de || ''), nome: nomeLimpo(d.nome || '?'), texto: String(d.texto).slice(0, 300), ts: +d.ts || Date.now() };
   chatGrupo.msgs.push(msg);
   if (chatGrupo.msgs.length > 150) chatGrupo.msgs.splice(0, chatGrupo.msgs.length - 150);
-  desenharMsg(msg);
+  desenharMsg(msg, false, local);
   toastNaTela(msg);
 }
 function receberHistorico(lista) {
@@ -3672,11 +3687,13 @@ function receberHistorico(lista) {
   for (const m of chatGrupo.msgs) desenharMsg(m, true);
   ol.scrollTop = ol.scrollHeight;
 }
-function desenharMsg(m, emLote) {
+function desenharMsg(m, emLote, enviando) {
   const ol = $('#chat-msgs');
   const noFim = ol.scrollHeight - ol.scrollTop - ol.clientHeight < 40;
   const li = document.createElement('li');
+  li.dataset.id = m.id;
   if (m.de === grupo.meuId) li.className = 'eu';
+  if (enviando) li.classList.add('enviando');
   const b = document.createElement('b'); b.textContent = m.de === grupo.meuId ? 'Você' : m.nome;
   li.append(b, document.createTextNode(m.texto));
   li.title = new Date(m.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -3765,7 +3782,29 @@ function aplicarVerReacoes() {
   $('#bt-ver-reacoes').onclick = () => { verReacoes = !verReacoes; guardar.set('verReacoes', verReacoes ? '1' : '0'); aplicarVerReacoes(); };
   aplicarVerReacoes();
 })();
-function limparChat() { chatGrupo.msgs = []; chatGrupo.vistos.clear(); $('#chat-msgs').innerHTML = ''; }
+// quem segura a sala está com a versão antiga: o chat e as reações não passam. Avisa (uma vez) quem chegou com a nova.
+function conferirVersaoHost(v, hostId) {
+  grupo.versaoHost = v;
+  if (v < VERSAO_GRUPO) {
+    if (grupo.avisouVersao === (hostId || 'antigo')) return;
+    grupo.avisouVersao = hostId || 'antigo';
+    const quem = hostId && (grupo.membros.find(m => m.id === hostId) || {}).nome;
+    msgSistema(`${quem || 'Quem está segurando o grupo'} abriu o site antes da atualização: o chat e as reações só passam pros outros depois que ${quem ? 'essa pessoa' : 'ela'} recarregar a página (F5).`);
+  } else if (v > VERSAO_GRUPO) avisarSiteNovo();
+  else grupo.avisouVersao = '';
+}
+function avisarSiteNovo() {
+  if (grupo.avisouNovo) return;
+  grupo.avisouNovo = true;
+  msgSistema('Saiu uma versão nova do site. Recarregue a página (F5) pro chat e as reações funcionarem com todo mundo.');
+  statusGrupo('Saiu uma versão nova do site: recarregue a página (F5).', 'aviso');
+}
+function msgSistema(texto) {
+  const li = document.createElement('li'); li.className = 'sis'; li.textContent = texto;
+  $('#chat-msgs').append(li); $('#chat-msgs').scrollTop = $('#chat-msgs').scrollHeight;
+}
+function limparChat() {
+  grupo.avisouVersao = ''; grupo.avisouNovo = false; chatGrupo.msgs = []; chatGrupo.vistos.clear(); $('#chat-msgs').innerHTML = ''; }
 
 // sair de verdade (botão "Sair do grupo" ou expulso): esquece o grupo. Fechar o site NÃO sai: ao voltar, reentra.
 function desligarGrupo() {
