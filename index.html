@@ -423,6 +423,11 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
 #grupo.cinema .grupo-telas{padding:0 var(--gut)}
 #grupo.cinema .grupo-telas.destaque .tile.foco{margin:0 calc(-1 * var(--gut)) 6px;aspect-ratio:auto;height:min(56.25vw,calc(100vh - 150px));min-height:220px;border-radius:0;border-left:0;border-right:0}
 #grupo.cinema .tile.foco iframe,#grupo.cinema .tile.foco video,#grupo.cinema .tile.foco .tile-barra{border-radius:0}
+#grupo.cinema .grupo-palco.luz-on .tile.foco,#grupo.cinema .grupo-palco.luz-on .tile.foco iframe{background:transparent}
+#grupo.cinema .grupo-palco.luz-on .tile.foco .tile-luz{left:-2%;width:104%;top:-8%;height:116%}
+#grupo.cinema .grupo-palco.luz-on .tile.foco .tile-luz.viva{opacity:.62}
+html.transp,html.transp body,html.transp #player,html.transp #video{background:transparent!important}
+html.transp body::before{display:none}
 .tile-luz{position:absolute;left:-6%;top:-9%;width:112%;height:118%;z-index:-1;pointer-events:none;border-radius:24px;
   filter:blur(34px) saturate(1.6) brightness(1.05);opacity:0;transition:opacity .9s}
 .luz-on .tile-luz.viva{opacity:.8}
@@ -3163,7 +3168,7 @@ setInterval(async () => {
         const conn = conexoes.get(id);
         if (conn && conn.open) try {
           conn.send({ tipo: 'info', capW: vs ? vs.width : 0, capH: vs ? vs.height : 0, w: s.w, h: s.h, limite: s.limite,
-                      qualidade: qualAtual ? qualAtual.nome : '', encoder: (tipoEncoder(s.encoder) || [''])[0], codec: s.codec,
+                      qualidade: qualAtual ? qualAtual.nome : '', dica: radio('dica'), turbo: turboLigado(), encoder: (tipoEncoder(s.encoder) || [''])[0], codec: s.codec,
                       fps: s.fps, fpsCaptura: s.fpsCaptura, fpsAlvo: qualAtual ? qualAtual.fps : 0,
                       giro: CELULAR_TX ? +(radio('giro') || 0) : null });
         } catch {}
@@ -3232,7 +3237,10 @@ setInterval(async () => {
 ` : '') +
           `Som         ${somRx.texto}\n` +
           `Descartados ${st.descartados} quadros\nDecoder     ${st.decoder || '?'}` +
-          (it && it.encoder ? `\nEncoder dele ${it.encoder}` : '');
+          (it && it.encoder ? `\nEncoder dele ${it.encoder}` : '') +
+          (it && it.dica === 'detail' ? `\nOtimizado   pra nitidez (texto): em vídeo/jogo, ele deve escolher "Movimento"` : '') +
+          (it && st.mbps < 4 && (/software|CPU/i.test(it.encoder || '') || /leve/.test(it.qualidade || ''))
+            ? `\nTroca cena  borra um instante: pouca taxa${/software|CPU/i.test(it.encoder || '') ? ' + encoder no processador' : ''}. Pra melhorar, ele escolhe "720p · 60 fps · recomendado" ou liga o Turbo${/software|CPU/i.test(it.encoder || '') ? ', e ativa "aceleração de hardware" nas configurações do navegador' : ''}` : '');
       }
     }
   } catch (e) { console.warn(e); }
@@ -3678,7 +3686,7 @@ function ajustarTiles(toque) {
     const nivel = grande ? 'auto' : nivelPorRot(grupo.layout === 'grade' && n <= 4 ? '540' : '360');
     const ligado = somLigado(t.dataset.sala);
     const cheia = t.classList.contains('tile-cheio') || t === (document.fullscreenElement || document.webkitFullscreenElement);
-    const cfg = { tvv: 'config', nivel, mudo: !ligado, toque: toque === true, grande: grande || cheia, cinema: cinemaGrupo && grupo.layout === 'destaque' && t.dataset.sala === grupo.foco };
+    const cfg = { tvv: 'config', nivel, mudo: !ligado, toque: toque === true, grande: grande || cheia, cinema: cinemaGrupo && grupo.layout === 'destaque' && t.dataset.sala === grupo.foco, luz: luzAmbiente };
     try { if (f.contentWindow.__tvvConfig) f.contentWindow.__tvvConfig(cfg); else f.contentWindow.postMessage(cfg, location.origin); } catch {}
     const ico = t.querySelector('.tile-som use');
     if (ico) ico.setAttribute('href', ligado ? '#i-som' : '#i-mudo');
@@ -3695,7 +3703,7 @@ function aplicarLuz() {
   $('#bt-luz').setAttribute('aria-pressed', String(luzAmbiente));
   $('.grupo-palco').classList.toggle('luz-on', luzAmbiente);
 }
-$('#bt-luz').onclick = () => { luzAmbiente = !luzAmbiente; guardar.set('luzAmbiente', luzAmbiente ? '1' : '0'); aplicarLuz(); };
+$('#bt-luz').onclick = () => { luzAmbiente = !luzAmbiente; guardar.set('luzAmbiente', luzAmbiente ? '1' : '0'); aplicarLuz(); ajustarTiles(); };
 aplicarLuz();
 function atualizarLuz() {
   if (!grupo.ativo || !luzAmbiente || document.hidden) return;
@@ -3754,6 +3762,8 @@ function configEmbed(d) {
   else if (d.nivel === 'auto') { if (!qRx.auto) { qRx.auto = true; trocarNivelRx(TETO_AUTO); } }
   else if (typeof d.nivel === 'number' && (qRx.auto || qRx.nivel !== d.nivel)) { qRx.auto = false; trocarNivelRx(d.nivel); }
   const ic = $('#ico-cinema'); if (ic) ic.setAttribute('href', d.cinema ? '#i-sair-cinema' : '#i-cinema');
+  // modo cinema com luz: as faixas dos lados ficam transparentes e mostram o brilho que está atrás
+  document.documentElement.classList.toggle('transp', !!(d.cinema && d.luz));
   const grandeAgora = d.grande !== false;
   if (grandeAgora !== embedGrande) { embedGrande = grandeAgora; if (SR.modo) srReiniciar(); }
   const mudo = !!d.mudo;
