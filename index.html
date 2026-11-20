@@ -1577,6 +1577,8 @@ async function sfuConfigIce() {
 }
 // "Modo" pras estatísticas: servidor (com o gasto do mês) ou direto (e por quê)
 function textoModo(pelaRede) {
+  const it = typeof infoTx !== 'undefined' && infoTx && Date.now() - infoTx.quando < 8000 ? infoTx : null;
+  if (!pelaRede && it && it.kbps > SFU_MAX_MBPS * 1000) return `direto · acima de ${SFU_MAX_MBPS} Mbps o servidor não é usado (não gasta o grátis do mês)`;
   const gasto = sfuInfo && sfuInfo.limite ? ` · ${String(sfuInfo.gb ?? 0).replace('.', ',')} de ${sfuInfo.limite} GB grátis no mês` : '';
   if (pelaRede) return 'servidor de repasse' + gasto;
   if (sfuInfo && sfuInfo.limite && !sfuInfo.ok) return 'direto · servidor desligado (acabou o grátis do mês, volta no mês que vem)';
@@ -4183,6 +4185,20 @@ function renderMenu(vista) {
       const d = document.createElement('small'); d.className = 'mi-desc'; d.textContent = desc; b.querySelector('.mi-rot').append(d);
       m.append(b);
     }
+    // a IA de vídeo da própria NVIDIA (roda nos núcleos de IA da placa; o site só sai da frente)
+    const rtx = itemMenu('Placa NVIDIA (RTX Video)', null, () => renderMenu('superres-rtx'), { sub: true });
+    const d = document.createElement('small'); d.className = 'mi-desc'; d.textContent = 'A IA de vídeo da própria placa RTX. Liga no NVIDIA App.'; rtx.querySelector('.mi-rot').append(d);
+    m.append(rtx);
+  } else if (vista === 'superres-rtx') {
+    m.append(cabMenu('Placa NVIDIA (RTX Video)', 'superres-tipo'));
+    const nota = document.createElement('div'); nota.className = 'menu-nota';
+    nota.innerHTML = '<b>Teste:</b> a NVIDIA tem uma IA de vídeo própria (RTX Video Super Resolution) que roda nos núcleos de IA da placa, no Chrome e no Edge.' +
+      '<ol style="margin:8px 0 0;padding-left:18px"><li>Abra o <b>NVIDIA App</b> › Sistema › Vídeo.</li><li>Ligue <b>Super resolução RTX</b> (qualidade 4 é a melhor).</li>' +
+      '<li>Aqui, deixe a super resolução do site <b>desligada</b> (o botão abaixo desliga), pra imagem chegar direto pra placa.</li>' +
+      '<li>Ela só age quando a imagem é <b>ampliada</b>: a transmissão precisa chegar menor que a sua tela. Numa tela 1080p, escolha <b>Qualidade 720p</b> no player e compare.</li></ol>' +
+      '<p style="margin:8px 0 0">Precisa de placa RTX série 20 ou mais nova. Não dá pra garantir que ela pega o vídeo de uma transmissão ao vivo: é teste.</p>';
+    m.append(nota);
+    m.append(itemMenu('Desligar a do site e testar a da placa', null, () => { definirSuperRes(0); avisoRx('Super resolução do site desligada: agora quem amplia é a placa (se a RTX Video estiver ligada no NVIDIA App).'); fecharMenu(); }));
   } else if (vista === 'superres') {
     m.append(cabMenu('Super resolução (beta)'));
     m.append(itemMenu('Desligada', null, () => { definirSuperRes(0); fecharMenu(); }, { marcado: !SR.modo }));
@@ -4643,7 +4659,7 @@ setInterval(async () => {
           const conn = conexoes.get(id);
           if (conn && conn.open) try {
             conn.send({ tipo: 'info', capW: vs ? vs.width : 0, capH: vs ? vs.height : 0, w: s.w, h: s.h, limite: s.limite,
-                        qualidade: qualAtual ? qualAtual.nome : '', dica: radio('dica'), encoder: (tipoEncoder(s.encoder) || [''])[0], codec: s.codec,
+                        qualidade: qualAtual ? qualAtual.nome : '', kbps: qualAtual ? kbpsDe(qualAtual) : 0, dica: radio('dica'), encoder: (tipoEncoder(s.encoder) || [''])[0], codec: s.codec,
                         fps: s.fps, fpsCaptura: s.fpsCaptura, fpsAlvo: qualAtual ? qualAtual.fps : 0,
                         giro: CELULAR_TX ? +(radio('giro') || 0) : null });
           } catch {}
@@ -4661,7 +4677,7 @@ setInterval(async () => {
         const conn = conexoes.get(id);
         if (conn && conn.open) try {
           conn.send({ tipo: 'info', capW: vs ? vs.width : 0, capH: vs ? vs.height : 0, w: s.w, h: s.h, limite: s.limite,
-                      qualidade: qualAtual ? qualAtual.nome : '', dica: radio('dica'), encoder: (tipoEncoder(s.encoder) || [''])[0], codec: s.codec,
+                      qualidade: qualAtual ? qualAtual.nome : '', kbps: qualAtual ? kbpsDe(qualAtual) : 0, dica: radio('dica'), encoder: (tipoEncoder(s.encoder) || [''])[0], codec: s.codec,
                       fps: s.fps, fpsCaptura: s.fpsCaptura, fpsAlvo: qualAtual ? qualAtual.fps : 0,
                       giro: CELULAR_TX ? +(radio('giro') || 0) : null });
         } catch {}
@@ -4726,7 +4742,7 @@ setInterval(async () => {
           `Travadas    ${st.travadas}${st.jitter != null ? ` · variação ${st.jitter} ms` : ''}\n` +
           `Folga       ${FOLGAS[folgaNivel] == null ? 'automática' : FOLGAS[folgaNivel] + ' ms'}\n` +
           `Você pediu  ${qRx.auto ? 'AUTO · ' : ''}${NIVEIS_RX[qRx.nivel].nome}\n` +
-          (it && it.capH && NIVEIS_RX[qRx.nivel].altura > it.capH ? `Limite      a tela dele está em ${it.capH}p (só ele pode subir, lá na transmissão)
+          (it && it.capH && NIVEIS_RX[qRx.nivel].altura > it.capH ? `Limite      o monitor de quem transmite é ${it.capH}p: a transmissão não passa disso (escolher 4K num monitor 1080p não aumenta)
 ` : '') +
           (SR.modo ? `Super res.  ${SR.info || (SR.motor === 'ia' ? 'ligada' : 'parada: a imagem já chega do tamanho da sua tela (pra restaurar vídeo esticado, use o tipo Anime ou escolha 2K/4K)')}
 ` : '') +
