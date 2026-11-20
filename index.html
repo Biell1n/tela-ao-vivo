@@ -1348,11 +1348,12 @@ function resumoStats(st) {
 // Miniaturas do grupo e quem está com a internet ruim (qualidade menor) continuam direto, que é de graça.
 const SFU_A_PARTIR_DE = 2; // quantas pessoas na qualidade cheia ligam o servidor
 // O servidor só vale se estiver configurado E o mês ainda estiver dentro do grátis (a Vercel confere o contador).
-let sfuLigado = null, sfuLigadoHora = 0;
+let sfuLigado = null, sfuLigadoHora = 0, sfuInfo = null; // sfuInfo: { ok, gb, limite } do último aviso da Vercel
 function sfuDisponivel(deNovo) {
   if (!sfuLigado || deNovo || Date.now() - sfuLigadoHora > 5 * 60e3) {
     sfuLigadoHora = Date.now();
-    sfuLigado = fetch('/api/sfu', { cache: 'no-store' }).then(r => r.status === 200 ? r.json() : { ok: false }).then(j => !!(j && j.ok)).catch(() => false);
+    sfuLigado = fetch('/api/sfu', { cache: 'no-store' }).then(r => r.status === 200 ? r.json() : { ok: false, semServidor: true })
+      .then(j => { sfuInfo = j; return !!(j && j.ok); }).catch(() => false);
   }
   return sfuLigado;
 }
@@ -1372,18 +1373,28 @@ async function sfuContar(pc, saindo) {
 setInterval(() => { if (callRx && callRx.__sfu) sfuContar(callRx.peerConnection); }, 60e3);
 addEventListener('pagehide', () => { if (callRx && callRx.__sfu) sfuContar(callRx.peerConnection, true); });
 async function sfuApi(op, sessao, dados) {
-  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 8000);
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 20000), t0 = performance.now();
   try {
     const r = await fetch('/api/sfu', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op, sessao, dados }), signal: ctl.signal });
     const j = await r.json().catch(() => ({}));
+    console.debug('sfu-tempo', op, Math.round(performance.now() - t0), 'ms');
     if (!r.ok || j.errorCode) throw new Error('sfu ' + op + ': ' + (j.errorCode || r.status) + ' ' + (j.errorDescription || ''));
     return j;
-  } finally { clearTimeout(t); }
+  } catch (e) { if (e.name === 'AbortError') throw new Error('sfu ' + op + ': demorou demais'); throw e; }
+  finally { clearTimeout(t); }
 }
 async function sfuConfigIce() {
   const op = await opcoesPeer();
   const turn = ((op.config || {}).iceServers || []).filter(x => [].concat(x.urls).some(u => /^turns?:/.test(u || '')));
   return { iceServers: [{ urls: 'stun:stun.cloudflare.com:3478' }, ...turn], bundlePolicy: 'max-bundle' };
+}
+// "Modo" pras estatísticas: servidor (com o gasto do mês) ou direto (e por quê)
+function textoModo(pelaRede) {
+  const gasto = sfuInfo && sfuInfo.limite ? ` · ${String(sfuInfo.gb ?? 0).replace('.', ',')} de ${sfuInfo.limite} GB grátis no mês` : '';
+  if (pelaRede) return 'servidor de repasse' + gasto;
+  if (sfuInfo && sfuInfo.limite && !sfuInfo.ok) return 'direto · servidor desligado (acabou o grátis do mês, volta no mês que vem)';
+  if (typeof SFU !== 'undefined' && SFU.bloqueadoAte > Date.now()) return 'direto · servidor desligado (acabou o grátis do mês)';
+  return 'direto (sem servidor)' + (sfuInfo && sfuInfo.ok ? ` · o servidor liga com ${SFU_A_PARTIR_DE}+ pessoas na qualidade cheia` + gasto : '');
 }
 function sfuConectado(pc, ms) {
   return new Promise((ok, falha) => {
@@ -2296,7 +2307,7 @@ async function sfuPublicar() {
     const tracks = [{ location: 'local', mid: tv.mid, trackName: 'v' }];
     if (ta) tracks.push({ location: 'local', mid: ta.mid, trackName: 'a' });
     const r = await sfuApi('faixas', SFU.sessao, { sessionDescription: { type: 'offer', sdp: pc.localDescription.sdp }, tracks });
-    if (!r.sessionDescription || (r.tracks || []).some(t => t.errorCode)) throw new Error('sfu: faixas recusadas');
+    if (!r.sessionDescription || (r.tracks || []).some(t => t.errorCode)) throw new Error('sfu: faixas recusadas ' + JSON.stringify((r.tracks || []).map(t => t.errorCode + ' ' + (t.errorDescription || ''))) + (r.sessionDescription ? '' : ' sem sdp'));
     // piso e começo da taxa (valem pra quem envia quando estão na resposta)
     const alvo = qualAtual ? kbpsDe(qualAtual) : 8000;
     const dicas = ';x-google-start-bitrate=' + Math.round(Math.max(2500, Math.min(20000, alvo * .7))) + (alvo >= 3000 ? ';x-google-min-bitrate=' + Math.round(Math.min(6000, alvo * .3)) : '');
@@ -3592,6 +3603,7 @@ async function sfuAssistir(d, con) {
       stream.addTrack(e.track);
       aplicarFolga(e.receiver);
       if (e.track.kind === 'video') temVideo();
+      else if (callRx && callRx.peerConnection === pc) tocar(stream); // o som chegou depois: junta na imagem que já toca
     });
     const sess = await sfuApi('nova');
     const tracks = [{ location: 'remote', sessionId: d.sessao, trackName: d.faixas.v }];
@@ -3600,9 +3612,10 @@ async function sfuAssistir(d, con) {
       const telaGrande = Math.max(screen.width, screen.height) * (devicePixelRatio || 1) >= 2500;
       tracks[0].simulcast = { preferredRid: telaGrande ? 'a' : 'b', priorityOrdering: 'asciibetical', ridNotAvailable: 'asciibetical' };
     }
-    if (d.faixas.a) tracks.push({ location: 'remote', sessionId: d.sessao, trackName: d.faixas.a });
+    // só a imagem primeiro: se o som ainda não tem nada (transmissão sem áudio, ou o som começa depois),
+    // o servidor espera ~8 s por ele. O som vem logo depois, separado (sfuPuxarSom).
     const r = await sfuApi('faixas', sess.sessionId, { tracks });
-    if (!r.sessionDescription || (r.tracks || []).some(t => t.errorCode)) throw new Error('sfu: faixas recusadas');
+    if (!r.sessionDescription || (r.tracks || []).some(t => t.errorCode)) throw new Error('sfu: faixas recusadas ' + JSON.stringify((r.tracks || []).map(t => t.errorCode + ' ' + (t.errorDescription || ''))) + (r.sessionDescription ? '' : ' sem sdp'));
     await pc.setRemoteDescription(r.sessionDescription);
     const ans = await pc.createAnswer();
     await pc.setLocalDescription({ type: 'answer', sdp: ajustarSDP(ans.sdp, null) });
@@ -3614,10 +3627,25 @@ async function sfuAssistir(d, con) {
     if (minha !== sfuRxTentativa || !rxAtivo || con !== conRx) { pc.close(); return; }
     receberChamada(chamadaSfu(pc), stream);
     try { con.send({ tipo: 'sfu-ok' }); } catch {}
+    if (d.faixas.a) sfuPuxarSom(pc, sess.sessionId, d);
   } catch (e) {
     console.warn(e);
     if (pc) try { pc.close(); } catch {}
     if (minha === sfuRxTentativa && con === conRx) try { con.send({ tipo: 'sfu-falhou' }); } catch {}
+  }
+}
+// o som pelo servidor: tenta algumas vezes (quem transmite pode estar sem som agora e ligar depois)
+async function sfuPuxarSom(pc, sessao, d, tentativa = 0) {
+  if (pc.connectionState === 'closed' || tentativa > 20) return;
+  try {
+    const r = await sfuApi('faixas', sessao, { tracks: [{ location: 'remote', sessionId: d.sessao, trackName: d.faixas.a }] });
+    if (!r.sessionDescription || (r.tracks || []).some(t => t.errorCode)) throw new Error('sem som ainda');
+    await pc.setRemoteDescription(r.sessionDescription);
+    const ans = await pc.createAnswer();
+    await pc.setLocalDescription({ type: 'answer', sdp: ajustarSDP(ans.sdp, null) });
+    await sfuApi('renegociar', sessao, { sessionDescription: { type: 'answer', sdp: pc.localDescription.sdp } });
+  } catch (e) {
+    if (pc.connectionState !== 'closed') setTimeout(() => sfuPuxarSom(pc, sessao, d, tentativa + 1), 15000);
   }
 }
 // imita a "chamada" do PeerJS pra o resto do player não precisar saber de onde vem a imagem
@@ -3934,7 +3962,17 @@ setInterval(async () => {
       const m = $('#metricas');
       m.innerHTML = '';
       m.append(chip(total ? `${total} assistindo` : 'ninguém assistindo ainda', '', 'i-usuarios'));
-      if (SFU.ok.size) { const c = chip(`${SFU.ok.size} pelo servidor`, 'bom'); c.title = 'Essas pessoas recebem pelo servidor de repasse: seu PC manda a imagem uma vez só pra todas.'; m.append(c); }
+      sfuDisponivel();
+      if (SFU.ok.size) {
+        const c = chip(`${SFU.ok.size} pelo servidor` + (sfuInfo && sfuInfo.limite ? ` · ${String(sfuInfo.gb ?? 0).replace('.', ',')} de ${sfuInfo.limite} GB` : ''), 'bom');
+        c.title = 'Essas pessoas recebem pelo servidor de repasse: seu PC manda a imagem uma vez só pra todas. O número é o gasto do grátis do mês (o site para em ' + ((sfuInfo && sfuInfo.limite) || 850) + ' GB de 1.000).';
+        m.append(c);
+      } else if (total) {
+        const t = textoModo(false), off = t.includes('desligado');
+        const c = chip(off ? 'servidor desligado (grátis do mês acabou)' : 'modo direto', off ? 'ruim' : '');
+        c.title = t;
+        m.append(c);
+      }
       const vs = streamTx.getVideoTracks()[0] && streamTx.getVideoTracks()[0].getSettings();
       if (vs && vs.width) { $('#tag-res').textContent = `${vs.width}×${vs.height}`; $('#tag-res').classList.remove('hidden'); }
       // stats de cada pessoa; os chips mostram a primeira, e cada uma recebe as suas pelo canal de dados
@@ -4003,6 +4041,7 @@ setInterval(async () => {
         ajustarFolga(st);
         ajustarQualidadeRx(st);
         await medirSomRx(callRx.peerConnection);
+        sfuDisponivel(); // atualiza o gasto do mês (a cada 5 min no máximo)
         function causaFps(i) {
           if (i.limite === 'bandwidth') return 'internet (upload) de quem transmite';
           if (i.limite === 'cpu') return 'processador de quem transmite';
@@ -4012,6 +4051,7 @@ setInterval(async () => {
         }
         $('#info-rx').textContent = resumoStats(st) + (it && it.capW ? ` · tela dele ${it.capW}×${it.capH}` : '') + (porque ? ` · ${porque}` : '');
         $('#stats-rx-box').textContent =
+          `Modo        ${textoModo(!!callRx.__sfu)}\n` +
           `Resolução   ${st.w}×${st.h}\n` +
           (it && it.capW ? `Tela dele   ${it.capW}×${it.capH}\n` : '') +
           (porque ? `Por quê      ${porque.replace('reduzido: ', '')}\n` : '') +
