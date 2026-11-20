@@ -570,7 +570,7 @@ html.transp body::before{display:none}
 /* player embutido no grupo: sem o cabeçalho e sem o "sair" */
 .embed .topo,.embed #bt-sair,.embed #bt-espera-sair,.embed #bt-qrx,.embed #info-rx,.embed .bt-p .txt{display:none!important}
 .embed #barra{gap:4px;padding:30px 10px 8px}
-@media (max-width:980px){.grupo-corpo{grid-template-columns:minmax(0,1fr);grid-template-areas:"membros" "palco" "chat";grid-template-rows:none}.grupo-chat{position:relative}.chat-msgs{height:240px}.grupo-acoes{margin-left:0}}
+@media (max-width:980px){.grupo-corpo{grid-template-columns:minmax(0,1fr);grid-template-areas:"palco" "chat" "membros";grid-template-rows:none}.grupo-chat{position:relative}.chat-msgs{height:240px}.grupo-acoes{margin-left:0}}
 @media (max-width:980px){
   #home{grid-template-columns:minmax(0,1fr);gap:36px}
   .acao-rx{order:-1}
@@ -690,6 +690,16 @@ html.com-fundo .bloco{background:none;-webkit-backdrop-filter:none;backdrop-filt
 .avatares img,.av-img{width:100%;height:100%;object-fit:cover;display:block}
 .av-img{width:26px;height:26px;border-radius:50%;flex:none}
 .chat-msgs li .av-img{width:20px;height:20px;display:inline-block;vertical-align:-5px;margin-right:6px}
+
+/* revisão: ícone na tela, avisos de entrada, mensagens entrando */
+.tile-nome{display:inline-flex;align-items:center;gap:7px}
+.tile-nome .av-img{width:20px;height:20px}
+.chat-msgs li.evento{color:var(--fraco);font-size:12.5px}
+.chat-msgs li.evento b{color:var(--sub);font-weight:600}
+.chat-msgs li.evento .av-img{width:18px;height:18px;display:inline-block;vertical-align:-4px;margin-right:6px}
+.chat-msgs li{animation:msgEntra .3s cubic-bezier(.2,.8,.2,1) both}
+@keyframes msgEntra{from{opacity:0;transform:translateY(6px)}}
+@media (prefers-reduced-motion:reduce){.chat-msgs li{animation:none}}
 </style>
 <script>
 // cor de destaque que muda com a hora do dia: violeta de madrugada, coral no amanhecer, amarelo de manhã,
@@ -4848,7 +4858,7 @@ function criarGrupo() {
 
 // ícones de perfil do grupo (avatares/0..15.webp); quem não escolheu ganha um aleatório
 const N_AVATARES = 16;
-const avValido = v => Number.isInteger(+v) && +v >= 0 && +v < N_AVATARES ? +v : null;
+const avValido = v => v == null || v === '' ? null : Number.isInteger(+v) && +v >= 0 && +v < N_AVATARES ? +v : null;
 let meuAvatar = avValido(guardar.get('avatar'));
 if (meuAvatar == null) { meuAvatar = Math.floor(Math.random() * N_AVATARES); guardar.set('avatar', String(meuAvatar)); }
 function imgAvatar(v) {
@@ -5287,11 +5297,28 @@ function avisarSiteNovo() {
   msgSistema('Saiu uma versão nova do site. Recarregue a página (F5) pro chat e as reações funcionarem com todo mundo.');
   statusGrupo('Saiu uma versão nova do site: recarregue a página (F5).', 'aviso');
 }
+function avisarEntradas() {
+  const agora = new Map(grupo.membros.filter(m => m.id !== grupo.meuId).map(m => [m.id, m]));
+  if (!grupo.__desde) grupo.__desde = Date.now();
+  // nos primeiros segundos depois de entrar, quem já estava lá não conta como "entrou"
+  if (grupo.__conhecidos && Date.now() - grupo.__desde > 4000) {
+    for (const [id, m] of agora) if (!grupo.__conhecidos.has(id)) msgEvento(m, 'entrou no grupo');
+    for (const [id, m] of grupo.__conhecidos) if (!agora.has(id)) msgEvento(m, 'saiu');
+  }
+  grupo.__conhecidos = agora;
+}
+function msgEvento(m, texto) {
+  const li = document.createElement('li'); li.className = 'evento';
+  const b = document.createElement('b'); b.textContent = m.nome || 'Alguém';
+  li.append(imgAvatar(m.av), b, document.createTextNode(' ' + texto));
+  $('#chat-msgs').append(li); $('#chat-msgs').scrollTop = $('#chat-msgs').scrollHeight;
+}
 function msgSistema(texto) {
   const li = document.createElement('li'); li.className = 'sis'; li.textContent = texto;
   $('#chat-msgs').append(li); $('#chat-msgs').scrollTop = $('#chat-msgs').scrollHeight;
 }
 function limparChat() {
+  grupo.__conhecidos = null; grupo.__desde = 0;
   grupo.avisouVersao = ''; grupo.avisouNovo = false; chatGrupo.msgs = []; chatGrupo.vistos.clear(); $('#chat-msgs').innerHTML = ''; }
 
 // sair de verdade (botão "Sair do grupo" ou expulso): esquece o grupo. Fechar o site NÃO sai: ao voltar, reentra.
@@ -5344,7 +5371,8 @@ function renderGrupo() {
     }
     ul.append(li);
   }
-  $('#grupo-contagem').textContent = grupo.membros.length ? `${grupo.membros.length} no grupo` : '';
+  $('#grupo-contagem').textContent = grupo.membros.length ? `· ${grupo.membros.length}` : '';
+  avisarEntradas();
   // telas: uma por pessoa compartilhando
   const box = $('#grupo-telas');
   const compart = grupo.membros.filter(m => m.sala);
@@ -5353,7 +5381,7 @@ function renderGrupo() {
   for (const m of compart) {
     let t = box.querySelector(`[data-sala="${CSS.escape(m.sala)}"]`);
     if (!t) { t = criarTile(m); box.append(t); }
-    t.querySelector('.tile-nome').textContent = m.id === grupo.meuId ? 'Você (sua tela)' : m.nome;
+    t.querySelector('.tile-nome').replaceChildren(imgAvatar(m.id === grupo.meuId ? grupo.av : m.av), document.createTextNode(m.id === grupo.meuId ? 'Você (sua tela)' : m.nome));
   }
   if (!grupo.foco || !chaves.has(grupo.foco)) {
     const outro = compart.find(m => m.id !== grupo.meuId) || compart[0];
