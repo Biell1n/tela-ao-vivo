@@ -1,0 +1,480 @@
+[
+{
+"nome": "body.0.weight",
+"forma": [
+64,
+3,
+3,
+3
+],
+"inicio": 0,
+"n": 1728
+},
+{
+"nome": "body.0.bias",
+"forma": [
+64
+],
+"inicio": 1728,
+"n": 64
+},
+{
+"nome": "body.1.weight",
+"forma": [
+64
+],
+"inicio": 1792,
+"n": 64
+},
+{
+"nome": "body.2.weight",
+"forma": [
+64,
+64,
+3,
+3
+],
+"inicio": 1856,
+"n": 36864
+},
+{
+"nome": "body.2.bias",
+"forma": [
+64
+],
+"inicio": 38720,
+"n": 64
+},
+{
+"nome": "body.3.weight",
+"forma": [
+64
+],
+"inicio": 38784,
+"n": 64
+},
+{
+"nome": "body.4.weight",
+"forma": [
+64,
+64,
+3,
+3
+],
+"inicio": 38848,
+"n": 36864
+},
+{
+"nome": "body.4.bias",
+"forma": [
+64
+],
+"inicio": 75712,
+"n": 64
+},
+{
+"nome": "body.5.weight",
+"forma": [
+64
+],
+"inicio": 75776,
+"n": 64
+},
+{
+"nome": "body.6.weight",
+"forma": [
+64,
+64,
+3,
+3
+],
+"inicio": 75840,
+"n": 36864
+},
+{
+"nome": "body.6.bias",
+"forma": [
+64
+],
+"inicio": 112704,
+"n": 64
+},
+{
+"nome": "body.7.weight",
+"forma": [
+64
+],
+"inicio": 112768,
+"n": 64
+},
+{
+"nome": "body.8.weight",
+"forma": [
+64,
+64,
+3,
+3
+],
+"inicio": 112832,
+"n": 36864
+},
+{
+"nome": "body.8.bias",
+"forma": [
+64
+],
+"inicio": 149696,
+"n": 64
+},
+{
+"nome": "body.9.weight",
+"forma": [
+64
+],
+"inicio": 149760,
+"n": 64
+},
+{
+"nome": "body.10.weight",
+"forma": [
+64,
+64,
+3,
+3
+],
+"inicio": 149824,
+"n": 36864
+},
+{
+"nome": "body.10.bias",
+"forma": [
+64
+],
+"inicio": 186688,
+"n": 64
+},
+{
+"nome": "body.11.weight",
+"forma": [
+64
+],
+"inicio": 186752,
+"n": 64
+},
+{
+"nome": "body.12.weight",
+"forma": [
+64,
+64,
+3,
+3
+],
+"inicio": 186816,
+"n": 36864
+},
+{
+"nome": "body.12.bias",
+"forma": [
+64
+],
+"inicio": 223680,
+"n": 64
+},
+{
+"nome": "body.13.weight",
+"forma": [
+64
+],
+"inicio": 223744,
+"n": 64
+},
+{
+"nome": "body.14.weight",
+"forma": [
+64,
+64,
+3,
+3
+],
+"inicio": 223808,
+"n": 36864
+},
+{
+"nome": "body.14.bias",
+"forma": [
+64
+],
+"inicio": 260672,
+"n": 64
+},
+{
+"nome": "body.15.weight",
+"forma": [
+64
+],
+"inicio": 260736,
+"n": 64
+},
+{
+"nome": "body.16.weight",
+"forma": [
+64,
+64,
+3,
+3
+],
+"inicio": 260800,
+"n": 36864
+},
+{
+"nome": "body.16.bias",
+"forma": [
+64
+],
+"inicio": 297664,
+"n": 64
+},
+{
+"nome": "body.17.weight",
+"forma": [
+64
+],
+"inicio": 297728,
+"n": 64
+},
+{
+"nome": "body.18.weight",
+"forma": [
+64,
+64,
+3,
+3
+],
+"inicio": 297792,
+"n": 36864
+},
+{
+"nome": "body.18.bias",
+"forma": [
+64
+],
+"inicio": 334656,
+"n": 64
+},
+{
+"nome": "body.19.weight",
+"forma": [
+64
+],
+"inicio": 334720,
+"n": 64
+},
+{
+"nome": "body.20.weight",
+"forma": [
+64,
+64,
+3,
+3
+],
+"inicio": 334784,
+"n": 36864
+},
+{
+"nome": "body.20.bias",
+"forma": [
+64
+],
+"inicio": 371648,
+"n": 64
+},
+{
+"nome": "body.21.weight",
+"forma": [
+64
+],
+"inicio": 371712,
+"n": 64
+},
+{
+"nome": "body.22.weight",
+"forma": [
+64,
+64,
+3,
+3
+],
+"inicio": 371776,
+"n": 36864
+},
+{
+"nome": "body.22.bias",
+"forma": [
+64
+],
+"inicio": 408640,
+"n": 64
+},
+{
+"nome": "body.23.weight",
+"forma": [
+64
+],
+"inicio": 408704,
+"n": 64
+},
+{
+"nome": "body.24.weight",
+"forma": [
+64,
+64,
+3,
+3
+],
+"inicio": 408768,
+"n": 36864
+},
+{
+"nome": "body.24.bias",
+"forma": [
+64
+],
+"inicio": 445632,
+"n": 64
+},
+{
+"nome": "body.25.weight",
+"forma": [
+64
+],
+"inicio": 445696,
+"n": 64
+},
+{
+"nome": "body.26.weight",
+"forma": [
+64,
+64,
+3,
+3
+],
+"inicio": 445760,
+"n": 36864
+},
+{
+"nome": "body.26.bias",
+"forma": [
+64
+],
+"inicio": 482624,
+"n": 64
+},
+{
+"nome": "body.27.weight",
+"forma": [
+64
+],
+"inicio": 482688,
+"n": 64
+},
+{
+"nome": "body.28.weight",
+"forma": [
+64,
+64,
+3,
+3
+],
+"inicio": 482752,
+"n": 36864
+},
+{
+"nome": "body.28.bias",
+"forma": [
+64
+],
+"inicio": 519616,
+"n": 64
+},
+{
+"nome": "body.29.weight",
+"forma": [
+64
+],
+"inicio": 519680,
+"n": 64
+},
+{
+"nome": "body.30.weight",
+"forma": [
+64,
+64,
+3,
+3
+],
+"inicio": 519744,
+"n": 36864
+},
+{
+"nome": "body.30.bias",
+"forma": [
+64
+],
+"inicio": 556608,
+"n": 64
+},
+{
+"nome": "body.31.weight",
+"forma": [
+64
+],
+"inicio": 556672,
+"n": 64
+},
+{
+"nome": "body.32.weight",
+"forma": [
+64,
+64,
+3,
+3
+],
+"inicio": 556736,
+"n": 36864
+},
+{
+"nome": "body.32.bias",
+"forma": [
+64
+],
+"inicio": 593600,
+"n": 64
+},
+{
+"nome": "body.33.weight",
+"forma": [
+64
+],
+"inicio": 593664,
+"n": 64
+},
+{
+"nome": "body.34.weight",
+"forma": [
+48,
+64,
+3,
+3
+],
+"inicio": 593728,
+"n": 27648
+},
+{
+"nome": "body.34.bias",
+"forma": [
+48
+],
+"inicio": 621376,
+"n": 48
+}
+]

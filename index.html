@@ -2849,6 +2849,7 @@ const SR = { modo: +(guardar.get('superRes') || 0) > 0 ? 1 : 0, alvo: [-1, 0, 10
   motor: guardar.get('superResMotor2') || 'fsr', // 'fsr' = neural (FSRCNNX) com a rápida antiga de reserva; 'ia' = Anime4K
   forte: guardar.get('superResForte') === '1' || guardar.get('superRes') === '2', gl: null, cv: null, ok: true, progD: null, texN: null, fbo2: null, nw: 0, nh: 0,
   progE: null, progR: null, texV: null, texM: null, fbo: null, mw: 0, mh: 0, laco: 0, gen: 0, ativo: false, info: '' };
+const srGPU = () => SR.motor === 'ia' || SR.motor === 'esr';
 const SR_VERT = `#version 300 es
 in vec2 p; void main(){ gl_Position = vec4(p, 0.0, 1.0); }`;
 const SR_COMUM = `#version 300 es
@@ -3248,7 +3249,7 @@ function srParar() {
 function srQuadro() {
   SR.laco = 0;
   if (!SR.modo || srBloqueado() || giroRx || $('#rx-player').classList.contains('hidden') || (EMBED && !embedGrande)) { srParar(); iaParar(); if (SR.modo && !TOQUE) srAgendar(); return; }
-  if (SR.motor === 'ia' && IA.estado !== 'erro') { srParar(); return; } // a IA tem o laço dela
+  if (srGPU() && IA.estado !== 'erro') { srParar(); return; } // a IA tem o laço dela
   if (!SR.ok) { srParar(); return; }
   iaParar();
   const vw = video.videoWidth, vh = video.videoHeight;
@@ -3353,7 +3354,7 @@ function srAgendar() {
 function srReiniciar() { SR.gen++; SR.laco = 0; srLigar(); }
 function srLigar() {
   if (!SR.modo) { srParar(); iaParar(); return; }
-  if (SR.motor === 'ia' && IA.estado !== 'erro') { srParar(); IA.gen++; IA.laco = 0; iaLigar(); return; }
+  if (srGPU() && IA.estado !== 'erro') { srParar(); IA.gen++; IA.laco = 0; iaLigar(); return; }
   if (!srIniciar()) return;
   if (!SR.laco) srQuadro();
 }
@@ -3392,6 +3393,324 @@ fn lz(x0: f32) -> f32 { let x = abs(x0); if (x < 1e-5) { return 1.0; } if (x >= 
   let base = textureSampleLevel(tex, samp, v.uv, 0.0).rgb; // usa o sampler (o layout automático exige)
   return vec4f(clamp(acc / ws + base * 0.0, vec3f(0.0), vec3f(1.0)), 1.0);
 }`;
+// ---------- IA realista: Real-ESRGAN compacta (xinntao, BSD-3; pesos em sr/), x4, rodando na placa de vídeo (WebGPU).
+// Pra vídeo de baixa resolução DE VERDADE (144p a ~480p), inclusive quando ele chega esticado dentro de uma tela maior
+// (ex.: YouTube em 360p numa aba 1080p): acha a parte que se mexe (o vídeo), mede a largura das bordas pra saber a
+// resolução real dela, reduz até lá e a rede reconstrói 4x (textura, contorno, sem os blocos da compressão).
+const ESR_CONV = `
+struct P { w: u32, h: u32, cin: u32, cout: u32, woff: u32, boff: u32, aoff: u32, relu: u32 };
+@group(0) @binding(0) var<storage, read> ent: array<f32>;
+@group(0) @binding(1) var<storage, read_write> sai: array<f32>;
+@group(0) @binding(2) var<storage, read> pw: array<f32>;
+@group(0) @binding(3) var<uniform> p: P;
+const CI: u32 = 8u;
+const CO: u32 = 16u;
+var<workgroup> tile: array<f32, 800>;
+var<workgroup> wsh: array<vec4f, 288>;
+@compute @workgroup_size(8, 8, 1)
+fn main(@builtin(global_invocation_id) g: vec3u, @builtin(local_invocation_id) l: vec3u, @builtin(workgroup_id) wg: vec3u) {
+  let lid = l.y * 8u + l.x;
+  let x0 = i32(wg.x * 8u) - 1; let y0 = i32(wg.y * 8u) - 1;
+  let co0 = wg.z * CO;
+  let plano = p.w * p.h;
+  var acc: array<vec4f, 4>;
+  for (var q = 0u; q < 4u; q++) { let b = p.boff + co0 + q * 4u; acc[q] = vec4f(pw[b], pw[b + 1u], pw[b + 2u], pw[b + 3u]); }
+  for (var c0 = 0u; c0 < p.cin; c0 += CI) {
+    for (var t = lid; t < 800u; t += 64u) {
+      let ci = t / 100u; let r = t % 100u; let yy = y0 + i32(r / 10u); let xx = x0 + i32(r % 10u);
+      var v = 0.0;
+      if (c0 + ci < p.cin && yy >= 0 && yy < i32(p.h) && xx >= 0 && xx < i32(p.w)) { v = ent[(c0 + ci) * plano + u32(yy) * p.w + u32(xx)]; }
+      tile[t] = v;
+    }
+    for (var t = lid; t < 288u; t += 64u) {
+      let ci = t / 36u; let r = t % 36u; let tap = r / 4u; let q = r % 4u;
+      var v = vec4f(0.0);
+      if (c0 + ci < p.cin) { for (var k = 0u; k < 4u; k++) { v[k] = pw[p.woff + ((co0 + q * 4u + k) * p.cin + c0 + ci) * 9u + tap]; } }
+      wsh[t] = v;
+    }
+    workgroupBarrier();
+    for (var ci = 0u; ci < CI; ci++) {
+      for (var dy = 0u; dy < 3u; dy++) {
+        for (var dx = 0u; dx < 3u; dx++) {
+          let v = tile[ci * 100u + (l.y + dy) * 10u + l.x + dx];
+          let wb = (ci * 9u + dy * 3u + dx) * 4u;
+          acc[0] += v * wsh[wb]; acc[1] += v * wsh[wb + 1u]; acc[2] += v * wsh[wb + 2u]; acc[3] += v * wsh[wb + 3u];
+        }
+      }
+    }
+    workgroupBarrier();
+  }
+  if (g.x >= p.w || g.y >= p.h) { return; }
+  let ix = g.y * p.w + g.x;
+  for (var q = 0u; q < 4u; q++) {
+    var a = acc[q];
+    if (p.relu == 1u) { let b = p.aoff + co0 + q * 4u; a = select(a, a * vec4f(pw[b], pw[b + 1u], pw[b + 2u], pw[b + 3u]), a < vec4f(0.0)); }
+    for (var k = 0u; k < 4u; k++) { sai[(co0 + q * 4u + k) * plano + ix] = a[k]; }
+  }
+}`;
+const ESR_ENT = `
+struct P { w: u32, h: u32 };
+@group(0) @binding(0) var img: texture_2d<f32>;
+@group(0) @binding(1) var<storage, read_write> sai: array<f32>;
+@group(0) @binding(2) var<uniform> p: P;
+@compute @workgroup_size(8, 8, 1)
+fn main(@builtin(global_invocation_id) g: vec3u) {
+  if (g.x >= p.w || g.y >= p.h) { return; }
+  let c = textureLoad(img, vec2i(g.xy), 0);
+  let pl = p.w * p.h; let i = g.y * p.w + g.x;
+  sai[i] = c.r; sai[pl + i] = c.g; sai[2u * pl + i] = c.b;
+}`;
+const ESR_SAI = `
+struct P { w: u32, h: u32 };
+@group(0) @binding(0) var<storage, read> res: array<f32>;
+@group(0) @binding(1) var img: texture_2d<f32>;
+@group(0) @binding(2) var sai: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(3) var<uniform> p: P;
+@compute @workgroup_size(8, 8, 1)
+fn main(@builtin(global_invocation_id) g: vec3u) {
+  let W = p.w * 4u; let H = p.h * 4u;
+  if (g.x >= W || g.y >= H) { return; }
+  let x = g.x / 4u; let y = g.y / 4u; let i = g.y % 4u; let j = g.x % 4u;
+  let pl = p.w * p.h; let ix = y * p.w + x;
+  let base = textureLoad(img, vec2i(i32(x), i32(y)), 0).rgb;
+  var c = vec3f(0.0);
+  for (var k = 0u; k < 3u; k++) { c[k] = res[(k * 16u + i * 4u + j) * pl + ix]; }
+  textureStore(sai, vec2i(g.xy), vec4f(clamp(c + base, vec3f(0.0), vec3f(1.0)), 1.0));
+}`;
+// recorta um pedaço do quadro e reduz (Lanczos) pro tamanho que entra na rede
+const ESR_RECORTE = `
+struct U { pe: vec2f, n: f32, pad: f32, o: vec2f, t: vec2f };
+@group(0) @binding(0) var samp: sampler;
+@group(0) @binding(1) var tex: texture_2d<f32>;
+@group(0) @binding(2) var<uniform> u: U;
+struct VO { @builtin(position) pos: vec4f, @location(0) uv: vec2f };
+@vertex fn vs(@builtin(vertex_index) i: u32) -> VO {
+  var p = array<vec2f, 3>(vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0));
+  var o: VO; o.pos = vec4f(p[i], 0.0, 1.0); o.uv = vec2f((p[i].x + 1.0) * 0.5, (1.0 - p[i].y) * 0.5); return o;
+}
+fn lz(x0: f32) -> f32 { let x = abs(x0); if (x < 1e-5) { return 1.0; } if (x >= 2.0) { return 0.0; } let p = 3.14159265 * x; return 2.0 * sin(p) * sin(p * 0.5) / (p * p); }
+@fragment fn fs(v: VO) -> @location(0) vec4f {
+  let tam = vec2f(textureDimensions(tex));
+  let saida = 1.0 / u.pe;
+  let r = max(u.t / saida, vec2f(1.0));
+  let c = u.o + v.uv * u.t;
+  let i0 = vec2i(floor(c - 2.0 * r)); let i1 = vec2i(ceil(c + 2.0 * r));
+  let lim = vec2i(tam) - 1;
+  var acc = vec3f(0.0); var ws = 0.0;
+  for (var y = i0.y; y <= i1.y; y++) {
+    let wy = lz((f32(y) + 0.5 - c.y) / r.y);
+    if (wy == 0.0) { continue; }
+    for (var x = i0.x; x <= i1.x; x++) {
+      let wx = lz((f32(x) + 0.5 - c.x) / r.x);
+      if (wx == 0.0) { continue; }
+      acc += textureLoad(tex, clamp(vec2i(x, y), vec2i(0), lim), 0).rgb * (wx * wy);
+      ws += wx * wy;
+    }
+  }
+  let base = textureSampleLevel(tex, samp, v.uv, 0.0).rgb;
+  return vec4f(clamp(acc / ws + base * 0.0, vec3f(0.0), vec3f(1.0)), 1.0);
+}`;
+async function esrCriarRede(dev, prefixo) {
+  const meta = await (await fetch(prefixo + '.json')).json();
+  const bin = new Float32Array(await (await fetch(prefixo + '.bin')).arrayBuffer());
+  const pw = dev.createBuffer({ size: bin.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+  dev.queue.writeBuffer(pw, 0, bin);
+  const porNome = Object.fromEntries(meta.map(m => [m.nome, m]));
+  const camadas = [];
+  for (let i = 0; ; i += 2) {
+    const w = porNome[`body.${i}.weight`]; if (!w) break;
+    const a = porNome[`body.${i + 1}.weight`];
+    camadas.push({ cout: w.forma[0], cin: w.forma[1], woff: w.inicio, boff: porNome[`body.${i}.bias`].inicio, aoff: a ? a.inicio : 0, relu: a ? 1 : 0 });
+  }
+  const mk = code => dev.createComputePipeline({ layout: 'auto', compute: { module: dev.createShaderModule({ code }), entryPoint: 'main' } });
+  const pConv = mk(ESR_CONV), pEnt = mk(ESR_ENT), pSai = mk(ESR_SAI);
+  let est = null;
+  return {
+    preparar(w, h) {
+      if (est && est.w === w && est.h === h) return est;
+      if (est) { est.lixo.forEach(b => { try { b.destroy(); } catch {} }); }
+      const pl = w * h, lixo = [];
+      const buf = n => { const b = dev.createBuffer({ size: n * 4, usage: GPUBufferUsage.STORAGE }); lixo.push(b); return b; };
+      const A = buf(64 * pl), B = buf(64 * pl), E = buf(3 * pl);
+      const entrada = dev.createTexture({ size: [w, h], format: 'rgba16float', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT });
+      const saida = dev.createTexture({ size: [w * 4, h * 4], format: 'rgba16float', usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING });
+      lixo.push(entrada, saida);
+      const uWH = dev.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      dev.queue.writeBuffer(uWH, 0, new Uint32Array([w, h, 0, 0]));
+      const passos = [{ pipe: pEnt, bind: dev.createBindGroup({ layout: pEnt.getBindGroupLayout(0), entries: [{ binding: 0, resource: entrada.createView() }, { binding: 1, resource: { buffer: E } }, { binding: 2, resource: { buffer: uWH } }] }), n: [Math.ceil(w / 8), Math.ceil(h / 8), 1] }];
+      let src = E, dst = A;
+      for (const c of camadas) {
+        const u = dev.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+        dev.queue.writeBuffer(u, 0, new Uint32Array([w, h, c.cin, c.cout, c.woff, c.boff, c.aoff, c.relu]));
+        passos.push({ pipe: pConv, bind: dev.createBindGroup({ layout: pConv.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: src } }, { binding: 1, resource: { buffer: dst } }, { binding: 2, resource: { buffer: pw } }, { binding: 3, resource: { buffer: u } }] }), n: [Math.ceil(w / 8), Math.ceil(h / 8), c.cout / 16] });
+        src = dst; dst = dst === A ? B : A;
+      }
+      passos.push({ pipe: pSai, bind: dev.createBindGroup({ layout: pSai.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: src } }, { binding: 1, resource: entrada.createView() }, { binding: 2, resource: saida.createView() }, { binding: 3, resource: { buffer: uWH } }] }), n: [Math.ceil(w * 4 / 8), Math.ceil(h * 4 / 8), 1] });
+      est = { w, h, entrada, saida, passos, lixo };
+      return est;
+    },
+    passar(enc, e) { for (const s of e.passos) { const c = enc.beginComputePass(); c.setPipeline(s.pipe); c.setBindGroup(0, s.bind); c.dispatchWorkgroups(...s.n); c.end(); } },
+  };
+}
+// largura mediana das bordas fortes (pixels): ~1,5 num vídeo nítido; cresce quando ele foi esticado de uma resolução menor
+const esrCv = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(8, 8) : null;
+function esrLarguraBordas(fonte, sx, sy, sw, sh) {
+  const W = Math.min(sw, 640), H = Math.min(sh, 360);
+  const cx = Math.round(sx + (sw - W) / 2), cy = Math.round(sy + (sh - H) / 2);
+  esrCv.width = W; esrCv.height = H;
+  const x = esrCv.getContext('2d', { willReadFrequently: true });
+  x.drawImage(fonte, cx, cy, W, H, 0, 0, W, H);
+  const d = x.getImageData(0, 0, W, H).data, Y = new Float32Array(W * H);
+  for (let i = 0; i < W * H; i++) Y[i] = 0.2126 * d[i * 4] + 0.7152 * d[i * 4 + 1] + 0.0722 * d[i * 4 + 2];
+  const at = (px, py) => {
+    px = Math.min(W - 1.001, Math.max(0, px)); py = Math.min(H - 1.001, Math.max(0, py));
+    const x0 = px | 0, y0 = py | 0, fx = px - x0, fy = py - y0, i = y0 * W + x0;
+    return (Y[i] * (1 - fx) + Y[i + 1] * fx) * (1 - fy) + (Y[i + W] * (1 - fx) + Y[i + W + 1] * fx) * fy;
+  };
+  const gs = [];
+  for (let yy = 2; yy < H - 2; yy += 1) for (let xx = 2; xx < W - 2; xx += 1) {
+    const i = yy * W + xx, gx = (Y[i + 1] - Y[i - 1]) / 2, gy = (Y[i + W] - Y[i - W]) / 2, g = Math.hypot(gx, gy);
+    if (g > 4) gs.push(g, xx, yy, gx / g, gy / g);
+  }
+  const n = gs.length / 5;
+  if (n < 150) return 0;
+  const ordem = Array.from({ length: n }, (_, k) => k).sort((a, b) => gs[b * 5] - gs[a * 5]).slice(0, Math.max(150, Math.round(n * 0.03)));
+  const ws = [];
+  for (const k of ordem) {
+    const g = gs[k * 5], px = gs[k * 5 + 1], py = gs[k * 5 + 2], ux = gs[k * 5 + 3], uy = gs[k * 5 + 4];
+    let mn = 1e9, mx = -1e9;
+    for (let t = -12; t <= 12; t++) { const v = at(px + ux * t, py + uy * t); if (v < mn) mn = v; if (v > mx) mx = v; }
+    if (mx - mn > 30) ws.push((mx - mn) / g);
+  }
+  if (ws.length < 50) return 0;
+  ws.sort((a, b) => a - b);
+  return ws[ws.length >> 1];
+}
+// desenha a saída da rede misturando ~12 px de beirada com o que já está na tela
+const ESR_MISTURA = IA_WGSL_FONTE_MISTURA();
+function IA_WGSL_FONTE_MISTURA() {
+  return IA_WGSL.replace('return vec4f(clamp(acc / ws + base * 0.0, vec3f(0.0), vec3f(1.0)), 1.0);',
+    'let px = min(v.uv, vec2f(1.0) - v.uv) / u.pe; let al = clamp(min(px.x, px.y) / 12.0, 0.0, 1.0);\n  return vec4f(clamp(acc / ws + base * 0.0, vec3f(0.0), vec3f(1.0)) * al, al);');
+}
+const RES = { estado: 'nada', pipeMistura: null, rede: null, modelo: '', alvo: null, esc: [], area: 640 * 360, ms: 0, n: 0, ocupado: false,
+  mov: null, ant: null, ultima: 0, regiao: null, regiaoHora: 0, texFull: null, fw: 0, fh: 0,
+  pipeRec: null, uFull: null, uReg: null, uRec: null, info: '' };
+async function esrCarregar(modelo) {
+  if (RES.modelo === modelo && RES.rede) return;
+  RES.estado = 'carregando';
+  try {
+    RES.rede = await esrCriarRede(IA.device, 'sr/esrgan_' + modelo);
+    RES.modelo = modelo; RES.estado = 'pronto'; RES.ms = 0; RES.n = 0;
+    if (!RES.pipeRec) {
+      const dev = IA.device, mod = dev.createShaderModule({ code: ESR_RECORTE });
+      RES.pipeRec = dev.createRenderPipeline({ layout: 'auto', vertex: { module: mod, entryPoint: 'vs' }, fragment: { module: mod, entryPoint: 'fs', targets: [{ format: 'rgba16float' }] }, primitive: { topology: 'triangle-list' } });
+      RES.uFull = dev.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      RES.uReg = dev.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      RES.uRec = dev.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      const modM = dev.createShaderModule({ code: ESR_MISTURA });
+      RES.pipeMistura = dev.createRenderPipeline({ layout: 'auto', vertex: { module: modM, entryPoint: 'vs' },
+        fragment: { module: modM, entryPoint: 'fs', targets: [{ format: IA.formato, blend: { color: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' }, alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' } } }] },
+        primitive: { topology: 'triangle-list' } });
+    }
+  } catch (e) { console.warn('IA realista indisponível', e); RES.estado = 'erro'; }
+}
+// 1x por ~0,7 s: onde está o vídeo (o que se mexe) e qual a resolução real dele
+function esrAnalisar(vw, vh, telaH) {
+  const GX = 16, GY = 9, CW = 160, CH = 90;
+  esrCv.width = CW; esrCv.height = CH;
+  const x = esrCv.getContext('2d', { willReadFrequently: true });
+  x.drawImage(video, 0, 0, CW, CH);
+  const d = x.getImageData(0, 0, CW, CH).data, Y = new Float32Array(CW * CH);
+  for (let i = 0; i < CW * CH; i++) Y[i] = 0.2126 * d[i * 4] + 0.7152 * d[i * 4 + 1] + 0.0722 * d[i * 4 + 2];
+  if (!RES.mov) RES.mov = new Float32Array(GX * GY);
+  if (RES.ant) {
+    for (let cy = 0; cy < GY; cy++) for (let cx = 0; cx < GX; cx++) {
+      let s = 0;
+      for (let yy = 0; yy < 10; yy++) for (let xx = 0; xx < 10; xx++) { const i = (cy * 10 + yy) * CW + cx * 10 + xx; s += Math.abs(Y[i] - RES.ant[i]); }
+      RES.mov[cy * GX + cx] = RES.mov[cy * GX + cx] * 0.96 + (s / 100 > 2.5 ? 1 : 0);
+    }
+  }
+  RES.ant = Y;
+  let x0 = GX, y0 = GY, x1 = -1, y1 = -1, n = 0;
+  for (let cy = 0; cy < GY; cy++) for (let cx = 0; cx < GX; cx++) if (RES.mov[cy * GX + cx] > 0.9) { n++; x0 = Math.min(x0, cx); y0 = Math.min(y0, cy); x1 = Math.max(x1, cx); y1 = Math.max(y1, cy); }
+  if (n >= 6) { RES.regiao = { x: Math.round(x0 * vw / GX), y: Math.round(y0 * vh / GY), w: Math.round((x1 - x0 + 1) * vw / GX), h: Math.round((y1 - y0 + 1) * vh / GY) }; RES.regiaoHora = Date.now(); }
+  else if (!RES.regiao || Date.now() - RES.regiaoHora > 15000) RES.regiao = { x: 0, y: 0, w: vw, h: vh }; // parado: a tela toda
+  const r = RES.regiao;
+  const larg = esrLarguraBordas(video, r.x, r.y, r.w, r.h);
+  if (larg) { RES.esc.push(Math.min(8, Math.max(1, (larg - 0.8) / 0.85))); if (RES.esc.length > 3) RES.esc.shift(); }
+  const esc = RES.esc.length ? [...RES.esc].sort((a, b) => a - b)[RES.esc.length >> 1] : 1;
+  // tamanho real do vídeo; a rede amplia 4x. Só vale se o vídeo é pequeno de verdade e a tela mostra ele bem maior.
+  let ih = Math.round(r.h / esc), iw = Math.round(r.w / esc);
+  const aTela = telaH * r.h / vh;
+  if (esc < 1.3 && ih > 480) { RES.alvo = null; RES.info = `IA realista · a imagem já é nítida (${r.w}×${r.h})`; return; }
+  if (aTela / ih < 1.4) { RES.alvo = null; RES.info = `IA realista · o vídeo (~${ih}p) já aparece no tamanho real na tela`; return; }
+  if (iw * ih > RES.area) { const k = Math.sqrt(RES.area / (iw * ih)); iw = Math.round(iw * k); ih = Math.round(ih * k); }
+  iw = Math.max(16, iw - iw % 4); ih = Math.max(16, ih - ih % 4);
+  const ant = RES.alvo;
+  // não troca de tamanho por pouca coisa (recriar a rede custa)
+  if (ant && Math.abs(ant.iw - iw) / iw < 0.12 && Math.abs(ant.ih - ih) / ih < 0.12 && Math.abs(ant.x - r.x) < 8 && Math.abs(ant.w - r.w) < 16) return;
+  RES.alvo = { ...r, iw, ih, real: Math.round(r.h / esc) };
+}
+function esrQuadro(vw, vh, W, H, ow, oh) {
+  const dev = IA.device, cv = IA.cv;
+  if (RES.estado === 'nada') { esrCarregar('geral'); return 'IA realista · carregando a rede (~5 MB)...'; }
+  if (RES.estado !== 'pronto') return RES.estado === 'erro' ? '' : 'IA realista · carregando...';
+  if (Date.now() - RES.ultima > 700) { RES.ultima = Date.now(); try { esrAnalisar(vw, vh, oh); } catch (e) { console.warn(e); } }
+  if (!RES.texFull || RES.fw !== vw || RES.fh !== vh) {
+    if (RES.texFull) try { RES.texFull.destroy(); } catch {}
+    RES.texFull = dev.createTexture({ size: [vw, vh], format: 'rgba16float', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT });
+    RES.fw = vw; RES.fh = vh;
+  }
+  if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+  dev.queue.copyExternalImageToTexture({ source: video }, { texture: RES.texFull }, [vw, vh]);
+  const ox = Math.floor((W - ow) / 2), oy = Math.floor((H - oh) / 2), e = ow / vw;
+  dev.queue.writeBuffer(RES.uFull, 0, new Float32Array([1 / ow, 1 / oh, 1, 0]));
+  const enc = dev.createCommandEncoder();
+  const a = RES.alvo;
+  let saidaRede = null;
+  if (a) {
+    const est = RES.rede.preparar(a.iw, a.ih);
+    dev.queue.writeBuffer(RES.uRec, 0, new Float32Array([1 / a.iw, 1 / a.ih, 1, 0, a.x, a.y, a.w, a.h]));
+    const rp = enc.beginRenderPass({ colorAttachments: [{ view: est.entrada.createView(), loadOp: 'clear', clearValue: { r: 0, g: 0, b: 0, a: 1 }, storeOp: 'store' }] });
+    rp.setPipeline(RES.pipeRec);
+    rp.setBindGroup(0, dev.createBindGroup({ layout: RES.pipeRec.getBindGroupLayout(0), entries: [{ binding: 0, resource: IA.sampler }, { binding: 1, resource: RES.texFull.createView() }, { binding: 2, resource: { buffer: RES.uRec } }] }));
+    rp.draw(3); rp.end();
+    RES.rede.passar(enc, est);
+    saidaRede = est.saida;
+    dev.queue.writeBuffer(RES.uReg, 0, new Float32Array([1 / Math.max(1, a.w * e), 1 / Math.max(1, a.h * e), 1, 0]));
+  }
+  const pass = enc.beginRenderPass({ colorAttachments: [{ view: IA.ctx.getCurrentTexture().createView(), clearValue: { r: 0, g: 0, b: 0, a: 0 }, loadOp: 'clear', storeOp: 'store' }] });
+  pass.setPipeline(IA.render);
+  pass.setViewport(ox, oy, ow, oh, 0, 1);
+  pass.setBindGroup(0, dev.createBindGroup({ layout: IA.render.getBindGroupLayout(0), entries: [{ binding: 0, resource: IA.sampler }, { binding: 1, resource: RES.texFull.createView() }, { binding: 2, resource: { buffer: RES.uFull } }] }));
+  pass.draw(3);
+  if (saidaRede) {
+    pass.setViewport(ox + a.x * e, oy + a.y * e, a.w * e, a.h * e, 0, 1);
+    pass.setPipeline(RES.pipeMistura);
+    pass.setBindGroup(0, dev.createBindGroup({ layout: RES.pipeMistura.getBindGroupLayout(0), entries: [{ binding: 0, resource: IA.sampler }, { binding: 1, resource: saidaRede.createView() }, { binding: 2, resource: { buffer: RES.uReg } }] }));
+    pass.draw(3);
+  }
+  pass.end();
+  const t0 = performance.now();
+  RES.ocupado = true;
+  dev.queue.submit([enc.finish()]);
+  dev.queue.onSubmittedWorkDone().then(() => {
+    RES.ocupado = false;
+    if (!saidaRede) return;
+    const ms = performance.now() - t0;
+    RES.ms = RES.n ? RES.ms * 0.9 + ms * 0.1 : ms; RES.n++;
+    // placa não dá conta: menos pixels; no mínimo e ainda pesado, a rede mais leve; e por fim a Neural
+    if (RES.n > 30 && RES.ms > 40) {
+      RES.n = 0;
+      if (RES.area > 256 * 144 * 1.2) { RES.area = Math.round(RES.area * 0.7); RES.alvo = null; }
+      else if (RES.modelo === 'geral') { RES.rede = null; RES.estado = 'nada'; esrCarregar('anime'); }
+      else { SR.motor = 'fsr'; guardar.set('superResMotor2', 'fsr'); avisoRx('A IA realista ficou pesada demais pra esta placa de vídeo. Voltei pra Neural.'); srReiniciar(); }
+    } else if (RES.n > 60 && RES.ms < 14 && RES.area < 960 * 540) { RES.n = 0; RES.area = Math.round(RES.area * 1.25); }
+  });
+  if (!a) return RES.info || 'IA realista · procurando vídeo de baixa resolução...';
+  return `IA realista (${RES.modelo === 'geral' ? 'geral' : 'leve'}) · vídeo ~${a.real}p na área ${a.w}×${a.h} → rede ${a.iw}×${a.ih} → ${a.iw * 4}×${a.ih * 4}` + (RES.n ? ` · ${Math.round(RES.ms)} ms` : '');
+}
+
 function iaCarregarLib() {
   if (window['anime4k-webgpu']) return Promise.resolve(window['anime4k-webgpu']);
   return new Promise((ok, falha) => {
@@ -3412,7 +3731,7 @@ async function iaIniciar() {
     if (!ad) throw new Error('sem placa de vídeo pro WebGPU');
     IA.lib = await iaCarregarLib();
     const dev = await ad.requestDevice();
-    dev.lost.then(() => { IA.estado = 'erro'; iaParar(); if (SR.modo && SR.motor === 'ia') srReiniciar(); });
+    dev.lost.then(() => { IA.estado = 'erro'; RES.estado = 'nada'; RES.rede = null; iaParar(); if (SR.modo && srGPU()) srReiniciar(); });
     const cv = document.createElement('canvas');
     cv.id = 'sr-ia'; cv.className = 'hidden';
     video.after(cv);
@@ -3437,7 +3756,7 @@ async function iaIniciar() {
 async function iaLigar() {
   const g = IA.gen;
   if (!(await iaIniciar())) {
-    if (IA.estado === 'erro' && SR.modo && SR.motor === 'ia') {
+    if (IA.estado === 'erro' && SR.modo && srGPU()) {
       avisoRx(`A super resolução por IA não funciona aqui (${IA.erro || 'precisa de WebGPU'}). Usando a rápida.`);
       srReiniciar();
     }
@@ -3472,7 +3791,7 @@ function iaAgendar() {
 }
 function iaQuadro() {
   IA.laco = 0;
-  if (!SR.modo || srBloqueado() || SR.motor !== 'ia' || IA.estado !== 'pronto' || giroRx || $('#rx-player').classList.contains('hidden') || (EMBED && !embedGrande)) { iaParar(); if (SR.modo && !TOQUE && SR.motor === 'ia' && IA.estado === 'pronto') iaAgendar(); return; }
+  if (!SR.modo || srBloqueado() || !srGPU() || IA.estado !== 'pronto' || giroRx || $('#rx-player').classList.contains('hidden') || (EMBED && !embedGrande)) { iaParar(); if (SR.modo && !TOQUE && srGPU() && IA.estado === 'pronto') iaAgendar(); return; }
   const vw = video.videoWidth, vh = video.videoHeight;
   if (!vw || !vh) { iaAgendar(); return; }
   if (IA.ocupado) { iaAgendar(); return; } // a placa ainda está no quadro anterior: pula este (sem acumular atraso)
@@ -3480,6 +3799,17 @@ function iaQuadro() {
   const W = Math.round(r.width * dpr), H = Math.round(r.height * dpr);
   const esc = Math.min(W / vw, H / vh);
   const ow = Math.round(vw * esc), oh = Math.round(vh * esc);
+  if (SR.motor === 'esr') {
+    if (RES.ocupado) { iaAgendar(); return; }
+    let txt = '';
+    try { txt = esrQuadro(vw, vh, W, H, ow, oh); }
+    catch (e) { console.warn('IA realista falhou', e); RES.estado = 'erro'; }
+    if (RES.estado === 'erro') { SR.motor = 'fsr'; avisoRx('A IA realista não funcionou aqui. Usando a Neural.'); srReiniciar(); return; }
+    if (txt && RES.estado === 'pronto' && !IA.ativo) { IA.ativo = true; IA.cv.classList.remove('hidden'); }
+    SR.info = txt;
+    iaAgendar();
+    return;
+  }
   let alvo = srAlvo();
   if (!alvo && vh >= oh * 0.9) alvo = 2160; // nada pra ampliar: restaura (amplia em 4K e reduz pra tela)
   let ih = Math.min(Math.max(oh, alvo), 2160, Math.round(oh * 2.5));
@@ -3530,16 +3860,19 @@ function iaQuadro() {
 }
 function alternarMotorSR() {
   if (SR.motor === 'fsr' && !('gpu' in navigator)) { avisoRx('A IA precisa de WebGPU (Chrome ou Edge atualizado no PC).'); return; }
-  SR.motor = SR.motor === 'ia' ? 'fsr' : 'ia';
-  if (SR.motor === 'ia' && IA.estado === 'erro') IA.estado = 'nada'; // tenta de novo
+  SR.motor = SR.motor === 'fsr' ? 'esr' : SR.motor === 'esr' ? 'ia' : 'fsr';
+  if (srGPU() && IA.estado === 'erro') IA.estado = 'nada'; // tenta de novo
+  if (SR.motor === 'esr' && RES.estado === 'erro') RES.estado = 'nada';
   guardar.set('superResMotor2', SR.motor);
   if (!SR.modo) definirSuperRes(1, true); else srReiniciar();
-  avisoRx(SR.motor === 'ia' ? 'Super resolução Anime4K: melhor em desenho e anime. Na primeira vez baixa a rede (alguns MB).' : 'Super resolução neural (FSRCNNX): boa em tudo, leve.');
+  avisoRx(SR.motor === 'ia' ? 'Super resolução Anime4K: melhor em desenho e anime. Na primeira vez baixa a rede (alguns MB).'
+    : SR.motor === 'esr' ? 'IA realista (Real-ESRGAN): reconstrói vídeo de baixa resolução (144p a 480p), até dentro de uma tela maior. Na primeira vez baixa a rede (~5 MB).'
+    : 'Super resolução neural (FSRCNNX): boa em tudo, leve.');
 }
 // "igual à qualidade": escolheu 2K na Qualidade, a super resolução vai até 2K
 const srAlvo = () => SR.alvo === -1 ? (NIVEIS_RX[qRx.nivel].altura || 0) : SR.alvo;
 const SR_ALVOS = [[-1, 'Igual à qualidade'], [0, 'Até a tela'], [1080, '1080p'], [1440, '2K (1440p)'], [2160, '4K (2160p)']];
-const textoSR = () => !SR.modo ? 'Desligada' : (SR.motor === 'ia' ? 'Anime · ' : '') + SR_ALVOS.find(a => a[0] === SR.alvo)[1] + (SR.forte ? (SR.motor === 'ia' ? ' · forte' : ' · nítida') : '');
+const textoSR = () => !SR.modo ? 'Desligada' : SR.motor === 'esr' ? 'IA realista' : (SR.motor === 'ia' ? 'Anime · ' : '') + SR_ALVOS.find(a => a[0] === SR.alvo)[1] + (SR.forte ? (SR.motor === 'ia' ? ' · forte' : ' · nítida') : '');
 function escolherAlvoSR(alvo) {
   SR.alvo = alvo;
   guardar.set('superResAlvo', String(alvo));
@@ -3556,7 +3889,7 @@ function definirSuperRes(m, quieto) {
   SR.modo = m;
   guardar.set('superRes', String(m));
   if (m && !SR.ok && !SR.gl) SR.ok = true;
-  if (m && SR.motor === 'ia' && IA.estado === 'erro') IA.estado = 'nada';
+  if (m && srGPU() && IA.estado === 'erro') IA.estado = 'nada';
   srReiniciar();
   if (m && !SR.ok && SR.motor !== 'ia') avisoRx('Super resolução não funciona neste navegador (precisa de WebGL2).');
   else if (!quieto) avisoRx(m ? 'Super resolução ligada (beta). Ela aparece quando a imagem que chega é menor que a sua tela.' : 'Super resolução desligada.');
@@ -3619,10 +3952,12 @@ function renderMenu(vista) {
     m.append(cabMenu('Super resolução (beta)'));
     m.append(itemMenu('Desligada', null, () => { definirSuperRes(0); fecharMenu(); }, { marcado: !SR.modo }));
     SR_ALVOS.forEach(([alvo, rot]) => m.append(itemMenu(rot, null, () => { escolherAlvoSR(alvo); fecharMenu(); }, { marcado: !!SR.modo && SR.alvo === alvo })));
-    m.append(itemMenu('Tipo', SR.motor === 'ia' ? 'Anime (Anime4K)' : 'Neural (jogos, filmes, tudo)', () => { alternarMotorSR(); renderMenu('superres'); }));
-    m.append(itemMenu(SR.motor === 'ia' ? 'Restauração forte' : 'Mais nitidez', SR.forte ? 'Ligada' : 'Desligada', () => { alternarForteSR(); renderMenu('superres'); }));
+    m.append(itemMenu('Tipo', SR.motor === 'ia' ? 'Anime (Anime4K)' : SR.motor === 'esr' ? 'IA realista (vídeo de baixa resolução)' : 'Neural (jogos, filmes, tudo)', () => { alternarMotorSR(); renderMenu('superres'); }));
+    if (SR.motor !== 'esr') m.append(itemMenu(SR.motor === 'ia' ? 'Restauração forte' : 'Mais nitidez', SR.forte ? 'Ligada' : 'Desligada', () => { alternarForteSR(); renderMenu('superres'); }));
     const nota = document.createElement('p'); nota.className = 'menu-nota';
-    nota.textContent = SR.motor === 'ia'
+    nota.textContent = SR.motor === 'esr'
+      ? 'IA realista (Real-ESRGAN): pra vídeo de baixa resolução de verdade (144p, 240p, 360p, 480p), mesmo quando ele chega esticado dentro da tela de quem transmite (ex.: um YouTube em 360p numa aba). O site acha sozinho onde está o vídeo (a parte que se mexe), mede a resolução real dele e uma rede neural reconstrói 4x: contorno, textura e sem os quadradinhos da compressão. Pesa na placa de vídeo; se não der conta, ela se ajusta sozinha. Em vídeo que já é HD, não muda nada.'
+      : SR.motor === 'ia'
       ? 'Anime (Anime4K): redes neurais na sua placa de vídeo tiram o borrão e reconstroem o traço. Melhor em desenho, anime e animação 3D. Restaura até vídeo pequeno esticado na tela (ex.: um 720p em tela cheia): quando a imagem já chega do tamanho da tela, ela amplia em 4K e reduz de volta, e o contorno fica nítido. "Restauração forte" limpa mais (pesa ~2x). Em foto e jogo realista, use a Neural. Se a placa não der conta, volta sozinha pra Neural.'
       : 'Neural (FSRCNNX): uma rede neural pequena na sua placa de vídeo reconstrói o detalhe ao dobrar a resolução, e depois ajusta pra sua tela. Nos testes ficou mais nítida e mais fiel que as outras em jogo, filme e desenho, e é leve. Se a placa não tiver suporte, usa a ampliação rápida.';
     m.append(nota);
