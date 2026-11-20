@@ -943,7 +943,7 @@ html.transp body::before{display:none}
             <label><span class="rotulo-campo">Resolução</span><select id="qc-res"></select></label>
             <label><span class="rotulo-campo">FPS</span><select id="qc-fps"></select></label>
           </div>
-          <div class="cam-linha"><span class="rotulo-campo">Taxa de dados</span><input type="range" id="qc-mbps" min="1" max="50" step="0.5" aria-label="Taxa de dados em Mbps"><span id="qc-mbps-txt" class="cam-tam-txt qc-mbps-txt">8 Mbps</span></div>
+          <div class="cam-linha"><span class="rotulo-campo">Taxa de dados</span><input type="range" id="qc-mbps" min="1" max="50" step="0.5" aria-label="Taxa de dados em Mbps"><span id="qc-mbps-txt" class="cam-tam-txt qc-mbps-txt">12 Mbps</span></div>
           <p class="dica qc-dica" id="qc-dica"></p>
         </div>
         <div class="seg" role="radiogroup" aria-label="Otimizar para">
@@ -1120,10 +1120,10 @@ async function opcoesPeer() {
 }
 // níveis prontos de quem transmite; "Personalizado" deixa escolher resolução, fps e taxa (até 50 Mbps)
 const NIVEIS_TX = {
-  leve:     { rot: 'Leve',     w: 1280, h: 720,  fps: 30, kbps: 3000 },
-  moderado: { rot: 'Moderado', w: 1920, h: 1080, fps: 60, kbps: 8000 },
-  alto:     { rot: 'Alto',     w: 2560, h: 1440, fps: 60, kbps: 18000 },
-  maximo:   { rot: 'Máximo',   w: 3840, h: 2160, fps: 60, kbps: 35000 },
+  leve:     { rot: 'Leve',     w: 1280, h: 720,  fps: 30, kbps: 4000 },
+  moderado: { rot: 'Moderado', w: 1920, h: 1080, fps: 60, kbps: 12000 },
+  alto:     { rot: 'Alto',     w: 2560, h: 1440, fps: 60, kbps: 16000 },
+  maximo:   { rot: 'Máximo',   w: 3840, h: 2160, fps: 60, kbps: 20000 },
 };
 const RES_TX = [[720, 1280, '720p'], [900, 1600, '900p'], [1080, 1920, '1080p'], [1440, 2560, '1440p (2K)'], [2160, 3840, '2160p (4K)'], [0, 7680, 'A da tela (nativa)']];
 const FPS_TX = [24, 30, 45, 60, 75, 90, 120, 144];
@@ -1132,8 +1132,8 @@ const fmtMbps = k => (Math.round(k / 100) / 10).toString().replace('.', ',');
 function lerCustom() {
   try {
     const c = JSON.parse(guardar.get('qualCustom') || '{}');
-    return { h: RES_TX.some(r => r[0] === c.h) ? c.h : 1080, fps: FPS_TX.includes(c.fps) ? c.fps : 60, mbps: Math.min(50, Math.max(1, +c.mbps || 8)) };
-  } catch { return { h: 1080, fps: 60, mbps: 8 }; }
+    return { h: RES_TX.some(r => r[0] === c.h) ? c.h : 1080, fps: FPS_TX.includes(c.fps) ? c.fps : 60, mbps: Math.min(50, Math.max(1, +c.mbps || 12)) };
+  } catch { return { h: 1080, fps: 60, mbps: 12 }; }
 }
 function qualidadeEscolhida() {
   const n = (document.querySelector('input[name="qnivel"]:checked') || {}).value || 'moderado';
@@ -1146,12 +1146,13 @@ function qualidadeEscolhida() {
     nome: `${rotRes(c.h)} · ${c.fps} fps · ${fmtMbps(c.mbps * 1000)} Mbps (personalizado)` };
 }
 // taxa que costuma bastar pra cada resolução/fps (H.264; os formatos modernos precisam de menos)
-const sugestaoMbps = (w, h, fps) => Math.min(50, Math.max(2, Math.round(w * h * Math.min(fps, 120) * 0.09 / 1e6 * 2) / 2));
+// 1080p60 = 12 Mbps; cresce menos que os pixels (resolução maior comprime melhor por pixel)
+const sugestaoMbps = (w, h, fps) => Math.min(50, Math.max(2, Math.round(12 * Math.pow(w * h * Math.min(fps, 120) / (1920 * 1080 * 60), 0.45) * 2) / 2));
 const kbpsDe = q => q.kbps;
 // o vídeo vai direto do seu PC pra cada pessoa: a internet de upload precisa aguentar isso vezes quem assiste
 function dicaQualidade() {
   const q = qualidadeEscolhida();
-  let t = `Precisa de uns ${fmtMbps(q.kbps)} Mbps de upload por pessoa assistindo.`;
+  let t = `Precisa de uns ${fmtMbps(q.kbps)} Mbps de upload por pessoa assistindo direto (com 2 ou mais pelo servidor de repasse, vai uma cópia só).`;
   if (q.h > 1080 && q.h <= 2160) t += ` Sua tela tem que ter ${q.h === 2160 ? '4K' : '1440p ou mais'} pra sair nessa resolução; se for menor, sai na resolução da tela.`;
   t += ' Se travar, escolha um nível mais leve. Dá pra trocar com a transmissão rolando.';
   $('#dica-qual').textContent = t;
@@ -2593,8 +2594,8 @@ const NIVEIS_RX = [
   { rot: 'MÁX',  nome: 'máxima (a que quem transmite escolheu)', kbps: 0,    altura: 0,    fps: 0 },
   { rot: '4K',   nome: '4K (2160p)',                              kbps: 0,    altura: 2160, fps: 0, soManual: true },
   { rot: '2K',   nome: '2K (1440p)',                              kbps: 0,    altura: 1440, fps: 0, soManual: true },
-  { rot: '1080', nome: '1080p',                                   kbps: 8000, altura: 1080, fps: 60 },
-  { rot: '720',  nome: '720p',                                    kbps: 3500, altura: 720,  fps: 60 },
+  { rot: '1080', nome: '1080p',                                   kbps: 12000, altura: 1080, fps: 60 },
+  { rot: '720',  nome: '720p',                                    kbps: 5000, altura: 720,  fps: 60 },
   { rot: '540',  nome: '540p',                                    kbps: 1800, altura: 540,  fps: 30 },
   { rot: '360',  nome: '360p',                                    kbps: 800,  altura: 360,  fps: 30 },
 ];
@@ -2707,7 +2708,7 @@ function girarRx() {
 // 1º passo (EASU): amplia seguindo a direção das bordas (sem serrilhado nem borrão).
 // 2º passo (RCAS): nitidez com limite, pra não criar contorno branco nos personagens.
 const SR = { modo: +(guardar.get('superRes') || 0) > 0 ? 1 : 0, alvo: [-1, 0, 1080, 1440, 2160].includes(+(guardar.get('superResAlvo') ?? -1)) ? +(guardar.get('superResAlvo') ?? -1) : -1,
-  motor: guardar.get('superResMotor') || ('gpu' in navigator ? 'ia' : 'fsr'),
+  motor: guardar.get('superResMotor2') || 'fsr', // 'fsr' = neural (FSRCNNX) com a rápida antiga de reserva; 'ia' = Anime4K
   forte: guardar.get('superResForte') === '1' || guardar.get('superRes') === '2', gl: null, cv: null, ok: true, progD: null, texN: null, fbo2: null, nw: 0, nh: 0,
   progE: null, progR: null, texV: null, texM: null, fbo: null, mw: 0, mh: 0, laco: 0, gen: 0, ativo: false, info: '' };
 const SR_VERT = `#version 300 es
@@ -2830,6 +2831,229 @@ void main(){
   }
   cor = vec4(clamp(acc / ws, 0.0, 1.0), 1.0);
 }`;
+// ---------- rede neural FSRCNNX (igv, LGPL 3, arquivo em sr/): reconstrói o brilho (luma) em 2x.
+// Nos testes (720p comprimido -> 1080p) ganhou da rápida antiga e da IA em foto, jogo e desenho, e é leve.
+// Roda num mini-runtime dos "user shaders" do mpv: a cor vem da imagem ampliada e o detalhe vem da rede.
+let srMpv = null;
+const srRedeRuntime = (function () {
+// Mini-runtime de "user shaders" do mpv (//!HOOK LUMA) em WebGL2.
+// Suporta: BIND, SAVE, WIDTH/HEIGHT/WHEN (RPN), TEXTURE (LUT embutida em hex), macros NAME_tex/_texOff/_pos/_size/_pt/_raw/_mul.
+
+  const VERT = SR_VERT;
+  function parse(src) {
+    const blocos = [];
+    let blk = null, emCodigo = false;
+    for (const l of src.split(/\r?\n/)) {
+      const m = l.match(/^\/\/!(\w+)\s*(.*)$/);
+      if (m) {
+        if (!blk || emCodigo) { blk = { dirs: [], codigo: '' }; blocos.push(blk); emCodigo = false; }
+        blk.dirs.push([m[1], m[2].trim()]);
+      } else if (blk) { if (l.trim()) emCodigo = true; if (emCodigo) blk.codigo += l + '\n'; }
+    }
+    const passes = [], texturas = [];
+    for (const b of blocos) {
+      const d = k => (b.dirs.find(x => x[0] === k) || [])[1];
+      if (d('TEXTURE') !== undefined) {
+        texturas.push({ nome: d('TEXTURE'), size: (d('SIZE') || '').split(/\s+/).map(Number), format: d('FORMAT'), filter: d('FILTER'), dados: b.codigo.replace(/\s+/g, '') });
+        continue;
+      }
+      passes.push({
+        hook: b.dirs.filter(x => x[0] === 'HOOK').map(x => x[1]), bind: b.dirs.filter(x => x[0] === 'BIND').map(x => x[1]),
+        save: d('SAVE'), width: d('WIDTH'), height: d('HEIGHT'), desc: d('DESC'), when: d('WHEN'), compute: d('COMPUTE') !== undefined, codigo: b.codigo,
+      });
+    }
+    return { passes: passes.filter(p => p.hook.includes('LUMA')), texturas };
+  }
+  function rpn(expr, tam) {
+    const st = [];
+    for (const t of expr.split(/\s+/)) {
+      if (!t) continue;
+      if (/^[-\d.]+$/.test(t)) st.push(+t);
+      else if (/^\w+\.(w|h|width|height)$/.test(t)) { const [n, c] = t.split('.'); const s = tam(n); st.push(c[0] === 'w' ? s[0] : s[1]); }
+      else {
+        const b = st.pop(), a = st.pop();
+        st.push(t === '+' ? a + b : t === '-' ? a - b : t === '*' ? a * b : t === '/' ? a / b : t === '>' ? +(a > b) : t === '<' ? +(a < b) : t === '=' ? +(a === b) : NaN);
+      }
+    }
+    return st.pop();
+  }
+  function hexBytes(hex) { const b = new Uint8Array(hex.length / 2); for (let i = 0; i < b.length; i++) b[i] = parseInt(hex.substr(i * 2, 2), 16); return b; }
+  srMpv = function (gl, fonte) {
+    if (!gl.getExtension('EXT_color_buffer_float') && !gl.getExtension('EXT_color_buffer_half_float')) throw new Error('sem render em float');
+    gl.getExtension('OES_texture_float_linear');
+    const { passes, texturas } = parse(fonte);
+    if (passes.some(p => p.compute)) throw new Error('shader usa COMPUTE (não dá em WebGL2)');
+    const luts = {};
+    for (const t of texturas) {
+      const tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex);
+      const [w, h] = t.size; const f = (t.format || 'rgba16f').toLowerCase();
+      const filt = t.filter === 'LINEAR' ? gl.LINEAR : gl.NEAREST;
+      for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, filt], [gl.TEXTURE_MAG_FILTER, filt], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
+      const by = hexBytes(t.dados);
+      if (f === 'rgba16f') gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.HALF_FLOAT, new Uint16Array(by.buffer));
+      else if (f === 'rgba32f') gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, w, h, 0, gl.RGBA, gl.FLOAT, new Float32Array(by.buffer));
+      else throw new Error('formato de LUT ' + f);
+      luts[t.nome] = { tex, w, h };
+    }
+    const progs = passes.map(p => {
+      const nomes = p.bind;
+      let cab = `#version 300 es
+precision highp float; precision highp int; precision highp sampler2D;
+out vec4 cor_; uniform vec2 saida_;
+vec2 pos_;
+`;
+      for (const n of nomes) {
+        cab += `uniform sampler2D ${n}_raw; uniform vec2 ${n}_size;
+#define ${n}_pos pos_
+#define ${n}_pt (vec2(1.0) / ${n}_size)
+#define ${n}_mul 1.0
+#define ${n}_tex(p) texture(${n}_raw, p)
+#define ${n}_texOff(o) texture(${n}_raw, pos_ + (vec2(1.0) / ${n}_size) * vec2(o))
+`;
+        if (luts[n]) cab += `#define ${n} ${n}_raw\n`; // tabelas (LUT) são lidas pelo nome puro
+      }
+      if (!nomes.includes('HOOKED')) cab += `#define HOOKED_pos pos_\n`;
+      const src = cab + p.codigo.replace(/\btexture2D\b/g, 'texture') + `
+void main(){ pos_ = gl_FragCoord.xy / saida_; cor_ = hook(); }`;
+      const prog = gl.createProgram();
+      for (const [tipo, s] of [[gl.VERTEX_SHADER, VERT], [gl.FRAGMENT_SHADER, src]]) {
+        const sh = gl.createShader(tipo); gl.shaderSource(sh, s); gl.compileShader(sh);
+        if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) throw new Error((p.desc || '') + ': ' + gl.getShaderInfoLog(sh));
+        gl.attachShader(prog, sh);
+      }
+      gl.bindAttribLocation(prog, 0, 'p'); gl.linkProgram(prog);
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+      const uni = {};
+      for (const n of nomes) { uni[n + '_raw'] = gl.getUniformLocation(prog, n + '_raw'); uni[n + '_size'] = gl.getUniformLocation(prog, n + '_size'); }
+      return { p, prog, nomes, uni, saida: gl.getUniformLocation(prog, 'saida_') };
+    });
+    const alvos = new Map();
+    function alvo(chave, w, h) {
+      let a = alvos.get(chave);
+      if (a && a.w === w && a.h === h) return a;
+      if (!a) a = { tex: gl.createTexture(), fbo: gl.createFramebuffer() };
+      gl.bindTexture(gl.TEXTURE_2D, a.tex);
+      for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.LINEAR], [gl.TEXTURE_MAG_FILTER, gl.LINEAR], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.HALF_FLOAT, null);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, a.fbo);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, a.tex, 0);
+      a.w = w; a.h = h; alvos.set(chave, a);
+      return a;
+    }
+    return {
+      passos: progs.length,
+      // roda os passos sobre a textura de luma (canal r) w×h; outW/outH = tamanho final (OUTPUT do mpv)
+      rodar(lumaTex, w, h, outW, outH) {
+        const tex = { LUMA: { tex: lumaTex, w, h } };
+        let n = 0;
+        for (const { p, prog, nomes, uni, saida } of progs) {
+          const tam = nome => nome === 'OUTPUT' ? [outW, outH] : (nome === 'HOOKED' || nome === 'LUMA') ? [tex.LUMA.w, tex.LUMA.h] : tex[nome] ? [tex[nome].w, tex[nome].h] : luts[nome] ? [luts[nome].w, luts[nome].h] : [0, 0];
+          if (p.when && !rpn(p.when, tam)) continue;
+          const ow = Math.round(p.width ? rpn(p.width, tam) : tex.LUMA.w), oh = Math.round(p.height ? rpn(p.height, tam) : tex.LUMA.h);
+          const a = alvo(p.save || ('LUMA' + (n++ % 2)), ow, oh);
+          gl.bindFramebuffer(gl.FRAMEBUFFER, a.fbo); gl.viewport(0, 0, ow, oh);
+          gl.useProgram(prog);
+          nomes.forEach((nm, i) => {
+            const f = (nm === 'HOOKED' || nm === 'LUMA') ? tex.LUMA : (tex[nm] || luts[nm]);
+            gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, f.tex);
+            gl.uniform1i(uni[nm + '_raw'], i); gl.uniform2f(uni[nm + '_size'], f.w, f.h);
+          });
+          gl.uniform2f(saida, ow, oh);
+          gl.drawArrays(gl.TRIANGLES, 0, 3);
+          if (p.save) tex[p.save] = { tex: a.tex, w: ow, h: oh };
+          else tex.LUMA = { tex: a.tex, w: ow, h: oh };
+        }
+        gl.activeTexture(gl.TEXTURE0);
+        return tex.LUMA;
+      },
+    };
+  };
+
+})();
+const SR_Y = `#version 300 es
+precision highp float;
+uniform sampler2D tex; out vec4 cor;
+void main(){ vec3 c = texelFetch(tex, ivec2(gl_FragCoord.xy), 0).rgb; cor = vec4(dot(c, vec3(0.2126, 0.7152, 0.0722)), 0.0, 0.0, 1.0); }`;
+const SR_JUNTA = `#version 300 es
+precision highp float;
+uniform sampler2D cor0; uniform sampler2D ysr; uniform vec2 outSize; out vec4 cor;
+void main(){
+  vec2 uv = gl_FragCoord.xy / outSize;
+  vec3 c = texture(cor0, uv).rgb;
+  float y0 = dot(c, vec3(0.2126, 0.7152, 0.0722));
+  cor = vec4(clamp(c + (texture(ysr, uv).r - y0), 0.0, 1.0), 1.0);
+}`;
+const REDE = { estado: 'nada', fonte: '', net: null, net2: null, progY: 0, progJ: 0, alvos: {} };
+async function redeCarregar() {
+  if (REDE.estado !== 'nada') return;
+  REDE.estado = 'carregando';
+  try {
+    const r = await fetch('sr/FSRCNNX_x2_8-0-4-1.glsl');
+    if (!r.ok) throw new Error('rede: ' + r.status);
+    REDE.fonte = await r.text();
+    const gl = SR.gl;
+    REDE.net = srMpv(gl, REDE.fonte);
+    REDE.progY = srCompilar(gl, SR_Y);
+    REDE.progJ = srCompilar(gl, SR_JUNTA);
+    REDE.estado = 'pronto';
+  } catch (e) { console.warn('rede neural indisponível, fica a rápida antiga', e); REDE.estado = 'erro'; }
+}
+function redeAlvo(nome, w, h) {
+  const gl = SR.gl;
+  let a = REDE.alvos[nome];
+  if (a && a.w === w && a.h === h) return a;
+  if (!a) a = REDE.alvos[nome] = { t: gl.createTexture(), f: gl.createFramebuffer() };
+  gl.bindTexture(gl.TEXTURE_2D, a.t);
+  for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.LINEAR], [gl.TEXTURE_MAG_FILTER, gl.LINEAR], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.HALF_FLOAT, null);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, a.f);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, a.t, 0);
+  a.w = w; a.h = h;
+  return a;
+}
+// a imagem do vídeo já está em SR.texV. Desenha no canvas (área ox,oy,ow,oh). Devolve o texto pras estatísticas.
+function redeQuadro(vw, vh, W, H, ow, oh, ox, oy, alvoH) {
+  const gl = SR.gl, U = (prog, nome) => gl.getUniformLocation(prog, nome);
+  // 1) brilho
+  const ty = redeAlvo('y', vw, vh);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, ty.f); gl.viewport(0, 0, vw, vh);
+  gl.useProgram(REDE.progY);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, SR.texV);
+  gl.uniform1i(U(REDE.progY, 'tex'), 0);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  // 2) rede 2x (e mais 2x se o vídeo for pequeno e a tela/alvo pedir bem mais)
+  let L = REDE.net.rodar(ty.t, vw, vh, ow, oh);
+  if (Math.max(oh, alvoH) > L.h * 1.05 && vh <= 720) {
+    if (!REDE.net2) REDE.net2 = srMpv(gl, REDE.fonte);
+    L = REDE.net2.rodar(L.tex, L.w, L.h, ow, oh);
+  }
+  // 3) junta o detalhe da rede com a cor
+  const tj = redeAlvo('j', L.w, L.h);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, tj.f); gl.viewport(0, 0, L.w, L.h);
+  gl.useProgram(REDE.progJ);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, SR.texV); gl.uniform1i(U(REDE.progJ, 'cor0'), 0);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, L.tex); gl.uniform1i(U(REDE.progJ, 'ysr'), 1);
+  gl.uniform2f(U(REDE.progJ, 'outSize'), L.w, L.h);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  gl.activeTexture(gl.TEXTURE0);
+  // 4) nitidez com limite (leve; mais forte com "Mais nitidez")
+  const tr = redeAlvo('r', L.w, L.h);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, tr.f); gl.viewport(0, 0, L.w, L.h);
+  gl.useProgram(SR.progR); gl.bindTexture(gl.TEXTURE_2D, tj.t);
+  gl.uniform1i(U(SR.progR, 'tex'), 0); gl.uniform2f(U(SR.progR, 'inSize'), L.w, L.h); gl.uniform2f(U(SR.progR, 'outSize'), L.w, L.h);
+  gl.uniform1f(U(SR.progR, 'nitidez'), SR.forte ? Math.pow(2, -0.8) : Math.pow(2, -1.5));
+  gl.uniform2f(U(SR.progR, 'orig'), 0, 0); gl.uniform1f(U(SR.progR, 'virar'), 0);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  // 5) Lanczos até o tamanho da tela
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.viewport(0, 0, W, H); gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.viewport(ox, H - oy - oh, ow, oh);
+  gl.useProgram(SR.progD); gl.bindTexture(gl.TEXTURE_2D, tr.t);
+  gl.uniform1i(U(SR.progD, 'tex'), 0); gl.uniform2f(U(SR.progD, 'inSize'), L.w, L.h); gl.uniform2f(U(SR.progD, 'outSize'), ow, oh);
+  gl.uniform2f(U(SR.progD, 'orig'), ox, H - oy - oh);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  return `neural · ${vw}×${vh} → ${L.w}×${L.h}` + (L.h !== oh ? ` (na tela ${ow}×${oh})` : '');
+}
 // celular/tablet: desligada (placa fraca + vídeo do iPhone não gosta de ser copiado). Tela cheia nativa/aba escondida: pausa.
 const srBloqueado = () => TOQUE || !!video.webkitDisplayingFullscreen || document.hidden;
 function srCompilar(gl, fonte) {
@@ -2864,7 +3088,7 @@ function srIniciar() {
       for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, filtro], [gl.TEXTURE_MAG_FILTER, filtro], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
       return t;
     };
-    SR.texV = novaTex(); SR.texM = novaTex();
+    SR.texV = novaTex(gl.LINEAR); SR.texM = novaTex();
     SR.texN = novaTex(gl.LINEAR);
     SR.fbo = gl.createFramebuffer(); SR.fbo2 = gl.createFramebuffer();
     cv.addEventListener('webglcontextlost', e => { e.preventDefault(); SR.ok = false; srParar(); });
@@ -2916,6 +3140,18 @@ function srQuadro() {
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, SR.texV);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
+    if (REDE.estado === 'nada') redeCarregar();
+    if (REDE.estado === 'pronto') {
+      let txt = '';
+      try { txt = redeQuadro(vw, vh, W, H, ow, oh, ox, oy, ih); }
+      catch (e) { console.warn('rede neural falhou, volta pra rápida antiga', e); REDE.estado = 'erro'; }
+      if (txt) {
+        if (!SR.ativo) { SR.ativo = true; cv.classList.remove('hidden'); }
+        SR.info = txt;
+        srAgendar();
+        return;
+      }
+    }
     if (SR.mw !== iw || SR.mh !== ih) { alocar(SR.texM, SR.fbo, iw, ih); SR.mw = iw; SR.mh = ih; }
     if (reduz && (SR.nw !== iw || SR.nh !== ih)) { alocar(SR.texN, SR.fbo2, iw, ih); SR.nw = iw; SR.nh = ih; }
     // passo 1: ampliar até a resolução-alvo
@@ -3155,9 +3391,9 @@ function alternarMotorSR() {
   if (SR.motor === 'fsr' && !('gpu' in navigator)) { avisoRx('A IA precisa de WebGPU (Chrome ou Edge atualizado no PC).'); return; }
   SR.motor = SR.motor === 'ia' ? 'fsr' : 'ia';
   if (SR.motor === 'ia' && IA.estado === 'erro') IA.estado = 'nada'; // tenta de novo
-  guardar.set('superResMotor', SR.motor);
+  guardar.set('superResMotor2', SR.motor);
   if (!SR.modo) definirSuperRes(1, true); else srReiniciar();
-  avisoRx(SR.motor === 'ia' ? 'Super resolução por IA (Anime4K): na primeira vez baixa a rede neural (alguns MB).' : 'Super resolução rápida (nitidez nas bordas).');
+  avisoRx(SR.motor === 'ia' ? 'Super resolução Anime4K: melhor em desenho e anime. Na primeira vez baixa a rede (alguns MB).' : 'Super resolução neural (FSRCNNX): boa em tudo, leve.');
 }
 // "igual à qualidade": escolheu 2K na Qualidade, a super resolução vai até 2K
 const srAlvo = () => SR.alvo === -1 ? (NIVEIS_RX[qRx.nivel].altura || 0) : SR.alvo;
@@ -3242,12 +3478,12 @@ function renderMenu(vista) {
     m.append(cabMenu('Super resolução (beta)'));
     m.append(itemMenu('Desligada', null, () => { definirSuperRes(0); fecharMenu(); }, { marcado: !SR.modo }));
     SR_ALVOS.forEach(([alvo, rot]) => m.append(itemMenu(rot, null, () => { escolherAlvoSR(alvo); fecharMenu(); }, { marcado: !!SR.modo && SR.alvo === alvo })));
-    m.append(itemMenu('Tipo', SR.motor === 'ia' ? 'IA (melhor em desenho)' : 'Rápida (jogos e filmes)', () => { alternarMotorSR(); renderMenu('superres'); }));
+    m.append(itemMenu('Tipo', SR.motor === 'ia' ? 'Anime (Anime4K)' : 'Neural (jogos, filmes, tudo)', () => { alternarMotorSR(); renderMenu('superres'); }));
     if (SR.motor !== 'ia') m.append(itemMenu('Mais nitidez', SR.forte ? 'Ligada' : 'Desligada', () => { alternarForteSR(); renderMenu('superres'); }));
     const nota = document.createElement('p'); nota.className = 'menu-nota';
     nota.textContent = SR.motor === 'ia'
       ? 'IA (Anime4K): redes neurais na sua placa de vídeo reconstroem o traço e as bordas e tiram o borrão da compressão, até a resolução escolhida; depois reduz pra sua tela, como a "resolução 200%" dos jogos. Melhor em desenho, anime e animação 3D (nos testes ficou quase tão nítido quanto um 1080p de verdade). Em jogo realista e filme, use a Rápida. Pesa: se a placa não der conta, volta sozinha pra rápida.'
-      : 'Rápida: amplia seguindo as bordas e deixa nítido, até a resolução escolhida, e reduz pra sua tela. Leve, funciona em qualquer PC.';
+      : 'Neural (FSRCNNX): uma rede neural pequena na sua placa de vídeo reconstrói o detalhe ao dobrar a resolução, e depois ajusta pra sua tela. Nos testes ficou mais nítida e mais fiel que as outras em jogo, filme e desenho, e é leve. Se a placa não tiver suporte, usa a ampliação rápida.';
     m.append(nota);
   } else if (vista === 'volume') {
     m.append(cabMenu('Volume extra'));
