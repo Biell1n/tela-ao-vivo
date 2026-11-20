@@ -471,7 +471,8 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
 .bt-luz[aria-pressed="true"] .ponto{background:conic-gradient(#ff6a3d,#ffc83d,#5ef0a0,#4aa8ff,#b56bff,#ff6a3d);box-shadow:0 0 12px rgba(255,190,110,.55)}
 .grupo-telas{isolation:isolate}
 .grupo-telas:has(.tile-cheio){isolation:auto}
-#grupo{overflow-x:clip}
+/* o corte da luz/modo cinema fica na borda da janela, não na da coluna (senão a luz acaba numa linha reta) */
+main{overflow-x:clip}
 #grupo.cinema{--gut:max(24px,calc((100vw - 1192px) / 2));max-width:none;padding-left:0;padding-right:0}
 #grupo.cinema .grupo-cab,#grupo.cinema #grupo-status,#grupo.cinema .grupo-ferramentas,#grupo.cinema .grupo-membros,#grupo.cinema .grupo-chat,#grupo.cinema #grupo-vazio{width:calc(100% - 2 * var(--gut));margin-left:auto;margin-right:auto}
 #grupo.cinema .grupo-corpo{grid-template-columns:minmax(0,1fr);grid-template-areas:"palco" "chat" "membros";grid-template-rows:none}
@@ -484,8 +485,11 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
 #grupo.cinema .grupo-palco.luz-on .tile.foco .tile-luz.viva{opacity:.62}
 html.transp,html.transp body,html.transp #player,html.transp #video{background:transparent!important}
 html.transp body::before{display:none}
-.tile-luz{position:absolute;left:-6%;top:-9%;width:112%;height:118%;z-index:-1;pointer-events:none;border-radius:24px;
-  filter:blur(34px) saturate(1.6) brightness(1.05);opacity:0;transition:opacity .9s}
+.tile-luz{position:absolute;left:-14%;top:-20%;width:128%;height:140%;z-index:-1;pointer-events:none;
+  filter:blur(40px) saturate(1.6) brightness(1.05);opacity:0;transition:opacity .9s;
+  /* vai sumindo aos poucos pros lados, sem borda */
+  -webkit-mask-image:radial-gradient(farthest-side,#000 52%,rgba(0,0,0,.45) 76%,transparent);mask-image:radial-gradient(farthest-side,#000 52%,rgba(0,0,0,.45) 76%,transparent)}
+#grupo.cinema .tile-luz{-webkit-mask-image:linear-gradient(180deg,transparent,#000 14%,#000 86%,transparent);mask-image:linear-gradient(180deg,transparent,#000 14%,#000 86%,transparent)}
 .luz-on .tile-luz.viva{opacity:.8}
 .tile:fullscreen .tile-luz,.tile.tile-cheio .tile-luz{display:none}
 .grupo-telas{display:grid;gap:10px}
@@ -1217,7 +1221,10 @@ function chip(txt, cls = '', ico = '') {
 // Formato do vídeo escolhido primeiro (codec = "H265", "AV1", "VP9" ou "H264"; null = não mexe na ordem,
 // usado na resposta de quem assiste pra valer a escolha de quem transmite). Opus estéreo, com mais
 // qualidade e com correção de perda (FEC) pra internet ruim.
-function ajustarSDP(sdp, codec = 'H264') {
+// extra: na oferta (quem transmite), a taxa alvo em kbps; na resposta (quem assiste), o SDP da oferta.
+// As dicas x-google-*-bitrate só valem pra quem envia quando estão no SDP QUE ELE RECEBE (a resposta),
+// então quem assiste copia as da oferta pra resposta.
+function ajustarSDP(sdp, codec = 'H264', extra) {
   let linhas = sdp.split('\r\n');
   const opus = (sdp.match(/a=rtpmap:(\d+) opus\/48000/i) || [])[1];
   const pts = nome => { const r = []; linhas.forEach(l => { const m = l.match(new RegExp('^a=rtpmap:(\\d+) ' + nome + '/90000', 'i')); if (m) r.push(m[1]); }); return r; };
@@ -1240,8 +1247,19 @@ function ajustarSDP(sdp, codec = 'H264') {
     }
     const fm = l.match(/^a=fmtp:(\d+) /);
     if (fm && preferidos.includes(fm[1]) && !/x-google-start-bitrate/.test(l)) {
-      // começa mais perto da qualidade escolhida (sem isso o 4K demora pra "acordar")
-      return l + ';x-google-start-bitrate=' + (qualAtual ? Math.max(2500, Math.min(15000, kbpsDe(qualAtual) / 2)) : 2500);
+      // começa perto da qualidade escolhida (sem isso começa em 0,3 Mbps e o 4K demora pra "acordar") e tem um piso:
+      // numa troca de cena o quadro pesa muito, a estimativa de banda despenca e a imagem fica pixelada por segundos.
+      // Com o piso ela não cai abaixo de ~30% e volta rápido.
+      const alvo = typeof extra === 'number' ? extra : qualAtual ? kbpsDe(qualAtual) : 3000;
+      let dicas = ';x-google-start-bitrate=' + Math.round(Math.max(2500, Math.min(20000, alvo * .7)));
+      // (sem teto aqui: o teto é o maxBitrate, que muda na hora quando a pessoa troca a qualidade)
+      if (alvo >= 3000) dicas += ';x-google-min-bitrate=' + Math.round(Math.min(6000, alvo * .3));
+      return l + dicas;
+    }
+    if (fm && typeof extra === 'string' && !/x-google-/.test(l)) {
+      const deles = extra.split(/\r?\n/).find(x => x.startsWith('a=fmtp:' + fm[1] + ' ')) || '';
+      const dicas = deles.match(/;\s*x-google-[a-z-]+=\d+/g);
+      if (dicas) return l + dicas.map(d => d.replace(/\s+/g, '')).join('');
     }
     if (l.startsWith('m=video ') && preferidos.length) {
       const p = l.split(' ');
@@ -2163,7 +2181,9 @@ function ligarPara(id) {
   const antiga = chamadas.get(id);
   if (antiga) try { antiga.close(); } catch {}
   const formato = formatoPara(id);
-  const call = peerTx.call(id, streamTx, { sdpTransform: sdp => ajustarSDP(sdp, formato) });
+  const ped = pedidos.get(id);
+  const alvo = qualAtual ? (ped && ped.kbps ? Math.min(kbpsDe(qualAtual), ped.kbps) : kbpsDe(qualAtual)) : undefined;
+  const call = peerTx.call(id, streamTx, { sdpTransform: sdp => ajustarSDP(sdp, formato, alvo) });
   if (!call) return;
   call.__formato = formato;
   chamadas.set(id, call);
@@ -3091,7 +3111,8 @@ function receberChamada(call) {
   if (!rxAtivo) { try { call.close(); } catch {} return; }
   if (callRx && callRx !== call) try { callRx.close(); } catch {}
   callRx = call;
-  call.answer(undefined, { sdpTransform: s => ajustarSDP(s, null) }); // vale o formato que quem transmite escolheu
+  // vale o formato que quem transmite escolheu; copia pra resposta as dicas de taxa da oferta
+  call.answer(undefined, { sdpTransform: s => ajustarSDP(s, null, (call.peerConnection && call.peerConnection.remoteDescription || {}).sdp || '') });
   const pc = call.peerConnection;
   if (pc) {
     pc.addEventListener('track', e => aplicarFolga(e.receiver));
