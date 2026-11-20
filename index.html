@@ -406,6 +406,7 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
 .menu-config{position:absolute;right:max(14px,env(safe-area-inset-right));bottom:calc(76px + env(safe-area-inset-bottom));z-index:6;width:min(300px,calc(100% - 28px));max-height:calc(100% - 100px);overflow:auto;
   padding:6px 0;border-radius:14px;background:rgba(18,19,23,.94);backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.1);
   box-shadow:0 18px 50px rgba(0,0,0,.55);color:#eceef2;font-size:14px;overscroll-behavior:contain}
+.mi-desc{display:block;font-size:11.5px;color:var(--fraco);font-weight:400;margin-top:2px;white-space:normal;line-height:1.35}
 .menu-item{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;padding:0 16px;text-align:left;color:inherit;font:inherit}
 .menu-item:hover,.menu-item:focus-visible{background:rgba(255,255,255,.08);outline:none}
 .menu-item .mi-rot{flex:1}
@@ -621,11 +622,11 @@ html.com-fundo .bloco{background:none;-webkit-backdrop-filter:none;backdrop-filt
 .lista-niveis .nl-txt{flex:1;min-width:0}
 .nl-spec{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:5px;font:500 11.5px/1 var(--mono);color:var(--sub);white-space:nowrap;padding-top:2px}
 .nl-mbps{display:flex;align-items:center;gap:7px;color:var(--fraco)}
-.sinal{display:inline-flex;align-items:flex-end;gap:2px;height:11px}
-.sinal i{width:3px;border-radius:1px;background:rgba(255,255,255,.14)}
-.sinal i:nth-child(1){height:4px}.sinal i:nth-child(2){height:6px}.sinal i:nth-child(3){height:8px}.sinal i:nth-child(4){height:11px}
-.sinal[data-n="1"] i:nth-child(-n+1),.sinal[data-n="2"] i:nth-child(-n+2),.sinal[data-n="3"] i:nth-child(-n+3),.sinal[data-n="4"] i:nth-child(-n+4){background:var(--sub)}
-.op-l input:checked~.nl-spec .sinal i[style],.op-l:has(input:checked) .sinal[data-n="1"] i:nth-child(-n+1),.op-l:has(input:checked) .sinal[data-n="2"] i:nth-child(-n+2),.op-l:has(input:checked) .sinal[data-n="3"] i:nth-child(-n+3),.op-l:has(input:checked) .sinal[data-n="4"] i:nth-child(-n+4){background:var(--acento)}
+.nl-sinal{display:inline-flex;align-items:flex-end;gap:2px;height:11px}
+.nl-sinal i{width:3px;border-radius:1px;background:rgba(255,255,255,.14)}
+.nl-sinal i:nth-child(1){height:4px}.nl-sinal i:nth-child(2){height:6px}.nl-sinal i:nth-child(3){height:8px}.nl-sinal i:nth-child(4){height:11px}
+.nl-sinal[data-n="1"] i:nth-child(-n+1),.nl-sinal[data-n="2"] i:nth-child(-n+2),.nl-sinal[data-n="3"] i:nth-child(-n+3),.nl-sinal[data-n="4"] i:nth-child(-n+4){background:var(--sub)}
+.op-l input:checked~.nl-spec .nl-sinal i[style],.op-l:has(input:checked) .nl-sinal[data-n="1"] i:nth-child(-n+1),.op-l:has(input:checked) .nl-sinal[data-n="2"] i:nth-child(-n+2),.op-l:has(input:checked) .nl-sinal[data-n="3"] i:nth-child(-n+3),.op-l:has(input:checked) .nl-sinal[data-n="4"] i:nth-child(-n+4){background:var(--acento)}
 .qual-avancado{margin-top:10px}
 .qual-avancado>summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--sub);padding:4px 0}
 .qual-avancado>summary::-webkit-details-marker{display:none}
@@ -642,6 +643,36 @@ html.com-fundo .bloco{background:none;-webkit-backdrop-filter:none;backdrop-filt
 .acao-grupo{gap:8px}
 .acao-grupo .btn{align-self:flex-start;margin-top:6px}
 
+
+/* ================= movimento: telas entrando, espera com barras de TV, fundo animado ================= */
+.espera-barras{display:flex;gap:4px;height:56px;align-items:flex-end}
+.espera-barras i{width:12px;height:100%;border-radius:2px;transform-origin:bottom;animation:procura 1.4s cubic-bezier(.4,0,.2,1) infinite}
+.espera-barras i:nth-child(1){background:var(--b1)}.espera-barras i:nth-child(2){background:var(--b2);animation-delay:.08s}
+.espera-barras i:nth-child(3){background:var(--b3);animation-delay:.16s}.espera-barras i:nth-child(4){background:var(--b4);animation-delay:.24s}
+.espera-barras i:nth-child(5){background:var(--b5);animation-delay:.32s}.espera-barras i:nth-child(6){background:var(--b6);animation-delay:.4s}
+.espera-barras i:nth-child(7){background:var(--b7);animation-delay:.48s}
+@keyframes procura{0%,100%{transform:scaleY(.18);opacity:.35}35%{transform:scaleY(1);opacity:1}70%{transform:scaleY(.45);opacity:.7}}
+#espera{background:radial-gradient(60% 50% at 50% 45%,rgba(255,255,255,.035),transparent 70%),repeating-linear-gradient(0deg,rgba(255,255,255,.018) 0 1px,transparent 1px 3px),var(--bg)}
+#espera p{font-size:15.5px;color:var(--texto)}
+.espera-cod{padding:6px 10px;border:1px solid var(--linha);border-radius:4px;letter-spacing:.22em}
+/* entrar no grupo: mesmo cabeçalho dos passos */
+.grupo-entrada .passo{margin:22px 0 10px}
+.grupo-entrada h2{font:750 30px/1.1 var(--fonte);font-stretch:116%;letter-spacing:-.02em;margin:0 0 8px}
+/* telas entrando: sobe e aparece; os blocos da tela Transmitir chegam um depois do outro */
+.tela.entrando{animation:telaEntra .42s cubic-bezier(.2,.8,.2,1) both}
+@keyframes telaEntra{from{opacity:0;transform:translateY(14px)}}
+#tx.entrando{animation:none}
+#tx.entrando .cab-estudio,#tx.entrando .bloco,#tx.entrando .monitor{animation:telaEntra .5s cubic-bezier(.2,.8,.2,1) both}
+#tx.entrando .bloco:nth-of-type(1){animation-delay:.06s}#tx.entrando .bloco:nth-of-type(2){animation-delay:.12s}#tx.entrando .bloco:nth-of-type(3){animation-delay:.18s}
+#tx.entrando .monitor{animation-name:monitorEntra;animation-delay:.1s}
+@keyframes monitorEntra{from{opacity:0;transform:translateY(10px) scale(.985)}}
+/* o cartão Transmitir "liga" quando clica: um flash de câmera ligando antes de trocar de tela */
+.acao-tx.ligando{animation:liga .32s ease-out both}
+@keyframes liga{0%{transform:none}40%{transform:scale(.985);box-shadow:0 0 0 1px var(--acento),0 0 40px -6px var(--acento)}100%{transform:none}}
+#fundo .ondas{position:absolute;inset:-5%;width:110%;height:110%;transform:translate3d(calc(var(--px,0)*-20px),calc(var(--py,0)*-20px),0)}
+#fundo[data-tema=sinal].animado .c2,#fundo[data-tema=sinal].animado .c3{display:none}
+#fundo:not([data-tema=sinal]) .ondas{display:none}
+@media (prefers-reduced-motion:reduce){.tela.entrando,#tx.entrando *,.acao-tx.ligando,.espera-barras i{animation:none!important}}
 </style>
 <script>
 // cor de destaque que muda com a hora do dia: violeta de madrugada, coral no amanhecer, amarelo de manhã,
@@ -684,7 +715,7 @@ html.com-fundo .bloco{background:none;-webkit-backdrop-filter:none;backdrop-filt
 </script>
 </head>
 <body>
-<div id="fundo" aria-hidden="true"><i class="cam c1"></i><i class="cam c2"></i><i class="cam c3"></i><i class="tinta"></i><i class="veu"></i></div>
+<div id="fundo" aria-hidden="true"><i class="cam c1"></i><i class="cam c2"></i><i class="cam c3"></i><canvas class="ondas"></canvas><i class="tinta"></i><i class="veu"></i></div>
 <script>
 (function () {
   const f = document.getElementById('fundo'), q = new URLSearchParams(location.search);
@@ -722,6 +753,86 @@ html.com-fundo .bloco{background:none;-webkit-backdrop-filter:none;backdrop-filt
     if (!rodando) { rodando = true; requestAnimationFrame(passo); }
   }, { passive: true });
 })();
+// ondas e partículas animadas (só no tema "sinal", de dia). Desenha em meia resolução, ~30 fps,
+// e para quando o fundo não aparece (vendo transmissão / grupo), com a aba escondida ou com "reduzir movimento".
+(function () {
+  const f = document.getElementById('fundo'); if (!f) return;
+  const cv = f.querySelector('.ondas'), x = cv.getContext('2d');
+  const calmo = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let cor = [120, 200, 255], corHora = 0, rodando = false, ult = 0, t0 = performance.now();
+  const pts = Array.from({ length: 46 }, () => ({ x: Math.random(), y: Math.random(), r: .6 + Math.random() * 2.2, v: .004 + Math.random() * .012, a: Math.random() * 6.28, f: .3 + Math.random() }));
+  const sprite = document.createElement('canvas'); sprite.width = sprite.height = 32;
+  function lerCor() {
+    const h = getComputedStyle(document.documentElement).getPropertyValue('--acento').trim();
+    const m = h.match(/^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+    if (m) cor = [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)];
+    const g = sprite.getContext('2d'), rg = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+    rg.addColorStop(0, `rgba(${cor},1)`); rg.addColorStop(.35, `rgba(${cor},.45)`); rg.addColorStop(1, `rgba(${cor},0)`);
+    g.clearRect(0, 0, 32, 32); g.fillStyle = rg; g.fillRect(0, 0, 32, 32);
+  }
+  function tamanho() {
+    const w = Math.round(innerWidth * 1.1 / 2), h = Math.round(innerHeight * 1.1 / 2);
+    if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+  }
+  // fita: várias linhas finas seguindo a mesma onda, com fase um pouco diferente (como o menu do PS3)
+  function fita(W, H, t, base, amp, fase, vel, linhas, alfa) {
+    for (let l = 0; l < linhas; l++) {
+      const d = l / linhas;
+      x.beginPath();
+      for (let i = 0; i <= 64; i++) {
+        const u = i / 64, px = u * W;
+        const y = base * H
+          + Math.sin(u * 3.2 + t * vel + fase + d * .9) * amp * H
+          + Math.sin(u * 7.1 - t * vel * 1.7 + fase * 2 + d * 1.6) * amp * .35 * H
+          + (d - .5) * amp * .55 * H * Math.sin(u * 2 + t * .2);
+        i ? x.lineTo(px, y) : x.moveTo(px, y);
+      }
+      x.strokeStyle = `rgba(${cor},${alfa * (1 - Math.abs(d - .5) * 1.4)})`;
+      x.stroke();
+    }
+  }
+  function quadro(agora) {
+    if (!rodando) return;
+    requestAnimationFrame(quadro);
+    if (agora - ult < 33) return; // ~30 fps
+    ult = agora;
+    if (agora - corHora > 5000) { corHora = agora; lerCor(); }
+    tamanho();
+    const W = cv.width, H = cv.height, t = (agora - t0) / 1000;
+    x.clearRect(0, 0, W, H);
+    x.globalCompositeOperation = 'lighter';
+    x.lineWidth = 1;
+    // brilho largo e suave por baixo, e as linhas finas por cima
+    x.lineWidth = 6; fita(W, H, t, .62, .09, 0, .35, 6, .05); fita(W, H, t, .72, .06, 2.1, .27, 5, .04);
+    x.lineWidth = 1.2;
+    fita(W, H, t, .62, .09, 0, .35, 18, .28);
+    fita(W, H, t, .72, .06, 2.1, .27, 14, .2);
+    fita(W, H, t, .55, .05, 4.2, .22, 10, .13);
+    for (const p of pts) {
+      p.y -= p.v / 30; p.x += Math.sin(t * .4 + p.a) * .0004;
+      if (p.y < -.05) { p.y = 1.05; p.x = Math.random(); }
+      const brilho = .35 + .65 * (.5 + .5 * Math.sin(t * p.f + p.a));
+      x.globalAlpha = brilho * .8;
+      const r = p.r * 6;
+      x.drawImage(sprite, p.x * W - r / 2, p.y * H - r / 2, r, r);
+    }
+    x.globalAlpha = 1;
+    x.globalCompositeOperation = 'source-over';
+  }
+  function ver() {
+    const tela = document.documentElement.dataset.tela || 'home';
+    const deve = f.dataset.tema === 'sinal' && !document.hidden && !/^(rx-player|grupo)$/.test(tela) && !calmo;
+    f.classList.toggle('animado', f.dataset.tema === 'sinal');
+    if (deve && !rodando) { rodando = true; lerCor(); requestAnimationFrame(quadro); }
+    else if (!deve && rodando) rodando = false;
+    if (!deve && f.dataset.tema === 'sinal' && !cv.__desenhou) { cv.__desenhou = true; lerCor(); tamanho(); rodando = true; quadro(performance.now() + 100); rodando = false; } // parado: um quadro só
+  }
+  document.addEventListener('visibilitychange', ver);
+  new MutationObserver(ver).observe(document.documentElement, { attributes: true, attributeFilter: ['data-tela'] });
+  new MutationObserver(ver).observe(f, { attributes: true, attributeFilter: ['data-tema'] });
+  ver();
+})();
+
 </script>
 <div id="abertura" aria-hidden="true">
   <div class="ab-logo">
@@ -1078,6 +1189,7 @@ html.com-fundo .bloco{background:none;-webkit-backdrop-filter:none;backdrop-filt
 <section id="grupo-entrar" class="tela hidden">
   <div class="grupo-entrada">
     <button class="voltar" id="bt-grupo-entrar-voltar"><svg class="i"><use href="#i-voltar"/></svg>Início</button>
+    <span class="passo" style="--cor:var(--b5)">Todo mundo mostra</span>
     <h2 id="titulo-entrar-grupo">Entrar no grupo</h2>
     <p class="lead" id="sub-entrar-grupo">Escolha como seu nome vai aparecer pros outros do grupo.</p>
     <form id="form-nome" class="campo-codigo" novalidate>
@@ -1138,7 +1250,7 @@ html.com-fundo .bloco{background:none;-webkit-backdrop-filter:none;backdrop-filt
     <div id="stats-rx-box" class="hidden"></div>
     <div id="toast-rx" class="toast-rx hidden"></div>
     <div id="espera">
-      <div class="sinal"><i></i><i></i><i></i><i></i></div>
+      <div class="espera-barras" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
       <p id="msg-espera">Conectando...</p>
       <span id="espera-cod" class="espera-cod"></span>
       <button id="bt-espera-sair" class="btn">Voltar</button>
@@ -1266,7 +1378,10 @@ const guardar = {
 };
 function mostrar(id) {
   document.querySelectorAll('.tela').forEach(e => e.classList.add('hidden'));
-  $('#' + id).classList.remove('hidden');
+  const el = $('#' + id);
+  el.classList.remove('hidden');
+  el.classList.remove('entrando'); void el.offsetWidth; el.classList.add('entrando');
+  clearTimeout(el.__entra); el.__entra = setTimeout(() => el.classList.remove('entrando'), 900);
   document.documentElement.dataset.tela = id;
   window.scrollTo(0, 0);
 }
@@ -3657,19 +3772,19 @@ function esrLarguraBordas(fonte, sx, sy, sw, sh) {
 const ESR_MISTURA = IA_WGSL_FONTE_MISTURA();
 function IA_WGSL_FONTE_MISTURA() {
   return IA_WGSL.replace('return vec4f(clamp(acc / ws + base * 0.0, vec3f(0.0), vec3f(1.0)), 1.0);',
-    'let px = min(v.uv, vec2f(1.0) - v.uv) / u.pe; let al = clamp(min(px.x, px.y) / 12.0, 0.0, 1.0);\n  return vec4f(clamp(acc / ws + base * 0.0, vec3f(0.0), vec3f(1.0)) * al, al);');
+    'let px = min(v.uv, vec2f(1.0) - v.uv) / u.pe; let al = clamp(min(px.x, px.y) / 12.0, 0.0, 1.0) * u.pad;\n  return vec4f(clamp(acc / ws + base * 0.0, vec3f(0.0), vec3f(1.0)) * al, al);');
 }
 const RES = { estado: 'nada', pipeMistura: null, rede: null, modelo: '', alvo: null, esc: [], area: 640 * 360, ms: 0, n: 0, ocupado: false,
   mov: null, ant: null, ultima: 0, regiao: null, regiaoHora: 0, texFull: null, fw: 0, fh: 0,
   pipeRec: null, uFull: null, uReg: null, uRec: null, info: '' };
-async function esrCarregar(modelo) {
-  if (RES.modelo === modelo && RES.rede) return;
+async function esrCarregar() {
+  if (RES.redes || RES.estado === 'carregando') return;
   RES.estado = 'carregando';
   try {
-    RES.rede = await esrCriarRede(IA.device, 'sr/esrgan_' + modelo);
-    RES.modelo = modelo; RES.estado = 'pronto'; RES.ms = 0; RES.n = 0;
+    const dev = IA.device;
+    const [geral, anime] = await Promise.all([esrCriarRede(dev, 'sr/esrgan_geral'), esrCriarRede(dev, 'sr/esrgan_anime')]);
     if (!RES.pipeRec) {
-      const dev = IA.device, mod = dev.createShaderModule({ code: ESR_RECORTE });
+      const mod = dev.createShaderModule({ code: ESR_RECORTE });
       RES.pipeRec = dev.createRenderPipeline({ layout: 'auto', vertex: { module: mod, entryPoint: 'vs' }, fragment: { module: mod, entryPoint: 'fs', targets: [{ format: 'rgba16float' }] }, primitive: { topology: 'triangle-list' } });
       RES.uFull = dev.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
       RES.uReg = dev.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
@@ -3679,6 +3794,20 @@ async function esrCarregar(modelo) {
         fragment: { module: modM, entryPoint: 'fs', targets: [{ format: IA.formato, blend: { color: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' }, alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' } } }] },
         primitive: { topology: 'triangle-list' } });
     }
+    // mede a placa: quantos pixels cada rede reconstrói em tempo real (~28 ms por quadro)
+    RES.areaMax = {};
+    for (const [k, rede] of Object.entries({ geral, anime })) {
+      const e = rede.preparar(320, 180);
+      for (let n = 0; n < 2; n++) { const enc = dev.createCommandEncoder(); rede.passar(enc, e); dev.queue.submit([enc.finish()]); }
+      await dev.queue.onSubmittedWorkDone();
+      const t0 = performance.now();
+      for (let n = 0; n < 4; n++) { const enc = dev.createCommandEncoder(); rede.passar(enc, e); dev.queue.submit([enc.finish()]); }
+      await dev.queue.onSubmittedWorkDone();
+      const ms = Math.max(0.5, (performance.now() - t0) / 4);
+      RES.areaMax[k] = Math.max(128 * 72, Math.min(1280 * 736, Math.round(320 * 180 * 28 / ms)));
+    }
+    RES.redes = { geral, anime };
+    RES.estado = 'pronto'; RES.ms = 0; RES.n = 0;
   } catch (e) { console.warn('IA realista indisponível', e); RES.estado = 'erro'; }
 }
 // 1x por ~0,7 s: onde está o vídeo (o que se mexe) e qual a resolução real dele
@@ -3698,10 +3827,27 @@ function esrAnalisar(vw, vh, telaH) {
     }
   }
   RES.ant = Y;
-  let x0 = GX, y0 = GY, x1 = -1, y1 = -1, n = 0;
-  for (let cy = 0; cy < GY; cy++) for (let cx = 0; cx < GX; cx++) if (RES.mov[cy * GX + cx] > 0.9) { n++; x0 = Math.min(x0, cx); y0 = Math.min(y0, cy); x1 = Math.max(x1, cx); y1 = Math.max(y1, cy); }
-  if (n >= 6) { RES.regiao = { x: Math.round(x0 * vw / GX), y: Math.round(y0 * vh / GY), w: Math.round((x1 - x0 + 1) * vw / GX), h: Math.round((y1 - y0 + 1) * vh / GY) }; RES.regiaoHora = Date.now(); }
-  else if (!RES.regiao || Date.now() - RES.regiaoHora > 15000) RES.regiao = { x: 0, y: 0, w: vw, h: vh }; // parado: a tela toda
+  // o maior pedaço contínuo que se mexe (o player); cursor e animaçõezinhas da página ficam de fora
+  const ativo = i => RES.mov[i] > 0.9, visto = new Uint8Array(GX * GY);
+  let melhor = null;
+  for (let i0 = 0; i0 < GX * GY; i0++) {
+    if (visto[i0] || !ativo(i0)) continue;
+    const fila = [i0]; visto[i0] = 1;
+    let n = 0, x0 = GX, y0 = GY, x1 = -1, y1 = -1;
+    while (fila.length) {
+      const i = fila.pop(), cx = i % GX, cy = (i / GX) | 0;
+      n++; x0 = Math.min(x0, cx); y0 = Math.min(y0, cy); x1 = Math.max(x1, cx); y1 = Math.max(y1, cy);
+      for (const j of [cx > 0 ? i - 1 : -1, cx < GX - 1 ? i + 1 : -1, cy > 0 ? i - GX : -1, cy < GY - 1 ? i + GX : -1])
+        if (j >= 0 && !visto[j] && ativo(j)) { visto[j] = 1; fila.push(j); }
+    }
+    if (!melhor || n > melhor.n) melhor = { n, x0, y0, x1, y1 };
+  }
+  const cheio = melhor ? melhor.n / ((melhor.x1 - melhor.x0 + 1) * (melhor.y1 - melhor.y0 + 1)) : 0;
+  if (melhor && melhor.n >= 12 && cheio >= 0.6) {
+    RES.regiao = { x: Math.round(melhor.x0 * vw / GX), y: Math.round(melhor.y0 * vh / GY), w: Math.round((melhor.x1 - melhor.x0 + 1) * vw / GX), h: Math.round((melhor.y1 - melhor.y0 + 1) * vh / GY) };
+    RES.regiaoHora = Date.now();
+  } else if (vh <= 480) RES.regiao = { x: 0, y: 0, w: vw, h: vh }; // a transmissão inteira já chega pequena
+  else if (!RES.regiao || Date.now() - RES.regiaoHora > 15000) { RES.regiao = null; RES.alvo = null; RES.info = 'IA realista · esperando um vídeo tocar (ela só mexe no vídeo, nunca no resto da tela)'; return; }
   const r = RES.regiao;
   const larg = esrLarguraBordas(video, r.x, r.y, r.w, r.h);
   if (larg) { RES.esc.push(Math.min(8, Math.max(1, (larg - 0.8) / 0.85))); if (RES.esc.length > 3) RES.esc.shift(); }
@@ -3709,18 +3855,23 @@ function esrAnalisar(vw, vh, telaH) {
   // tamanho real do vídeo; a rede amplia 4x. Só vale se o vídeo é pequeno de verdade e a tela mostra ele bem maior.
   let ih = Math.round(r.h / esc), iw = Math.round(r.w / esc);
   const aTela = telaH * r.h / vh;
-  if (esc < 1.3 && ih > 480) { RES.alvo = null; RES.info = `IA realista · a imagem já é nítida (${r.w}×${r.h})`; return; }
+  if (esc < 1.25) { RES.alvo = null; RES.info = `IA realista · o vídeo já chega nítido (~${r.h}p): nada a reconstruir`; return; }
   if (aTela / ih < 1.4) { RES.alvo = null; RES.info = `IA realista · o vídeo (~${ih}p) já aparece no tamanho real na tela`; return; }
-  if (iw * ih > RES.area) { const k = Math.sqrt(RES.area / (iw * ih)); iw = Math.round(iw * k); ih = Math.round(ih * k); }
+  const px = iw * ih;
+  const modelo = px <= RES.areaMax.geral && ih <= 480 ? 'geral' : px <= RES.areaMax.anime ? 'anime' : '';
+  if (!modelo) {
+    const lim = Math.round(Math.sqrt(RES.areaMax.anime * 9 / 16));
+    RES.alvo = null; RES.info = `IA realista · vídeo de ~${ih}p: esta placa reconstrói em tempo real até ~${lim}p (use o tipo Anime ou Neural)`; return;
+  }
   iw = Math.max(16, iw - iw % 4); ih = Math.max(16, ih - ih % 4);
   const ant = RES.alvo;
   // não troca de tamanho por pouca coisa (recriar a rede custa)
-  if (ant && Math.abs(ant.iw - iw) / iw < 0.12 && Math.abs(ant.ih - ih) / ih < 0.12 && Math.abs(ant.x - r.x) < 8 && Math.abs(ant.w - r.w) < 16) return;
-  RES.alvo = { ...r, iw, ih, real: Math.round(r.h / esc) };
+  if (ant && ant.modelo === modelo && Math.abs(ant.iw - iw) / iw < 0.12 && Math.abs(ant.ih - ih) / ih < 0.12 && Math.abs(ant.x - r.x) < 8 && Math.abs(ant.w - r.w) < 16) return;
+  RES.alvo = { ...r, iw, ih, modelo, real: Math.round(r.h / esc) };
 }
 function esrQuadro(vw, vh, W, H, ow, oh) {
   const dev = IA.device, cv = IA.cv;
-  if (RES.estado === 'nada') { esrCarregar('geral'); return 'IA realista · carregando a rede (~5 MB)...'; }
+  if (RES.estado === 'nada') { esrCarregar(); return 'IA realista · carregando as redes (~7 MB) e medindo a placa...'; }
   if (RES.estado !== 'pronto') return RES.estado === 'erro' ? '' : 'IA realista · carregando...';
   if (Date.now() - RES.ultima > 700) { RES.ultima = Date.now(); try { esrAnalisar(vw, vh, oh); } catch (e) { console.warn(e); } }
   if (!RES.texFull || RES.fw !== vw || RES.fh !== vh) {
@@ -3736,15 +3887,16 @@ function esrQuadro(vw, vh, W, H, ow, oh) {
   const a = RES.alvo;
   let saidaRede = null;
   if (a) {
-    const est = RES.rede.preparar(a.iw, a.ih);
+    const rede = RES.redes[a.modelo];
+    const est = rede.preparar(a.iw, a.ih);
     dev.queue.writeBuffer(RES.uRec, 0, new Float32Array([1 / a.iw, 1 / a.ih, 1, 0, a.x, a.y, a.w, a.h]));
     const rp = enc.beginRenderPass({ colorAttachments: [{ view: est.entrada.createView(), loadOp: 'clear', clearValue: { r: 0, g: 0, b: 0, a: 1 }, storeOp: 'store' }] });
     rp.setPipeline(RES.pipeRec);
     rp.setBindGroup(0, dev.createBindGroup({ layout: RES.pipeRec.getBindGroupLayout(0), entries: [{ binding: 0, resource: IA.sampler }, { binding: 1, resource: RES.texFull.createView() }, { binding: 2, resource: { buffer: RES.uRec } }] }));
     rp.draw(3); rp.end();
-    RES.rede.passar(enc, est);
+    rede.passar(enc, est);
     saidaRede = est.saida;
-    dev.queue.writeBuffer(RES.uReg, 0, new Float32Array([1 / Math.max(1, a.w * e), 1 / Math.max(1, a.h * e), 1, 0]));
+    dev.queue.writeBuffer(RES.uReg, 0, new Float32Array([1 / Math.max(1, a.w * e), 1 / Math.max(1, a.h * e), 1, 0.8]));
   }
   const pass = enc.beginRenderPass({ colorAttachments: [{ view: IA.ctx.getCurrentTexture().createView(), clearValue: { r: 0, g: 0, b: 0, a: 0 }, loadOp: 'clear', storeOp: 'store' }] });
   pass.setPipeline(IA.render);
@@ -3769,13 +3921,12 @@ function esrQuadro(vw, vh, W, H, ow, oh) {
     // placa não dá conta: menos pixels; no mínimo e ainda pesado, a rede mais leve; e por fim a Neural
     if (RES.n > 30 && RES.ms > 40) {
       RES.n = 0;
-      if (RES.area > 256 * 144 * 1.2) { RES.area = Math.round(RES.area * 0.7); RES.alvo = null; }
-      else if (RES.modelo === 'geral') { RES.rede = null; RES.estado = 'nada'; esrCarregar('anime'); }
-      else { SR.motor = 'fsr'; guardar.set('superResMotor2', 'fsr'); avisoRx('A IA realista ficou pesada demais pra esta placa de vídeo. Voltei pra Neural.'); srReiniciar(); }
-    } else if (RES.n > 60 && RES.ms < 14 && RES.area < 960 * 540) { RES.n = 0; RES.area = Math.round(RES.area * 1.25); }
+      RES.areaMax[a.modelo] = Math.round(RES.areaMax[a.modelo] * 0.75); RES.alvo = null;
+      if (RES.areaMax.anime < 128 * 72) { SR.motor = 'fsr'; guardar.set('superResMotor2', 'fsr'); avisoRx('A IA realista ficou pesada demais pra esta placa de vídeo. Voltei pra Neural.'); srReiniciar(); }
+    } else if (RES.n > 60 && RES.ms < 16 && RES.areaMax[a.modelo] < 1280 * 736) { RES.n = 0; RES.areaMax[a.modelo] = Math.round(RES.areaMax[a.modelo] * 1.15); }
   });
   if (!a) return RES.info || 'IA realista · procurando vídeo de baixa resolução...';
-  return `IA realista (${RES.modelo === 'geral' ? 'geral' : 'leve'}) · vídeo ~${a.real}p na área ${a.w}×${a.h} → rede ${a.iw}×${a.ih} → ${a.iw * 4}×${a.ih * 4}` + (RES.n ? ` · ${Math.round(RES.ms)} ms` : '');
+  return `IA realista (rede ${a.modelo === 'geral' ? 'geral' : 'leve'}) · vídeo ~${a.real}p na área ${a.w}×${a.h} → rede ${a.iw}×${a.ih} → ${a.iw * 4}×${a.ih * 4}` + (RES.n ? ` · ${Math.round(RES.ms)} ms` : '');
 }
 
 function iaCarregarLib() {
@@ -3798,7 +3949,7 @@ async function iaIniciar() {
     if (!ad) throw new Error('sem placa de vídeo pro WebGPU');
     IA.lib = await iaCarregarLib();
     const dev = await ad.requestDevice();
-    dev.lost.then(() => { IA.estado = 'erro'; RES.estado = 'nada'; RES.rede = null; iaParar(); if (SR.modo && srGPU()) srReiniciar(); });
+    dev.lost.then(() => { IA.estado = 'erro'; RES.estado = 'nada'; RES.redes = null; iaParar(); if (SR.modo && srGPU()) srReiniciar(); });
     const cv = document.createElement('canvas');
     cv.id = 'sr-ia'; cv.className = 'hidden';
     video.after(cv);
@@ -3925,6 +4076,12 @@ function iaQuadro() {
   }
   iaAgendar();
 }
+function escolherMotorSR(k) {
+  if (k === SR.motor) return;
+  if (k !== 'fsr' && !('gpu' in navigator)) { avisoRx('Esse tipo precisa de WebGPU (Chrome ou Edge atualizado no PC).'); return; }
+  SR.motor = { esr: 'fsr', ia: 'esr', fsr: 'ia' }[k]; // o alternar abaixo avança um passo: cai exatamente no escolhido
+  alternarMotorSR();
+}
 function alternarMotorSR() {
   if (SR.motor === 'fsr' && !('gpu' in navigator)) { avisoRx('A IA precisa de WebGPU (Chrome ou Edge atualizado no PC).'); return; }
   SR.motor = SR.motor === 'fsr' ? 'esr' : SR.motor === 'esr' ? 'ia' : 'fsr';
@@ -3983,11 +4140,11 @@ function itemMenu(rot, val, fn, opts = {}) {
   b.onclick = e => { e.stopPropagation(); fn(); };
   return b;
 }
-function cabMenu(titulo) {
+function cabMenu(titulo, voltar = 'principal') {
   const c = document.createElement('div'); c.className = 'menu-cab';
   c.innerHTML = '<button type="button" aria-label="Voltar"><svg class="i"><use href="#i-seta-dir"/></svg></button><span></span>';
   c.querySelector('span').textContent = titulo;
-  c.querySelector('button').onclick = e => { e.stopPropagation(); renderMenu('principal'); };
+  c.querySelector('button').onclick = e => { e.stopPropagation(); renderMenu(voltar); };
   return c;
 }
 function textoQualidade() {
@@ -4015,11 +4172,23 @@ function renderMenu(vista) {
     const nota = document.createElement('p'); nota.className = 'menu-nota';
     nota.textContent = 'Automática baixa só se a sua internet ficar ruim por um tempo, e volta sozinha. Escolhendo uma fixa, ela não muda.';
     m.append(nota);
+  } else if (vista === 'superres-tipo') {
+    m.append(cabMenu('Tipo de super resolução', 'superres'));
+    const TIPOS = [
+      ['fsr', 'Neural', 'Jogo, filme, tudo. Leve e fiel.'],
+      ['esr', 'IA realista', 'Vídeo pequeno (144p–480p) esticado na tela. Pesa mais.'],
+      ['ia', 'Anime', 'Desenho, anime e animação 3D. Deixa o traço nítido.'],
+    ];
+    for (const [k, rot, desc] of TIPOS) {
+      const b = itemMenu(rot, null, () => { escolherMotorSR(k); renderMenu('superres'); }, { marcado: SR.motor === k });
+      const d = document.createElement('small'); d.className = 'mi-desc'; d.textContent = desc; b.querySelector('.mi-rot').append(d);
+      m.append(b);
+    }
   } else if (vista === 'superres') {
     m.append(cabMenu('Super resolução (beta)'));
     m.append(itemMenu('Desligada', null, () => { definirSuperRes(0); fecharMenu(); }, { marcado: !SR.modo }));
     SR_ALVOS.forEach(([alvo, rot]) => m.append(itemMenu(rot, null, () => { escolherAlvoSR(alvo); fecharMenu(); }, { marcado: !!SR.modo && SR.alvo === alvo })));
-    m.append(itemMenu('Tipo', SR.motor === 'ia' ? 'Anime (Anime4K)' : SR.motor === 'esr' ? 'IA realista (vídeo de baixa resolução)' : 'Neural (jogos, filmes, tudo)', () => { alternarMotorSR(); renderMenu('superres'); }));
+    m.append(itemMenu('Tipo', SR.motor === 'ia' ? 'Anime' : SR.motor === 'esr' ? 'IA realista' : 'Neural', () => renderMenu('superres-tipo'), { sub: true }));
     if (SR.motor !== 'esr') m.append(itemMenu(SR.motor === 'ia' ? 'Restauração forte' : 'Mais nitidez', SR.forte ? 'Ligada' : 'Desligada', () => { alternarForteSR(); renderMenu('superres'); }));
     const nota = document.createElement('p'); nota.className = 'menu-nota';
     nota.textContent = SR.motor === 'esr'
@@ -5347,7 +5516,7 @@ if (EMBED) {
   const box = $('#niveis-tx');
   const PRA = { leve: 'Celular ou internet fraca. Bom pra conversa e tela parada.', moderado: 'O normal: 1080p liso, igual ou melhor que o Discord.',
     alto: 'Pra quem assiste num monitor 2K.', maximo: 'Pra quem assiste em 4K. Pesa mais na internet.' };
-  const sinal = k => `<span class="sinal" data-n="${k <= 4000 ? 1 : k <= 12000 ? 2 : k <= 16000 ? 3 : 4}" aria-hidden="true"><i></i><i></i><i></i><i></i></span>`;
+  const sinal = k => `<span class="nl-sinal" data-n="${k <= 4000 ? 1 : k <= 12000 ? 2 : k <= 16000 ? 3 : 4}" aria-hidden="true"><i></i><i></i><i></i><i></i></span>`;
   for (const [k, q] of Object.entries(NIVEIS_TX))
     box.insertAdjacentHTML('beforeend', `<label class="op-l"><input type="radio" name="qnivel" value="${k}"><span class="radio"></span>
       <span class="nl-txt"><b>${q.rot}</b>${k === 'moderado' ? '<span class="etq rec">RECOMENDADO</span>' : ''}<small>${PRA[k]}</small></span>
@@ -5399,7 +5568,12 @@ document.querySelectorAll('input[name="fonte"]').forEach(i => i.onchange = troco
 document.querySelectorAll('input[name="audio"]').forEach(i => i.onchange = atualizarModoAudio);
 document.querySelectorAll('input[name="dica"]').forEach(i => i.onchange = trocarQualidade);
 
-$('#bt-modo-tx').onclick = () => { mostrar('tx'); atualizarModoAudio(); mostrarOpcoesCamera(); if (!CELULAR_TX) verConexaoDireta(); };
+// o cartão "liga" (flash rápido) e aí a tela Transmitir entra
+$('#bt-modo-tx').onclick = () => {
+  const c = $('#bt-modo-tx'), rapido = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  c.classList.remove('ligando'); void c.offsetWidth; c.classList.add('ligando');
+  setTimeout(() => { c.classList.remove('ligando'); mostrar('tx'); atualizarModoAudio(); mostrarOpcoesCamera(); if (!CELULAR_TX) verConexaoDireta(); }, rapido ? 0 : 170);
+};
 document.querySelectorAll('[data-voltar]').forEach(b => b.onclick = () => {
   if (grupo.ativo) { mostrar('grupo'); renderGrupo(); return; } // no grupo: volta pro grupo e continua transmitindo
   pararTx();
