@@ -1335,7 +1335,12 @@ function dicaQualidade() {
   let t = q.kbps / 1000 > SFU_MAX_MBPS
     ? `Sua internet precisa mandar ${fmtMbps(q.kbps)} Mbps pra cada pessoa assistindo (acima de 20 Mbps o servidor de repasse não é usado).`
     : `Sua internet precisa mandar uns ${fmtMbps(q.kbps)} Mbps. Com 1 pessoa assistindo vai direto; com 2 ou mais, o servidor de repasse manda pra todo mundo e você continua mandando só uma cópia.`;
-  if (q.h > 1080 && q.h <= 2160) t += ` Sua tela tem que ter ${q.h === 2160 ? '4K' : '1440p ou mais'} pra sair nessa resolução; se for menor, sai na resolução da tela.`;
+  const monitor = Math.round(Math.min(screen.width, screen.height) * (devicePixelRatio || 1));
+  if (q.h > monitor * 1.05 && q.h <= 4320) {
+    t += radio('fonte') === 'browser'
+      ? ` Com Aba sai em ${rotRes(q.h)} mesmo no seu monitor de ${monitor}p: o Chrome desenha a aba em até 2x só pra transmissão (um vídeo 4K do YouTube vai em 4K).`
+      : ` Seu monitor é ${monitor}p: Tela inteira e Janela não passam disso. Pra transmitir em ${rotRes(q.h)}, escolha Aba (o Chrome desenha a aba em até 2x só pra transmissão).`;
+  }
   t += ' Se travar, escolha um nível mais leve. Dá pra trocar com a transmissão rolando.';
   $('#dica-qual').textContent = t;
   if (q.chave === 'custom') {
@@ -1882,6 +1887,7 @@ function trocouFonte() {
     atualizarModoAudio();
   }
   mostrarOpAppAba();
+  dicaQualidade();
 }
 // "Juntar o som da aba": só faz sentido com Aba + programa. Se o programa manda tudo (ou tudo menos o Discord),
 // ele já pega o som do navegador: aí o som da aba sairia em dobro, então avisa e sugere "só os apps marcados".
@@ -4742,7 +4748,7 @@ setInterval(async () => {
           `Travadas    ${st.travadas}${st.jitter != null ? ` · variação ${st.jitter} ms` : ''}\n` +
           `Folga       ${FOLGAS[folgaNivel] == null ? 'automática' : FOLGAS[folgaNivel] + ' ms'}\n` +
           `Você pediu  ${qRx.auto ? 'AUTO · ' : ''}${NIVEIS_RX[qRx.nivel].nome}\n` +
-          (it && it.capH && NIVEIS_RX[qRx.nivel].altura > it.capH ? `Limite      o monitor de quem transmite é ${it.capH}p: a transmissão não passa disso (escolher 4K num monitor 1080p não aumenta)
+          (it && it.capH && NIVEIS_RX[qRx.nivel].altura > it.capH ? `Limite      chega em ${it.capH}p: com Tela inteira ou Janela não passa do monitor de quem transmite. Pra 4K, ele precisa compartilhar uma Aba (o Chrome desenha a aba em 2x)
 ` : '') +
           (SR.modo ? `Super res.  ${SR.info || (SR.motor === 'ia' ? 'ligada' : 'parada: a imagem já chega do tamanho da sua tela (pra restaurar vídeo esticado, use o tipo Anime ou escolha 2K/4K)')}
 ` : '') +
