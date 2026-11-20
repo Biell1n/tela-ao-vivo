@@ -30,6 +30,34 @@ body{min-height:100dvh;display:flex;flex-direction:column;
   background:radial-gradient(900px 480px at 80% -12%,rgba(77,107,255,.07),transparent 62%),var(--bg)}
 body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.035;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+/* ---------- fundo em camadas: mexe com o mouse e pega a cor da hora do dia ---------- */
+#fundo{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none;background:var(--bg);opacity:0;transition:opacity .9s var(--ease),visibility .9s}
+#fundo.pronto{opacity:1}
+html.com-fundo body{background:transparent}
+#fundo .cam{position:absolute;inset:-5%;background:center bottom/cover no-repeat;
+  transform:translate3d(calc(var(--px,0)*var(--k)*-1px),calc(var(--py,0)*var(--k)*-1px),0)}
+#fundo .c1{--k:8}#fundo .c2{--k:20}#fundo .c3{--k:38}
+#fundo[data-tema=ceu] .c1{background-image:url(fundo/ceu-1.webp)}
+#fundo[data-tema=ceu] .c2{background-image:url(fundo/ceu-2.webp);opacity:.85;animation:deriva 60s ease-in-out infinite alternate}
+#fundo[data-tema=ceu] .c3{background-image:url(fundo/ceu-3.webp);opacity:.7;animation:deriva 38s ease-in-out infinite alternate-reverse}
+#fundo[data-tema=sinal] .c1{background-image:url(fundo/sinal-1.webp)}
+#fundo[data-tema=sinal] .c2,#fundo[data-tema=sinal] .c3{background:var(--acento);-webkit-mask:center bottom/cover no-repeat;mask:center bottom/cover no-repeat}
+#fundo[data-tema=sinal] .c2{-webkit-mask-image:url(fundo/sinal-2.webp);mask-image:url(fundo/sinal-2.webp);opacity:.55;animation:deriva 50s ease-in-out infinite alternate}
+#fundo[data-tema=sinal] .c3{-webkit-mask-image:url(fundo/sinal-3.webp);mask-image:url(fundo/sinal-3.webp);opacity:.6;animation:pisca 7s ease-in-out infinite alternate}
+@keyframes deriva{from{translate:-1.6% 0}to{translate:1.6% 0}}
+@keyframes pisca{from{opacity:.35}to{opacity:.7}}
+/* tinge tudo de leve com a cor da hora e escurece onde fica o texto */
+#fundo .tinta{position:absolute;inset:0;background:var(--acento);mix-blend-mode:color;opacity:.2}
+#fundo[data-tema=sinal] .tinta{opacity:.12}
+#fundo .veu{position:absolute;inset:0;background:linear-gradient(100deg,rgba(16,18,24,.78) 0%,rgba(16,18,24,.45) 38%,rgba(16,18,24,.12) 70%,transparent),
+  linear-gradient(180deg,rgba(16,18,24,.55),transparent 30%)}
+html[data-tela=grupo] #fundo,html[data-tela=rx-player] #fundo{opacity:0;visibility:hidden}
+html[data-tela=tx] #fundo.pronto{opacity:.45}
+@media (max-width:860px){#fundo .veu{background:linear-gradient(180deg,rgba(16,18,24,.6),rgba(16,18,24,.35) 50%,rgba(16,18,24,.15))}}
+@media (prefers-reduced-motion:reduce){#fundo .cam{animation:none!important}}
+/* cartões de vidro: o fundo aparece por trás, desfocado */
+html.com-fundo .acao,html.com-fundo .cartao-prog{background:rgba(25,28,36,.56);-webkit-backdrop-filter:blur(18px) saturate(1.3);backdrop-filter:blur(18px) saturate(1.3);border-color:rgba(255,255,255,.08)}
+html.com-fundo .acao-tx:hover{border-color:var(--acento-borda)}
 .hidden{display:none!important}
 button,input,select{font:inherit;color:inherit}
 button{cursor:pointer;border:0;background:none;padding:0}
@@ -592,6 +620,45 @@ html.transp body::before{display:none}
 </script>
 </head>
 <body>
+<div id="fundo" aria-hidden="true"><i class="cam c1"></i><i class="cam c2"></i><i class="cam c3"></i><i class="tinta"></i><i class="veu"></i></div>
+<script>
+(function () {
+  const f = document.getElementById('fundo'), q = new URLSearchParams(location.search);
+  if (q.get('embed') === '1') { f.remove(); return; } // telinhas do grupo: nada atrás do vídeo
+  // de dia (6h às 18h) o sinal; de noite o céu. ?fundo=ceu|sinal força um deles
+  const forcado = /^(ceu|sinal)$/.test(q.get('fundo') || '') ? q.get('fundo') : '';
+  const temaDaHora = () => forcado || ((h => h >= 6 && h < 18)(new Date().getHours()) ? 'sinal' : 'ceu');
+  const carregar = tema => Promise.all([1, 2, 3].map(n => { const im = new Image(); im.src = `fundo/${tema}-${n}.webp`; return im.decode().catch(() => {}); }));
+  document.documentElement.classList.add('com-fundo');
+  if (!document.documentElement.dataset.tela) document.documentElement.dataset.tela = 'home';
+  // só aparece depois que as camadas carregam, pra não ir surgindo aos pedaços
+  f.dataset.tema = temaDaHora();
+  carregar(f.dataset.tema).then(() => f.classList.add('pronto'));
+  // virou a hora: apaga devagar, troca as camadas e acende de novo
+  setInterval(() => {
+    const t = temaDaHora();
+    if (t === f.dataset.tema || f.trocando) return;
+    f.trocando = true;
+    carregar(t).then(() => {
+      f.classList.remove('pronto');
+      setTimeout(() => { f.dataset.tema = t; f.classList.add('pronto'); f.trocando = false; }, 950);
+    });
+  }, 60000);
+  if (!matchMedia('(pointer:fine)').matches || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  let ax = 0, ay = 0, x = 0, y = 0, rodando = false;
+  const escondido = () => /^(grupo|rx-player)$/.test(document.documentElement.dataset.tela || '');
+  function passo() {
+    x += (ax - x) * .05; y += (ay - y) * .05;
+    f.style.setProperty('--px', x.toFixed(4)); f.style.setProperty('--py', y.toFixed(4));
+    if (Math.abs(ax - x) + Math.abs(ay - y) > .002) requestAnimationFrame(passo); else rodando = false;
+  }
+  addEventListener('pointermove', e => {
+    if (escondido()) return;
+    ax = e.clientX / innerWidth * 2 - 1; ay = e.clientY / innerHeight * 2 - 1;
+    if (!rodando) { rodando = true; requestAnimationFrame(passo); }
+  }, { passive: true });
+})();
+</script>
 <div id="abertura" aria-hidden="true">
   <div class="ab-logo">
     <span class="ab-ponto"><i></i><i></i></span>
@@ -1119,6 +1186,7 @@ const guardar = {
 function mostrar(id) {
   document.querySelectorAll('.tela').forEach(e => e.classList.add('hidden'));
   $('#' + id).classList.remove('hidden');
+  document.documentElement.dataset.tela = id;
   window.scrollTo(0, 0);
 }
 function novoCodigo() {
