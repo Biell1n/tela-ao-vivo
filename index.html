@@ -301,7 +301,9 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
 .seg input:focus-visible+span{outline:2px solid var(--acento)}
 .dica{font-size:12.5px;color:var(--fraco);margin:10px 0 0;text-wrap:pretty}
 .dica.aviso{color:var(--aviso)}
-.cam-liga small.aviso{color:var(--aviso)}
+.aviso-captura{display:flex;flex-direction:column;gap:8px;margin:10px 0 0;padding:14px 16px;border-radius:var(--r-l);background:rgba(244,181,63,.08);border:1px solid rgba(244,181,63,.35);font-size:13.5px;line-height:1.45;color:var(--sub)}
+.aviso-captura b:first-child{color:var(--aviso);font-size:14.5px}
+.aviso-captura-bts{display:flex;gap:8px;flex-wrap:wrap}
 .niveis{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:6px}
 .nivel{position:relative;cursor:pointer;min-width:0}
 .nivel input{position:absolute;opacity:0;pointer-events:none}
@@ -994,6 +996,11 @@ html.transp body::before{display:none}
       </div>
 
       <div id="status-tx" class="status">Escolha a tela e o áudio, depois comece.</div>
+      <div id="aviso-captura" class="aviso-captura hidden" role="alert">
+        <b>A captura da tela parou.</b>
+        <span>Quem está assistindo continua conectado, vendo a última imagem. Escolha a tela de novo pra voltar pro ar. Se for uma janela do Chrome, prefira compartilhar a <b>Aba</b> (é mais estável e leva o som da aba).</span>
+        <div class="aviso-captura-bts"><button id="bt-recapturar" class="btn primario" type="button">Escolher a tela de novo</button><button id="bt-parar-de-vez" class="btn" type="button">Parar</button></div>
+      </div>
       <div class="metricas" id="metricas"></div>
       <div id="card-direta" class="card-direta hidden">
         <div><b>Alguém vai assistir no mesmo Wi-Fi?</b>
@@ -1643,14 +1650,14 @@ function ajustarAudioPraFonte() {
   // câmera: o som é do microfone (ou do programa/cabo no PC); "som da tela" não existe
   op('captura').classList.toggle('hidden', cam);
   op('device').classList.toggle('hidden', CELULAR_TX && !cam);
-  op('app').classList.toggle('hidden', CELULAR_TX);
+  op('app').classList.toggle('hidden', CELULAR_TX || cam);
   $('#disp-titulo').textContent = cam ? 'Microfone' : 'Cabo virtual (Voicemeeter ou VB-Cable)';
   $('#disp-desc').textContent = cam ? 'Sua voz junto da câmera.' : 'Pra quem já tem cabo de áudio virtual configurado.';
   $('#guia').classList.toggle('hidden', cam);
   $('#bloco-mic').classList.toggle('hidden', cam);
   if (!cam && $('#mic-junto').checked && !$('#tx').classList.contains('hidden') && $('#sel-mic').options[0] && $('#sel-mic').options[0].value === '') listarMics();
   const naTela = !$('#tx').classList.contains('hidden');
-  if (cam && radio('audio') === 'captura') { marcar('audio', 'device'); if (naTela) atualizarModoAudio(); }
+  if (cam && (radio('audio') === 'captura' || radio('audio') === 'app')) { marcar('audio', 'device'); if (naTela) atualizarModoAudio(); }
   if (!cam && CELULAR_TX && radio('audio') === 'device') { marcar('audio', 'captura'); if (naTela) atualizarModoAudio(); }
 }
 function prepararCelular() {
@@ -1700,13 +1707,13 @@ function trocouFonte() {
 // "Juntar o som da aba": só faz sentido com Aba + programa. Se o programa manda tudo (ou tudo menos o Discord),
 // ele já pega o som do navegador: aí o som da aba sairia em dobro, então avisa e sugere "só os apps marcados".
 function mostrarOpAppAba() {
-  const vale = radio('fonte') === 'browser' && radio('audio') === 'app' && !CELULAR_TX;
+  // só aparece quando faz sentido: programa em "só os apps que eu marcar" (nos outros modos ele já manda o som do navegador)
+  const f = radio('fonte');
+  const vale = (f === 'browser' || f === 'window') && radio('audio') === 'app' && prog.modo === 'incluir' && !CELULAR_TX;
   $('#op-app-aba').classList.toggle('hidden', !vale);
-  const dobro = prog.modo !== 'incluir';
-  $('#app-aba-desc').textContent = dobro
-    ? 'Atenção: o programa está mandando o som do PC todo (tirando o Discord), e isso já inclui o navegador. Ligando isto, o som da aba sai em dobro. Pra juntar a aba com outros apps, escolha "Só os apps que eu marcar" no programa e marque os apps (sem o navegador).'
-    : 'O som da aba vem direto do Chrome e entra junto com o dos apps marcados no programa (não marque o navegador lá, senão sai em dobro).';
-  $('#app-aba-desc').classList.toggle('aviso', dobro && $('#app-com-aba').checked);
+  const nome = f === 'window' ? 'da janela' : 'da aba';
+  $('#op-app-aba b').textContent = `Juntar o som ${nome} também`;
+  $('#app-aba-desc').textContent = `Além dos apps marcados no programa, vai o som ${nome}. Não marque o navegador no programa, senão sai em dobro.`;
 }
 
 async function atualizarModoAudio() {
@@ -2121,7 +2128,7 @@ async function comecar() {
   if (typeof Peer === 'undefined') { statusTx('O componente de conexão não carregou. Confira a internet e aperte F5.', 'erro'); return; }
   qualAtual = qualidadeEscolhida();
   const fonte = radio('fonte'), modo = radio('audio'), dica = radio('dica');
-  const abaJunto = modo === 'app' && fonte === 'browser' && $('#app-com-aba').checked && !CELULAR_TX;
+  const abaJunto = modo === 'app' && (fonte === 'browser' || fonte === 'window') && prog.modo === 'incluir' && $('#app-com-aba').checked && !CELULAR_TX;
   const pedeAudio = modo === 'captura' || abaJunto;
   const opcoes = {
     // Safari/iPhone: pedir qualquer tamanho faz ele capturar em ~640 px (bug do WebKit); lá vai sem restrição
@@ -2158,7 +2165,8 @@ async function comecar() {
   }
   let vt = tela.getVideoTracks()[0];
   try { vt.contentHint = fonte === 'camera' ? 'motion' : dica; } catch {}
-  vt.addEventListener('ended', pararTx);
+  vt.addEventListener('ended', capturaAcabou);
+  capturaOpcoes = opcoes;
 
   // estilo OBS: junta a tela com a câmera por cima
   if (fonte !== 'camera' && $('#cam-junto').checked && PODE_COMPOR && !CELULAR_TX) {
@@ -2199,7 +2207,7 @@ async function comecar() {
     if (abaJunto) {
       const at = tela.getAudioTracks()[0];
       if (at) { try { at.contentHint = 'music'; } catch {} somAba = at; }
-      else notaAudio('O Chrome não entregou o som da aba: no seletor, deixe marcado "Compartilhar áudio da aba". O som do programa continua indo.');
+      else notaAudio(fonte === 'window' ? 'O Chrome não entregou o som dessa janela (nem toda versão suporta). O som do programa continua indo.' : 'O Chrome não entregou o som da aba: no seletor, deixe marcado "Compartilhar áudio da aba". O som do programa continua indo.');
     }
   } else if (!trilhaAudio) {
     await selecionarAudio();
@@ -2513,7 +2521,55 @@ async function trocarQualidade() {
   sfuParametros();
 }
 
+// A janela/aba/tela deixou de ser capturada (o Chrome cortou, a janela fechou, ou clicaram em "Parar de compartilhar"
+// na barra do Chrome). A sala e quem assiste continuam; um clique escolhe a tela de novo e troca pra todo mundo.
+let capturaOpcoes = null, capturaCaiu = 0, capturaTimer = 0;
+function capturaAcabou() {
+  if (!streamTx) return;
+  if (composicao || radio('fonte') === 'camera' || !capturaOpcoes) { pararTx(); return; }
+  capturaCaiu = Date.now();
+  $('#aviso-captura').classList.remove('hidden');
+  statusTx('A captura parou. Quem está assistindo continua conectado.', 'aviso');
+  if (grupo.ativo && $('#tx').classList.contains('hidden')) mostrar('tx');
+  clearTimeout(capturaTimer);
+  capturaTimer = setTimeout(() => { if (capturaCaiu && streamTx) pararTx(); }, 5 * 60e3); // ninguém voltou: encerra
+}
+async function recapturar() {
+  if (!streamTx || !capturaOpcoes) return;
+  let tela;
+  try { tela = await navigator.mediaDevices.getDisplayMedia(capturaOpcoes); }
+  catch (e) { statusTx(e.name === 'NotAllowedError' ? 'Você cancelou. A sala continua aberta: escolha a tela de novo quando quiser.' : 'Não deu pra capturar (' + e.name + ').', 'aviso'); return; }
+  const vt = tela.getVideoTracks()[0];
+  try { vt.contentHint = radio('dica'); } catch {}
+  vt.addEventListener('ended', capturaAcabou);
+  const velho = streamTx.getVideoTracks()[0];
+  if (velho) { streamTx.removeTrack(velho); try { velho.stop(); } catch {} }
+  streamTx.addTrack(vt);
+  const pcs = [...chamadas.values()].map(c => c.peerConnection).filter(Boolean);
+  if (SFU.pc) pcs.push(SFU.pc);
+  for (const pc of pcs) {
+    const snd = pc.getSenders().find(x => x.track && x.track.kind === 'video');
+    if (snd) try { await snd.replaceTrack(vt); } catch {}
+  }
+  // o som da captura (aba/janela/Windows) também é novo
+  const at = tela.getAudioTracks()[0];
+  if (at) {
+    try { at.contentHint = 'music'; } catch {}
+    if (radio('audio') === 'captura') { audioDaCaptura = true; await trocarTrilha(at); medir(at); }
+    else if (radio('audio') === 'app') { desligarSomAba(); somAba = at; await trocarSaida(audioSaida()); }
+    else at.stop();
+  }
+  $('#preview').srcObject = streamTx;
+  for (const [id, c] of chamadas) if (c.peerConnection) aplicarParametros(c.peerConnection, id);
+  sfuParametros();
+  capturaCaiu = 0; clearTimeout(capturaTimer);
+  $('#aviso-captura').classList.add('hidden');
+  statusTx('De volta no ar. Quem estava assistindo já está vendo a tela nova.', 'ok');
+  if (grupo.ativo) setTimeout(() => { if (grupo.ativo && streamTx && !$('#tx').classList.contains('hidden')) { mostrar('grupo'); renderGrupo(); } }, 1200);
+}
 function pararTx() {
+  capturaCaiu = 0; clearTimeout(capturaTimer); capturaOpcoes = null;
+  $('#aviso-captura').classList.add('hidden');
   if (salaTx) { salaTx = null; if (grupo.ativo) avisarSala(null); }
   desligarMic();
   desligarSomAba();
@@ -4947,6 +5003,8 @@ document.querySelectorAll('[data-voltar]').forEach(b => b.onclick = () => {
 $('#sel-audio').onchange = selecionarAudio;
 $('#bt-atualizar').onclick = listarAudio;
 $('#bt-comecar').onclick = comecar;
+$('#bt-recapturar').onclick = recapturar;
+$('#bt-parar-de-vez').onclick = () => pararTx();
 $('#bt-comecar-flut').onclick = comecar;
 // resumo: o que vai sair na transmissão, em chips
 function resumoTx() {
