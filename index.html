@@ -591,6 +591,57 @@ html.transp body::before{display:none}
   #barra{gap:2px;padding-top:56px}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ================= refino visual: menos caixa dentro de caixa, cabeçalho de passo tipo claquete de TV ================= */
+:root{--r-l:14px;--r-m:10px}
+/* passos: sem cartão em volta; um traço fino + barra na cor da barra de TV do passo */
+.bloco{background:none;border:0;border-top:1px solid var(--linha);border-radius:0;padding:22px 0 26px;box-shadow:none}
+html.com-fundo .bloco{background:none;-webkit-backdrop-filter:none;backdrop-filter:none}
+.bloco legend{display:flex;flex-direction:column;align-items:flex-start;gap:9px;margin:0 0 18px}
+.passo{display:flex;align-items:center;gap:10px;font:600 10.5px/1 var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--fraco)}
+.passo::before{content:"";width:22px;height:4px;border-radius:1px;background:var(--cor,var(--acento))}
+.passo-1{--cor:var(--b2)}.passo-2{--cor:var(--b3)}.passo-3{--cor:var(--b4)}
+.bloco legend .tit{font:750 21px/1.1 var(--fonte);font-stretch:114%;letter-spacing:-.015em;color:var(--texto)}
+/* opções: borda firme, seleção sem degradê (borda dupla na cor de destaque) */
+.op-caixa,.lista-audio,.cam-liga,.seg,.guia,.qual-custom{border-color:rgba(255,255,255,.075);background:rgba(22,25,32,.82)}
+.op-caixa{border-radius:10px}
+.op input:checked+.op-caixa{background:rgba(22,25,32,.92);border-color:var(--acento);box-shadow:inset 0 0 0 1px var(--acento)}
+.op input:checked+.op-caixa b{color:var(--acento)}
+.cam-liga:has(input:checked){background:rgba(22,25,32,.92);border-color:var(--acento);box-shadow:inset 0 0 0 1px var(--acento)}
+.op-l input:checked~span b{color:var(--acento)}
+.lista-audio .op-l:has(input:checked){background:rgba(255,255,255,.025);box-shadow:inset 3px 0 0 var(--acento)}
+.etq{border-radius:3px;letter-spacing:.06em}
+/* página inicial: cartões mais firmes */
+.acao,.cartao-prog{border-radius:14px;border-color:rgba(255,255,255,.08);box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 24px 48px -28px rgba(0,0,0,.8)}
+.acao-tx b,.acao-grupo .grupo-titulo b{font-stretch:116%;letter-spacing:-.02em}
+.acao-rx label{font-weight:650;letter-spacing:-.005em}
+.fontes-mini span{border-radius:6px;background:rgba(255,255,255,.035);border-color:rgba(255,255,255,.07)}
+/* qualidade em lista que se explica */
+.lista-niveis .op-l{align-items:flex-start}
+.lista-niveis .nl-txt{flex:1;min-width:0}
+.nl-spec{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:5px;font:500 11.5px/1 var(--mono);color:var(--sub);white-space:nowrap;padding-top:2px}
+.nl-mbps{display:flex;align-items:center;gap:7px;color:var(--fraco)}
+.sinal{display:inline-flex;align-items:flex-end;gap:2px;height:11px}
+.sinal i{width:3px;border-radius:1px;background:rgba(255,255,255,.14)}
+.sinal i:nth-child(1){height:4px}.sinal i:nth-child(2){height:6px}.sinal i:nth-child(3){height:8px}.sinal i:nth-child(4){height:11px}
+.sinal[data-n="1"] i:nth-child(-n+1),.sinal[data-n="2"] i:nth-child(-n+2),.sinal[data-n="3"] i:nth-child(-n+3),.sinal[data-n="4"] i:nth-child(-n+4){background:var(--sub)}
+.op-l input:checked~.nl-spec .sinal i[style],.op-l:has(input:checked) .sinal[data-n="1"] i:nth-child(-n+1),.op-l:has(input:checked) .sinal[data-n="2"] i:nth-child(-n+2),.op-l:has(input:checked) .sinal[data-n="3"] i:nth-child(-n+3),.op-l:has(input:checked) .sinal[data-n="4"] i:nth-child(-n+4){background:var(--acento)}
+.qual-avancado{margin-top:10px}
+.qual-avancado>summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--sub);padding:4px 0}
+.qual-avancado>summary::-webkit-details-marker{display:none}
+.qual-avancado>summary::before{content:"+";font:600 14px/1 var(--mono);color:var(--fraco);width:14px}
+.qual-avancado[open]>summary::before{content:"−"}
+.qual-avancado .lista-audio{margin-top:8px}
+.qual-prioridade{margin-top:16px}
+@media (max-width:520px){.nl-spec{display:none}.bloco legend .tit{font-size:19px}}
+/* página inicial: rótulo de quem faz o quê, no mesmo estilo dos passos */
+.acao .passo{margin:0 0 10px}
+.acao-tx .passo{margin-bottom:12px}
+.acao-rx label{font:750 20px/1.15 var(--fonte);font-stretch:114%;letter-spacing:-.015em;margin:0 0 14px}
+.acao-grupo .grupo-titulo b{font:750 20px/1.15 var(--fonte);font-stretch:114%;letter-spacing:-.015em}
+.acao-grupo{gap:8px}
+.acao-grupo .btn{align-self:flex-start;margin-top:6px}
+
 </style>
 <script>
 // cor de destaque que muda com a hora do dia: violeta de madrugada, coral no amanhecer, amarelo de manhã,
@@ -740,7 +791,7 @@ html.transp body::before{display:none}
     <h1>Bota sua tela no ar pros amigos.</h1>
     <p class="lead">Tela inteira, uma janela ou uma aba, com o som do jogo e sem a voz da call. Abre no navegador e você manda o link.</p>
     <ul class="fatos">
-      <li>Vai direto do seu PC pro deles, sem servidor no meio.</li>
+      <li>Vai direto do seu PC pro deles. Com mais gente assistindo, um servidor repassa, como no Discord.</li>
       <li>Até 4K a 60 fps, com o som em estéreo.</li>
       <li>Grupo com várias telas ao mesmo tempo, no PC ou no celular.</li>
     </ul>
@@ -749,7 +800,7 @@ html.transp body::before{display:none}
   <div class="acoes">
     <button id="bt-modo-tx" class="acao acao-tx">
       <span class="topo-acao">
-        <span><b>Transmitir</b><small>Escolha o que mostrar e de onde vem o áudio.</small></span>
+        <span><span class="passo" style="--cor:var(--vivo)">Você mostra</span><b>Transmitir</b><small>Escolha o que mostrar e de onde vem o áudio.</small></span>
         <span class="seta"><svg class="i"><use href="#i-seta"/></svg></span>
       </span>
       <span class="fontes-mini">
@@ -762,7 +813,8 @@ html.transp body::before{display:none}
     </button>
 
     <form id="form-rx" class="acao acao-rx" novalidate>
-      <label for="in-codigo"><svg class="i"><use href="#i-olho"/></svg>Assistir um amigo</label>
+      <span class="passo" style="--cor:var(--b3)">Você assiste</span>
+      <label for="in-codigo">Assistir um amigo</label>
       <div class="campo-codigo">
         <input id="in-codigo" type="text" placeholder="código, ex: k7m2p" maxlength="40" autocomplete="off" spellcheck="false" autocapitalize="off">
         <button id="bt-assistir" class="btn primario" type="submit">Entrar</button>
@@ -770,7 +822,8 @@ html.transp body::before{display:none}
       <p id="erro-codigo" class="erro-campo hidden">Digite o código que seu amigo mandou.</p>
     </form>
     <div class="acao acao-grupo">
-      <div class="grupo-titulo"><svg class="i"><use href="#i-usuarios"/></svg><b>Grupo</b><span class="etq rec">NOVO</span></div>
+      <span class="passo" style="--cor:var(--b5)">Todo mundo mostra</span>
+      <div class="grupo-titulo"><b>Grupo</b></div>
       <small>Todo mundo que entrar pelo link pode compartilhar a tela, várias ao mesmo tempo. Você escolhe qual fica grande.</small>
       <button id="bt-criar-grupo" class="btn" type="button">Criar grupo</button>
     </div>
@@ -793,7 +846,7 @@ html.transp body::before{display:none}
   <div class="estudio">
     <div class="config">
       <fieldset class="bloco" id="bloco-fonte">
-        <legend><span class="num">1</span>O que mostrar</legend>
+        <legend><span class="passo passo-1">Passo 1</span><span class="tit">O que mostrar</span></legend>
         <div class="fontes" role="radiogroup" aria-label="O que mostrar">
           <label class="op"><input type="radio" name="fonte" value="monitor"><span class="op-caixa"><svg class="i"><use href="#i-monitor"/></svg><span><b>Tela inteira</b><small>O monitor todo</small></span></span></label>
           <label class="op"><input type="radio" name="fonte" value="window"><span class="op-caixa"><svg class="i"><use href="#i-janela"/></svg><span><b>Janela</b><small>Só um jogo ou app</small></span></span></label>
@@ -838,7 +891,7 @@ html.transp body::before{display:none}
       </fieldset>
 
       <fieldset class="bloco" id="bloco-audio">
-        <legend><span class="num">2</span>Áudio</legend>
+        <legend><span class="passo passo-2">Passo 2</span><span class="tit">Áudio</span></legend>
         <div class="lista-audio" role="radiogroup" aria-label="Áudio">
           <label class="op-l"><input type="radio" name="audio" value="app"><span class="radio"></span>
             <span><b>Pelo programa Tela ao Vivo Áudio</b><span class="etq rec">RECOMENDADO</span>
@@ -941,8 +994,11 @@ html.transp body::before{display:none}
       </fieldset>
 
       <fieldset class="bloco">
-        <legend><span class="num">3</span>Qualidade</legend>
-        <div id="niveis-tx" class="niveis" role="radiogroup" aria-label="Nível de qualidade"></div>
+        <legend><span class="passo passo-3">Passo 3</span><span class="tit">Qualidade</span></legend>
+        <div id="niveis-tx" class="lista-audio lista-niveis" role="radiogroup" aria-label="Nível de qualidade"></div>
+        <details class="qual-avancado" id="qual-avancado">
+          <summary>Avançado: escolher resolução, fps e taxa</summary>
+          <div id="niveis-tx-av" class="lista-audio lista-niveis"></div>
         <div id="qual-custom" class="qual-custom hidden">
           <div class="qc-grade">
             <label><span class="rotulo-campo">Resolução</span><select id="qc-res"></select></label>
@@ -951,10 +1007,12 @@ html.transp body::before{display:none}
           <div class="cam-linha"><span class="rotulo-campo">Taxa de dados</span><input type="range" id="qc-mbps" min="1" max="50" step="0.5" aria-label="Taxa de dados em Mbps"><span id="qc-mbps-txt" class="cam-tam-txt qc-mbps-txt">12 Mbps</span></div>
           <p class="dica qc-dica" id="qc-dica"></p>
         </div>
+        </details>
+        <div class="qual-prioridade"><span class="rotulo-campo">Quando a imagem pesa, priorizar</span>
         <div class="seg" role="radiogroup" aria-label="Otimizar para">
           <label><input type="radio" name="dica" value="motion"><span>Movimento<small>jogos, vídeo</small></span></label>
           <label><input type="radio" name="dica" value="detail"><span>Nitidez<small>texto, código</small></span></label>
-        </div>
+        </div></div>
 
         <details class="guia" id="guia-fps">
           <summary><svg class="i"><use href="#i-stats"/></svg>Como não cair fps sem perder qualidade<svg class="i mais"><use href="#i-mais"/></svg></summary>
@@ -1162,7 +1220,9 @@ const kbpsDe = q => q.kbps;
 // o vídeo vai direto do seu PC pra cada pessoa: a internet de upload precisa aguentar isso vezes quem assiste
 function dicaQualidade() {
   const q = qualidadeEscolhida();
-  let t = `Precisa de uns ${fmtMbps(q.kbps)} Mbps de upload por pessoa assistindo direto (com 2 ou mais pelo servidor de repasse, vai uma cópia só).`;
+  let t = q.kbps / 1000 > SFU_MAX_MBPS
+    ? `Sua internet precisa mandar ${fmtMbps(q.kbps)} Mbps pra cada pessoa assistindo (acima de 20 Mbps o servidor de repasse não é usado).`
+    : `Sua internet precisa mandar uns ${fmtMbps(q.kbps)} Mbps. Com 1 pessoa assistindo vai direto; com 2 ou mais, o servidor de repasse manda pra todo mundo e você continua mandando só uma cópia.`;
   if (q.h > 1080 && q.h <= 2160) t += ` Sua tela tem que ter ${q.h === 2160 ? '4K' : '1440p ou mais'} pra sair nessa resolução; se for menor, sai na resolução da tela.`;
   t += ' Se travar, escolha um nível mais leve. Dá pra trocar com a transmissão rolando.';
   $('#dica-qual').textContent = t;
@@ -1357,6 +1417,8 @@ function resumoStats(st) {
 // (igual ao Discord): o upload e a placa de vídeo de quem transmite fazem 1 vídeo em vez de 1 por pessoa.
 // Miniaturas do grupo e quem está com a internet ruim (qualidade menor) continuam direto, que é de graça.
 const SFU_A_PARTIR_DE = 2; // quantas pessoas na qualidade cheia ligam o servidor
+const SFU_MAX_MBPS = 20;   // acima disso (personalizado) o servidor não é usado: gastaria o grátis do mês rápido demais
+const sfuTaxaOk = () => !qualAtual || kbpsDe(qualAtual) <= SFU_MAX_MBPS * 1000;
 // O servidor só vale se estiver configurado E o mês ainda estiver dentro do grátis (a Vercel confere o contador).
 let sfuLigado = null, sfuLigadoHora = 0, sfuInfo = null; // sfuInfo: { ok, gb, limite } do último aviso da Vercel
 function sfuDisponivel(deNovo) {
@@ -2290,7 +2352,7 @@ async function abrirSala(novo) {
       }
       if (SFU.assistindo.has(id)) return;
       // direta e subiu pra qualidade cheia (virou a tela grande do grupo): vê se vale ir pro servidor
-      if (querCheio(id) && d.sfu === 1 && !SFU.falhou.has(id) && (SFU.pc || cheiosAgora(id) + 1 >= SFU_A_PARTIR_DE)) { conectarViewer(id); return; }
+      if (querCheio(id) && d.sfu === 1 && !SFU.falhou.has(id) && sfuTaxaOk() && (SFU.pc || cheiosAgora(id) + 1 >= SFU_A_PARTIR_DE)) { conectarViewer(id); return; }
       // o pedido chegou depois da ligação sair: se agora dá pra usar um formato melhor, refaz a ligação nele
       const atual = chamadas.get(conn.peer);
       if (atual && atual.__formato && atual.__formato !== formatoPara(conn.peer)) { ligarPara(conn.peer); return; }
@@ -2420,7 +2482,7 @@ function cheiosAgora(excluir) {
 }
 async function conectarViewer(id) {
   const conn = conexoes.get(id), ped = pedidos.get(id);
-  const pode = conn && ped && ped.sfu && !SFU.falhou.has(id) && querCheio(id) && streamTx && !(SFU.bloqueadoAte > Date.now());
+  const pode = conn && ped && ped.sfu && !SFU.falhou.has(id) && querCheio(id) && streamTx && !(SFU.bloqueadoAte > Date.now()) && sfuTaxaOk();
   if (pode && (SFU.pc || cheiosAgora(id) + 1 >= SFU_A_PARTIR_DE) && await sfuPublicar()) {
     sfuMandar(id);
     // quem já estava direto na qualidade cheia passa pro servidor também (o PC de quem transmite faz 1 vídeo só)
@@ -2519,6 +2581,11 @@ async function trocarQualidade() {
   if (!EH_WEBKIT) try { await vt.applyConstraints({ frameRate: { ideal: qualAtual.fps, max: qualAtual.fps }, width: { max: qualAtual.w }, height: { max: qualAtual.h } }); } catch {}
   for (const [id, c] of chamadas) if (c.peerConnection) aplicarParametros(c.peerConnection, id);
   sfuParametros();
+  // subiu pra mais de 20 Mbps no meio da transmissão: quem estava no servidor passa pro direto
+  if (SFU.pc && !sfuTaxaOk()) {
+    for (const id of [...SFU.assistindo]) { const conn = conexoes.get(id); try { conn && conn.open && conn.send({ tipo: 'sfu-sair' }); } catch {} ligarPara(id); }
+    sfuParar();
+  }
 }
 
 // A janela/aba/tela deixou de ser capturada (o Chrome cortou, a janela fechou, ou clicaram em "Parar de compartilhar"
@@ -5278,9 +5345,14 @@ if (EMBED) {
 // ============================================================ ligações da interface
 (function iniciarQualidade() {
   const box = $('#niveis-tx');
+  const PRA = { leve: 'Celular ou internet fraca. Bom pra conversa e tela parada.', moderado: 'O normal: 1080p liso, igual ou melhor que o Discord.',
+    alto: 'Pra quem assiste num monitor 2K.', maximo: 'Pra quem assiste em 4K. Pesa mais na internet.' };
+  const sinal = k => `<span class="sinal" data-n="${k <= 4000 ? 1 : k <= 12000 ? 2 : k <= 16000 ? 3 : 4}" aria-hidden="true"><i></i><i></i><i></i><i></i></span>`;
   for (const [k, q] of Object.entries(NIVEIS_TX))
-    box.insertAdjacentHTML('beforeend', `<label class="nivel"><input type="radio" name="qnivel" value="${k}"><span><b>${q.rot}</b><small>${rotRes(q.h)} · ${q.fps} fps<br>${fmtMbps(q.kbps)} Mbps</small></span></label>`);
-  box.insertAdjacentHTML('beforeend', '<label class="nivel"><input type="radio" name="qnivel" value="custom"><span><b>Personalizado</b><small id="qc-resumo"></small></span></label>');
+    box.insertAdjacentHTML('beforeend', `<label class="op-l"><input type="radio" name="qnivel" value="${k}"><span class="radio"></span>
+      <span class="nl-txt"><b>${q.rot}</b>${k === 'moderado' ? '<span class="etq rec">RECOMENDADO</span>' : ''}<small>${PRA[k]}</small></span>
+      <span class="nl-spec"><span>${rotRes(q.h)} · ${q.fps} fps</span><span class="nl-mbps">${sinal(q.kbps)}${fmtMbps(q.kbps)} Mbps</span></span></label>`);
+  $('#niveis-tx-av').insertAdjacentHTML('beforeend', '<label class="op-l"><input type="radio" name="qnivel" value="custom"><span class="radio"></span><span class="nl-txt"><b>Personalizado</b><small id="qc-resumo">Você escolhe. Acima de 20 Mbps não passa pelo servidor de repasse: vai uma cópia direto pra cada pessoa.</small></span></label>');
   RES_TX.forEach(([h, , rot]) => $('#qc-res').add(new Option(rot, h)));
   FPS_TX.forEach(f => $('#qc-fps').add(new Option(f + ' fps', f)));
   let n = guardar.get('qualNivel');
@@ -5304,8 +5376,9 @@ function mostrarCustom() {
   $('#qual-custom').classList.toggle('hidden', radio('qnivel') !== 'custom');
   const c = lerCustom();
   $('#qc-mbps-txt').textContent = fmtMbps(c.mbps * 1000) + ' Mbps';
-  $('#qc-resumo').innerHTML = '';
-  $('#qc-resumo').append(`${rotRes(c.h)} · ${c.fps} fps`, document.createElement('br'), `${fmtMbps(c.mbps * 1000)} Mbps`);
+  $('#qc-resumo').textContent = `${rotRes(c.h)} · ${c.fps} fps · ${fmtMbps(c.mbps * 1000)} Mbps` +
+    (c.mbps > SFU_MAX_MBPS ? ' · acima de 20 Mbps não usa o servidor de repasse (vai uma cópia direto pra cada pessoa)' : '');
+  if (radio('qnivel') === 'custom') $('#qual-avancado').open = true;
   dicaQualidade();
 }
 document.querySelectorAll('input[name="qnivel"]').forEach(i => i.onchange = () => { guardar.set('qualNivel', radio('qnivel')); mostrarCustom(); trocarQualidade(); });
