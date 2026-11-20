@@ -495,6 +495,18 @@ html.transp body::before{display:none}
   -webkit-mask-image:radial-gradient(farthest-side,#000 58%,rgba(0,0,0,.7) 70%,rgba(0,0,0,.3) 85%,transparent);mask-image:radial-gradient(farthest-side,#000 58%,rgba(0,0,0,.7) 70%,rgba(0,0,0,.3) 85%,transparent)}
 #grupo.cinema .tile-luz{-webkit-mask-image:linear-gradient(180deg,transparent,#000 14%,#000 86%,transparent);mask-image:linear-gradient(180deg,transparent,#000 14%,#000 86%,transparent)}
 .luz-on .tile-luz.viva{opacity:.8}
+/* camada de perto: brilho forte que abraça a borda da tela */
+.tile-luz.perto{left:-5%;top:-9%;width:110%;height:118%;filter:blur(22px) saturate(1.6) brightness(1.25);
+  -webkit-mask-image:none;mask-image:none;transition:opacity .6s}
+.luz-on .tile-luz.perto.viva{opacity:.55}
+#grupo.cinema .tile-luz.perto{display:none}
+/* grão bem fino por cima da luz: some com as "listras" do degradê escuro */
+.tile-luz.grao{filter:none;mix-blend-mode:overlay;transition:opacity .9s;background-size:160px 160px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 1.6 -.3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23g)'/%3E%3C/svg%3E")}
+.luz-on .tile-luz.grao.viva{opacity:.09}
+#grupo.cinema .tile-luz.grao{display:none}
+.bt-luz[aria-pressed="true"] .ponto{transition:background .6s,box-shadow .6s}
+.bt-luz[aria-pressed="true"][style*="--luz-cor"] .ponto{background:var(--luz-cor);box-shadow:0 0 12px var(--luz-cor)}
 .tile:fullscreen .tile-luz,.tile.tile-cheio .tile-luz{display:none}
 .grupo-telas{display:grid;gap:10px}
 .grupo-telas.grade{grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr))}
@@ -5558,31 +5570,86 @@ function aplicarLuz() {
 }
 $('#bt-luz').onclick = () => { luzAmbiente = !luzAmbiente; guardar.set('luzAmbiente', luzAmbiente ? '1' : '0'); aplicarLuz(); ajustarTiles(); };
 aplicarLuz();
-function atualizarLuz() {
+// Duas camadas: um brilho forte colado na borda da tela e um halo largo e suave por trás.
+// A imagem é lida 8x por segundo, mas a luz é pintada a 30 quadros por segundo indo aos poucos
+// até a cor nova: muda liso, sem degrau. Clarão acende rápido e apaga devagar, como luz de verdade.
+const LUZ_W = 32, LUZ_H = 18, luzes = new Map(); // tile -> estado
+function amostrarLuz() {
   if (!grupo.ativo || !luzAmbiente || document.hidden) return;
+  for (const [t, st] of luzes) if (!t.isConnected) luzes.delete(t);
   for (const t of document.querySelectorAll('#grupo-telas .tile')) {
     let v = null;
     if (t.classList.contains('eu')) v = t.querySelector('video');
     else try { const f = t.querySelector('iframe'); v = f && f.contentDocument && f.contentDocument.getElementById('video'); } catch {}
-    let c = t.querySelector('.tile-luz');
-    if (!v || v.readyState < 2 || !v.videoWidth || v.webkitDisplayingFullscreen) { if (c) c.classList.remove('viva'); continue; }
-    if (!c) { c = document.createElement('canvas'); c.className = 'tile-luz'; c.width = 32; c.height = 18; t.prepend(c); }
-    const x = c.getContext('2d');
-    // mistura com o quadro anterior: a cor muda devagar, sem piscar
-    x.globalAlpha = c.classList.contains('viva') ? 0.25 : 1;
-    try { x.drawImage(luzEquilibrada(v), 0, 0); c.classList.add('viva'); } catch {}
+    let st = luzes.get(t);
+    if (!v || v.readyState < 2 || !v.videoWidth || v.webkitDisplayingFullscreen) {
+      if (st) { for (const e of [st.longe, st.perto, st.grao]) e.classList.remove('viva'); st.pronta = false; }
+      continue;
+    }
+    if (!st) {
+      const longe = document.createElement('canvas'); longe.className = 'tile-luz'; longe.width = LUZ_W; longe.height = LUZ_H;
+      const perto = document.createElement('canvas'); perto.className = 'tile-luz perto'; perto.width = LUZ_W; perto.height = LUZ_H;
+      t.querySelectorAll('.tile-luz').forEach(x => x.remove());
+      const grao = document.createElement('div'); grao.className = 'tile-luz grao';
+      t.prepend(longe, perto, grao);
+      const ctx = longe.getContext('2d');
+      st = { longe, perto, grao, ctx, ctx2: perto.getContext('2d'), img: ctx.createImageData(LUZ_W, LUZ_H),
+             alvo: new Float32Array(LUZ_W * LUZ_H * 3), atual: new Float32Array(LUZ_W * LUZ_H * 3), pronta: false, corte: 0 };
+      luzes.set(t, st);
+    }
+    const d = luzEquilibrada(v); if (!d) continue;
+    let dif = 0;
+    for (let i = 0, j = 0; i < d.length; i += 4, j += 3) {
+      dif += Math.abs(d[i] - st.alvo[j]) + Math.abs(d[i + 1] - st.alvo[j + 1]) + Math.abs(d[i + 2] - st.alvo[j + 2]);
+      st.alvo[j] = d[i]; st.alvo[j + 1] = d[i + 1]; st.alvo[j + 2] = d[i + 2];
+    }
+    // troca de cena (a imagem mudou quase toda): a luz acompanha rápido nos próximos quadros
+    if (dif / (LUZ_W * LUZ_H * 3) > 38) st.corte = 6;
+    if (!st.pronta) { st.atual.set(st.alvo); st.pronta = 'nova'; }
   }
 }
+let luzUltimo = 0;
+function pintarLuz(agora) {
+  requestAnimationFrame(pintarLuz);
+  if (agora - luzUltimo < 32 || !grupo.ativo || !luzAmbiente || document.hidden || !luzes.size) return;
+  luzUltimo = agora;
+  for (const st of luzes.values()) {
+    if (!st.pronta) continue;
+    const a = st.atual, b = st.alvo, px = st.img.data;
+    const subir = st.corte > 0 ? 0.32 : 0.24, descer = st.corte > 0 ? 0.26 : 0.07; // acende rápido, apaga devagar
+    if (st.corte > 0) st.corte--;
+    let mexeu = st.pronta === 'nova';
+    for (let i = 0, j = 0; j < a.length; i += 4, j += 3) {
+      for (let k = 0; k < 3; k++) {
+        const de = b[j + k] - a[j + k];
+        if (de > 0.4 || de < -0.4) { a[j + k] += de * (de > 0 ? subir : descer); mexeu = true; }
+      }
+      px[i] = a[j]; px[i + 1] = a[j + 1]; px[i + 2] = a[j + 2]; px[i + 3] = 255;
+    }
+    if (!mexeu) continue; // tela parada: não gasta nada
+    st.ctx.putImageData(st.img, 0, 0);
+    st.ctx2.clearRect(0, 0, LUZ_W, LUZ_H); st.ctx2.drawImage(st.longe, 0, 0);
+    if (st.pronta === 'nova') { st.pronta = true; for (const e of [st.longe, st.perto, st.grao]) e.classList.add('viva'); }
+  }
+  // o pontinho do botão fica com a cor mais viva da luz
+  const fonte = [...luzes.values()].find(st => st.pronta);
+  if (fonte) {
+    const a = fonte.atual; let melhor = 0, j0 = 0;
+    for (let j = 0; j < a.length; j += 3) { const f = Math.max(a[j], a[j + 1], a[j + 2]) - Math.min(a[j], a[j + 1], a[j + 2]); if (f > melhor) { melhor = f; j0 = j; } }
+    $('#bt-luz').style.setProperty('--luz-cor', `rgb(${a[j0] | 0},${a[j0 + 1] | 0},${a[j0 + 2] | 0})`);
+  }
+}
+requestAnimationFrame(pintarLuz);
 // A luz vem das beiradas da imagem; se um lado da tela é claro e o outro escuro, ela fica torta.
 // Aqui mistura um pouco da cor geral e iguala o brilho das colunas: os dois lados brilham parecido,
 // mas ainda com um toque da cor de cada lado.
-const luzTmp = document.createElement('canvas'); luzTmp.width = 32; luzTmp.height = 18;
+const luzTmp = document.createElement('canvas'); luzTmp.width = LUZ_W; luzTmp.height = LUZ_H;
 const luzCtx = luzTmp.getContext('2d', { willReadFrequently: true });
 function luzEquilibrada(v) {
   luzCtx.globalAlpha = 1;
   luzCtx.drawImage(v, 0, 0, 32, 18);
   let img;
-  try { img = luzCtx.getImageData(0, 0, 32, 18); } catch { return luzTmp; }
+  try { img = luzCtx.getImageData(0, 0, 32, 18); } catch { return null; }
   const d = img.data, W = 32, H = 18, lum = (r, g, b) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
   let mr = 0, mg = 0, mb = 0;
   const col = new Array(W).fill(0);
@@ -5595,16 +5662,15 @@ function luzEquilibrada(v) {
   const media = Math.max(1, lum(mr, mg, mb));
   for (let y = 0; y < H; y++) for (let xx = 0; xx < W; xx++) {
     const i = (y * W + xx) * 4;
-    // 40% da cor geral da imagem
-    let r = d[i] * .6 + mr * .4, g = d[i + 1] * .6 + mg * .4, b = d[i + 2] * .6 + mb * .4;
+    // 25% da cor geral da imagem (o brilho dos dois lados quem iguala é o ganho abaixo; a cor de cada lado fica fiel)
+    let r = d[i] * .75 + mr * .25, g = d[i + 1] * .75 + mg * .25, b = d[i + 2] * .75 + mb * .25;
     // brilho da coluna puxado pro brilho médio (limitado, pra não estourar uma coluna preta)
     const ganho = Math.min(2.5, Math.max(.6, media / Math.max(4, col[xx] * .6 + media * .4)));
     d[i] = Math.min(255, r * ganho); d[i + 1] = Math.min(255, g * ganho); d[i + 2] = Math.min(255, b * ganho);
   }
-  luzCtx.putImageData(img, 0, 0);
-  return luzTmp;
+  return d;
 }
-setInterval(atualizarLuz, 200);
+setInterval(amostrarLuz, 125);
 // celular: o som só pode ligar dentro de um toque. Qualquer toque na tela do grupo tenta de novo nas janelinhas.
 for (const ev of ['touchend', 'click']) document.addEventListener(ev, () => { if (grupo.ativo && !EMBED) ajustarTiles(true); }, true);
 
