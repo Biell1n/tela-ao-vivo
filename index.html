@@ -675,7 +675,15 @@ html.com-fundo .bloco{background:none;-webkit-backdrop-filter:none;backdrop-filt
 @media (prefers-reduced-motion:reduce){.tela.entrando,#tx.entrando *,.acao-tx.ligando,.espera-barras i{animation:none!important}}
 
 /* ícones de perfil do grupo */
-.avatares{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:8px;margin:0 0 18px}
+.av-escolha{display:flex;gap:20px;align-items:flex-start;margin:18px 0 18px}
+.av-previa{flex:none;width:132px;height:132px;border-radius:50%;overflow:hidden;padding:0;border:3px solid var(--acento);box-shadow:0 0 0 6px var(--acento-suave),0 20px 40px -18px rgba(0,0,0,.8);cursor:zoom-in}
+.av-previa img{width:100%;height:100%;object-fit:cover;display:block}
+.av-lado{flex:1;min-width:0}
+@media (max-width:560px){.av-escolha{flex-direction:column;align-items:center}.av-previa{width:112px;height:112px}}
+.avatares{display:grid;grid-template-columns:repeat(auto-fill,minmax(54px,1fr));gap:8px;margin:0}
+.av-zoom{position:fixed;inset:0;z-index:200;display:grid;place-items:center;background:rgba(8,10,14,.82);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);cursor:zoom-out;animation:telaEntra .25s ease-out both}
+.av-zoom img{width:min(78vmin,512px);height:min(78vmin,512px);border-radius:28px;box-shadow:0 30px 80px -20px rgba(0,0,0,.9)}
+.av-img{cursor:zoom-in}
 .avatares button{aspect-ratio:1;border-radius:50%;padding:0;overflow:hidden;border:2px solid transparent;transition:transform .15s,border-color .15s}
 .avatares button:hover{transform:scale(1.06)}
 .avatares button[aria-checked=true]{border-color:var(--acento);box-shadow:0 0 0 3px var(--acento-suave)}
@@ -1201,8 +1209,11 @@ html.com-fundo .bloco{background:none;-webkit-backdrop-filter:none;backdrop-filt
     <span class="passo" style="--cor:var(--b5)">Todo mundo mostra</span>
     <h2 id="titulo-entrar-grupo">Entrar no grupo</h2>
     <p class="lead" id="sub-entrar-grupo">Escolha como seu nome vai aparecer pros outros do grupo.</p>
-    <span class="rotulo-campo" style="margin-top:18px">Seu ícone</span>
-    <div id="avatares" class="avatares" role="radiogroup" aria-label="Seu ícone"></div>
+    <div class="av-escolha">
+      <button type="button" class="av-previa" id="av-previa" aria-label="Ver o ícone maior"><img id="av-previa-img" alt=""></button>
+      <div class="av-lado"><span class="rotulo-campo">Seu ícone</span>
+      <div id="avatares" class="avatares" role="radiogroup" aria-label="Seu ícone"></div></div>
+    </div>
     <form id="form-nome" class="campo-codigo" novalidate>
       <input id="in-nome" type="text" placeholder="Seu nome" maxlength="24" autocomplete="nickname" spellcheck="false">
       <button class="btn primario" type="submit">Entrar</button>
@@ -4840,16 +4851,38 @@ const N_AVATARES = 16;
 const avValido = v => Number.isInteger(+v) && +v >= 0 && +v < N_AVATARES ? +v : null;
 let meuAvatar = avValido(guardar.get('avatar'));
 if (meuAvatar == null) { meuAvatar = Math.floor(Math.random() * N_AVATARES); guardar.set('avatar', String(meuAvatar)); }
-function imgAvatar(v) { const i = document.createElement('img'); i.className = 'av-img'; i.alt = ''; i.loading = 'lazy'; i.src = `avatares/${avValido(v) ?? 0}.webp`; return i; }
+function imgAvatar(v) {
+  const k = avValido(v) ?? 0, i = document.createElement('img');
+  i.className = 'av-img'; i.alt = ''; i.loading = 'lazy'; i.src = `avatares/p${k}.webp`; i.title = 'Ver maior';
+  i.onclick = e => { e.stopPropagation(); zoomAvatar(k); };
+  return i;
+}
+// ver o ícone de perto: tela cheia escurecida; clique ou Esc fecha
+function zoomAvatar(k) {
+  let z = document.getElementById('av-zoom');
+  if (!z) {
+    z = document.createElement('div'); z.id = 'av-zoom'; z.className = 'av-zoom hidden'; z.setAttribute('role', 'dialog'); z.setAttribute('aria-label', 'Ícone ampliado');
+    z.innerHTML = '<img alt="">'; z.onclick = () => z.classList.add('hidden');
+    addEventListener('keydown', e => { if (e.key === 'Escape') z.classList.add('hidden'); });
+    document.body.append(z);
+  }
+  z.querySelector('img').src = `avatares/${k}.webp`;
+  z.classList.remove('hidden');
+}
 (function montarAvatares() {
   const box = $('#avatares'); if (!box) return;
   for (let k = 0; k < N_AVATARES; k++) {
     const b = document.createElement('button'); b.type = 'button'; b.setAttribute('role', 'radio'); b.setAttribute('aria-label', 'Ícone ' + (k + 1));
     b.setAttribute('aria-checked', String(k === meuAvatar));
-    const im = document.createElement('img'); im.src = `avatares/${k}.webp`; im.alt = ''; im.loading = 'lazy'; b.append(im);
-    b.onclick = () => { meuAvatar = k; guardar.set('avatar', String(k)); box.querySelectorAll('button').forEach((x, j) => x.setAttribute('aria-checked', String(j === k))); };
+    const im = document.createElement('img'); im.src = `avatares/p${k}.webp`; im.alt = ''; im.loading = 'lazy'; b.append(im);
+    b.onclick = () => { meuAvatar = k; guardar.set('avatar', String(k)); box.querySelectorAll('button').forEach((x, j) => x.setAttribute('aria-checked', String(j === k))); previa(k); };
+    b.onmouseenter = b.onfocus = () => previa(k);
+    b.onmouseleave = b.onblur = () => previa(meuAvatar);
     box.append(b);
   }
+  const previa = k => { $('#av-previa-img').src = `avatares/${k}.webp`; };
+  previa(meuAvatar);
+  $('#av-previa').onclick = () => zoomAvatar(meuAvatar);
 })();
 function entrarNoGrupo() {
   const nome = $('#in-nome').value.trim();
