@@ -3072,10 +3072,11 @@ function redeQuadro(vw, vh, W, H, ow, oh, ox, oy, alvoH) {
   gl.uniform1i(U(REDE.progY, 'tex'), 0);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   // 2) rede 2x (e mais 2x se o vídeo for pequeno e a tela/alvo pedir bem mais)
-  let L = REDE.net.rodar(ty.t, vw, vh, ow, oh);
-  if (Math.max(oh, alvoH) > L.h * 1.05 && vh <= 720) {
+  const destH = Math.max(oh, alvoH), destW = Math.round(vw * destH / vh);
+  let L = REDE.net.rodar(ty.t, vw, vh, destW, destH);
+  if (destH > L.h * 1.05 && vh <= 720) {
     if (!REDE.net2) REDE.net2 = srMpv(gl, REDE.fonte);
-    L = REDE.net2.rodar(L.tex, L.w, L.h, ow, oh);
+    L = REDE.net2.rodar(L.tex, L.w, L.h, destW, destH);
   }
   // 3) junta o detalhe da rede com a cor
   const tj = redeAlvo('j', L.w, L.h);
@@ -3366,7 +3367,7 @@ function iaMontar(vw, vh, iw, ih) {
   IA.entrada = dev.createTexture({ size: [vw, vh, 1], format: 'rgba16float',
     usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT });
   // Modo A do Anime4K: segura os brilhos, restaura (tira o borrão da compressão) e amplia 2x (ou 4x) com rede neural
-  IA.pipes = [new IA.lib.ModeA({ device: dev, inputTexture: IA.entrada,
+  IA.pipes = [new IA.lib[SR.forte && IA.lib.ModeAA ? 'ModeAA' : 'ModeA']({ device: dev, inputTexture: IA.entrada,
     nativeDimensions: { width: vw, height: vh }, targetDimensions: { width: iw, height: ih } })];
   IA.bind = dev.createBindGroup({ layout: IA.render.getBindGroupLayout(0), entries: [
     { binding: 0, resource: IA.sampler },
@@ -3391,13 +3392,15 @@ function iaQuadro() {
   const W = Math.round(r.width * dpr), H = Math.round(r.height * dpr);
   const esc = Math.min(W / vw, H / vh);
   const ow = Math.round(vw * esc), oh = Math.round(vh * esc);
-  let ih = Math.min(Math.max(oh, srAlvo()), 2160, Math.round(oh * 2.5));
+  let alvo = srAlvo();
+  if (!alvo && vh >= oh * 0.9) alvo = 2160; // nada pra ampliar: restaura (amplia em 4K e reduz pra tela)
+  let ih = Math.min(Math.max(oh, alvo), 2160, Math.round(oh * 2.5));
   let iw = Math.round(vw * ih / vh);
   if (iw > 5120) { iw = 5120; ih = Math.round(vh * iw / vw); }
   if (ih < vh * 1.08 || oh < vh * 0.9) { iaParar(); SR.info = ''; iaAgendar(); return; } // já chega do tamanho (ou a tela é menor): nada a ampliar
   const dev = IA.device, cv = IA.cv;
   try {
-    const chave = `${vw}x${vh}>${iw}x${ih}`;
+    const chave = `${vw}x${vh}>${iw}x${ih}${SR.forte ? '+' : ''}`;
     if (chave !== IA.chave) { iaMontar(vw, vh, iw, ih); IA.chave = chave; }
     if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
     dev.queue.copyExternalImageToTexture({ source: video }, { texture: IA.entrada }, [vw, vh]);
@@ -3448,7 +3451,7 @@ function alternarMotorSR() {
 // "igual à qualidade": escolheu 2K na Qualidade, a super resolução vai até 2K
 const srAlvo = () => SR.alvo === -1 ? (NIVEIS_RX[qRx.nivel].altura || 0) : SR.alvo;
 const SR_ALVOS = [[-1, 'Igual à qualidade'], [0, 'Até a tela'], [1080, '1080p'], [1440, '2K (1440p)'], [2160, '4K (2160p)']];
-const textoSR = () => !SR.modo ? 'Desligada' : (SR.motor === 'ia' ? 'IA · ' : '') + SR_ALVOS.find(a => a[0] === SR.alvo)[1] + (SR.motor !== 'ia' && SR.forte ? ' · nítida' : '');
+const textoSR = () => !SR.modo ? 'Desligada' : (SR.motor === 'ia' ? 'Anime · ' : '') + SR_ALVOS.find(a => a[0] === SR.alvo)[1] + (SR.forte ? (SR.motor === 'ia' ? ' · forte' : ' · nítida') : '');
 function escolherAlvoSR(alvo) {
   SR.alvo = alvo;
   guardar.set('superResAlvo', String(alvo));
@@ -3529,10 +3532,10 @@ function renderMenu(vista) {
     m.append(itemMenu('Desligada', null, () => { definirSuperRes(0); fecharMenu(); }, { marcado: !SR.modo }));
     SR_ALVOS.forEach(([alvo, rot]) => m.append(itemMenu(rot, null, () => { escolherAlvoSR(alvo); fecharMenu(); }, { marcado: !!SR.modo && SR.alvo === alvo })));
     m.append(itemMenu('Tipo', SR.motor === 'ia' ? 'Anime (Anime4K)' : 'Neural (jogos, filmes, tudo)', () => { alternarMotorSR(); renderMenu('superres'); }));
-    if (SR.motor !== 'ia') m.append(itemMenu('Mais nitidez', SR.forte ? 'Ligada' : 'Desligada', () => { alternarForteSR(); renderMenu('superres'); }));
+    m.append(itemMenu(SR.motor === 'ia' ? 'Restauração forte' : 'Mais nitidez', SR.forte ? 'Ligada' : 'Desligada', () => { alternarForteSR(); renderMenu('superres'); }));
     const nota = document.createElement('p'); nota.className = 'menu-nota';
     nota.textContent = SR.motor === 'ia'
-      ? 'IA (Anime4K): redes neurais na sua placa de vídeo reconstroem o traço e as bordas e tiram o borrão da compressão, até a resolução escolhida; depois reduz pra sua tela, como a "resolução 200%" dos jogos. Melhor em desenho, anime e animação 3D (nos testes ficou quase tão nítido quanto um 1080p de verdade). Em jogo realista e filme, use a Rápida. Pesa: se a placa não der conta, volta sozinha pra rápida.'
+      ? 'Anime (Anime4K): redes neurais na sua placa de vídeo tiram o borrão e reconstroem o traço. Melhor em desenho, anime e animação 3D. Restaura até vídeo pequeno esticado na tela (ex.: um 720p em tela cheia): quando a imagem já chega do tamanho da tela, ela amplia em 4K e reduz de volta, e o contorno fica nítido. "Restauração forte" limpa mais (pesa ~2x). Em foto e jogo realista, use a Neural. Se a placa não der conta, volta sozinha pra Neural.'
       : 'Neural (FSRCNNX): uma rede neural pequena na sua placa de vídeo reconstrói o detalhe ao dobrar a resolução, e depois ajusta pra sua tela. Nos testes ficou mais nítida e mais fiel que as outras em jogo, filme e desenho, e é leve. Se a placa não tiver suporte, usa a ampliação rápida.';
     m.append(nota);
   } else if (vista === 'volume') {
@@ -4067,7 +4070,7 @@ setInterval(async () => {
           `Você pediu  ${qRx.auto ? 'AUTO · ' : ''}${NIVEIS_RX[qRx.nivel].nome}\n` +
           (it && it.capH && NIVEIS_RX[qRx.nivel].altura > it.capH ? `Limite      a tela dele está em ${it.capH}p (só ele pode subir, lá na transmissão)
 ` : '') +
-          (SR.modo ? `Super res.  ${SR.info || 'ligada (a imagem já está do tamanho da tela)'}
+          (SR.modo ? `Super res.  ${SR.info || (SR.motor === 'ia' ? 'ligada' : 'parada: a imagem já chega do tamanho da sua tela (pra restaurar vídeo esticado, use o tipo Anime ou escolha 2K/4K)')}
 ` : '') +
           `Som         ${somRx.texto}\n` +
           `Descartados ${st.descartados} quadros\nDecoder     ${st.decoder || '?'}` +
