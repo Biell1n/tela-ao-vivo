@@ -485,10 +485,10 @@ main{overflow-x:clip}
 #grupo.cinema .grupo-palco.luz-on .tile.foco .tile-luz.viva{opacity:.62}
 html.transp,html.transp body,html.transp #player,html.transp #video{background:transparent!important}
 html.transp body::before{display:none}
-.tile-luz{position:absolute;left:-14%;top:-20%;width:128%;height:140%;z-index:-1;pointer-events:none;
-  filter:blur(40px) saturate(1.6) brightness(1.05);opacity:0;transition:opacity .9s;
-  /* vai sumindo aos poucos pros lados, sem borda */
-  -webkit-mask-image:radial-gradient(farthest-side,#000 52%,rgba(0,0,0,.45) 76%,transparent);mask-image:radial-gradient(farthest-side,#000 52%,rgba(0,0,0,.45) 76%,transparent)}
+.tile-luz{position:absolute;left:-30%;top:-32%;width:160%;height:164%;z-index:-1;pointer-events:none;
+  filter:blur(48px) saturate(1.8) brightness(1.15);opacity:0;transition:opacity .9s;
+  /* forte até um pouco depois da borda da tela e depois vai sumindo bem devagar, sem corte */
+  -webkit-mask-image:radial-gradient(farthest-side,#000 58%,rgba(0,0,0,.7) 70%,rgba(0,0,0,.3) 85%,transparent);mask-image:radial-gradient(farthest-side,#000 58%,rgba(0,0,0,.7) 70%,rgba(0,0,0,.3) 85%,transparent)}
 #grupo.cinema .tile-luz{-webkit-mask-image:linear-gradient(180deg,transparent,#000 14%,#000 86%,transparent);mask-image:linear-gradient(180deg,transparent,#000 14%,#000 86%,transparent)}
 .luz-on .tile-luz.viva{opacity:.8}
 .tile:fullscreen .tile-luz,.tile.tile-cheio .tile-luz{display:none}
@@ -1234,6 +1234,9 @@ function ajustarSDP(sdp, codec = 'H264', extra) {
     const h264 = pts('H264');
     const pm1 = h264.filter(pt => /packetization-mode=1/.test(fmtp(pt)));
     preferidos = pm1.length ? pm1 : h264;
+    // perfil High (64) > Main (4d) > Baseline (42): o High comprime melhor (menos pixelado na troca de cena, mesma taxa)
+    const perfil = pt => { const m = fmtp(pt).match(/profile-level-id=([0-9a-f]{2})/i); return m ? ({ '64': 0, '4d': 1 }[m[1].toLowerCase()] ?? 2) : 3; };
+    preferidos = [...preferidos].sort((a, b) => perfil(a) - perfil(b));
   } else if (codec) {
     preferidos = pts(codec);
     if (codec === 'VP9') preferidos = preferidos.filter(pt => !/profile-id=[12]/.test(fmtp(pt))); // VP9: só o perfil 0 (o comum)
@@ -1315,6 +1318,7 @@ async function lerStats(pc, tipo) {
     const u = (rel.url || '') + ' ' + (local && local.url || '');
     rota = 'servidor' + (/cloudflare/i.test(u) ? ' São Paulo' : /expressturn/i.test(u) ? ' Paris' : '') + (rel.relayProtocol === 'tcp' || rel.relayProtocol === 'tls' ? ' (TCP)' : '');
   } else if (local) rota = ehHost(local) || ehHost(remoto) ? 'direto (mesma rede)' : 'direto (internet)';
+  if (pc.__sfu) rota = 'servidor de repasse' + (rel ? ' (TURN)' : '');
   return {
     fps: Math.round(v.framesPerSecond || 0), w: v.frameWidth || 0, h: v.frameHeight || 0, mbps,
     ping: par && par.currentRoundTripTime != null ? Math.round(par.currentRoundTripTime * 1000) : null,
@@ -1335,6 +1339,41 @@ function resumoStats(st) {
   if (st.ping != null) p.push(`${st.ping} ms`);
   if (st.rota) p.push(st.rota);
   return p.join(' · ');
+}
+
+// ============================================================ servidor de repasse (SFU da Cloudflare)
+// Com 2+ pessoas assistindo na qualidade cheia, quem transmite manda a imagem UMA vez pro servidor e ele repassa
+// (igual ao Discord): o upload e a placa de vídeo de quem transmite fazem 1 vídeo em vez de 1 por pessoa.
+// Miniaturas do grupo e quem está com a internet ruim (qualidade menor) continuam direto, que é de graça.
+const SFU_A_PARTIR_DE = 2; // quantas pessoas na qualidade cheia ligam o servidor
+let sfuLigado = null; // promessa: a Vercel tem o servidor configurado?
+function sfuDisponivel() {
+  if (!sfuLigado) sfuLigado = fetch('/api/sfu', { cache: 'no-store' }).then(r => r.status === 200).catch(() => false);
+  return sfuLigado;
+}
+async function sfuApi(op, sessao, dados) {
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 8000);
+  try {
+    const r = await fetch('/api/sfu', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op, sessao, dados }), signal: ctl.signal });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.errorCode) throw new Error('sfu ' + op + ': ' + (j.errorCode || r.status) + ' ' + (j.errorDescription || ''));
+    return j;
+  } finally { clearTimeout(t); }
+}
+async function sfuConfigIce() {
+  const op = await opcoesPeer();
+  const turn = ((op.config || {}).iceServers || []).filter(x => [].concat(x.urls).some(u => /^turns?:/.test(u || '')));
+  return { iceServers: [{ urls: 'stun:stun.cloudflare.com:3478' }, ...turn], bundlePolicy: 'max-bundle' };
+}
+function sfuConectado(pc, ms) {
+  return new Promise((ok, falha) => {
+    if (pc.connectionState === 'connected') return ok();
+    const t = setTimeout(() => falha(new Error('sfu: não conectou')), ms);
+    pc.addEventListener('connectionstatechange', () => {
+      if (pc.connectionState === 'connected') { clearTimeout(t); ok(); }
+      if (pc.connectionState === 'failed' || pc.connectionState === 'closed') { clearTimeout(t); falha(new Error('sfu: ' + pc.connectionState)); }
+    });
+  });
 }
 
 // ============================================================ TRANSMITIR
@@ -1436,6 +1475,10 @@ async function trocarSaida(t) {
   for (const c of chamadas.values()) {
     const pc = c.peerConnection; if (!pc) continue;
     const snd = pc.getSenders().find(x => x.track && x.track.kind === 'audio');
+    if (snd) try { await snd.replaceTrack(t); } catch {}
+  }
+  if (SFU.pc) {
+    const snd = SFU.pc.getSenders().find(x => x.track && x.track.kind === 'audio');
     if (snd) try { await snd.replaceTrack(t); } catch {}
   }
 }
@@ -2152,14 +2195,32 @@ async function abrirSala(novo) {
     conn.on('open', () => {
       conexoes.set(conn.peer, conn);
       // espera um instante o "pedido" (diz o que o aparelho decodifica); quem tem versão antiga do site não manda
-      const t = setTimeout(() => ligarPara(conn.peer), 1500);
-      esperandoPedido.set(conn.peer, () => { clearTimeout(t); ligarPara(conn.peer); });
+      const t = setTimeout(() => conectarViewer(conn.peer), 1500);
+      esperandoPedido.set(conn.peer, () => { clearTimeout(t); conectarViewer(conn.peer); });
     });
     conn.on('data', d => {
-      if (!d || d.tipo !== 'pedido') return;
-      pedidos.set(conn.peer, { kbps: +d.kbps || 0, altura: +d.altura || 0, fps: +d.fps || 0, decod: Array.isArray(d.decod) ? d.decod : null });
+      if (!d) return;
+      const id = conn.peer;
+      if (d.tipo === 'sfu-ok') { // já está vendo pelo servidor: desliga a ligação direta
+        if (!SFU.assistindo.has(id)) return;
+        SFU.ok.add(id);
+        const c = chamadas.get(id);
+        if (c) { chamadas.delete(id); try { c.close(); } catch {} }
+        return;
+      }
+      if (d.tipo === 'sfu-falhou') { SFU.falhou.add(id); SFU.assistindo.delete(id); SFU.ok.delete(id); if (!chamadas.has(id)) ligarPara(id); sfuRevisar(); return; }
+      if (d.tipo !== 'pedido') return;
+      pedidos.set(conn.peer, { kbps: +d.kbps || 0, altura: +d.altura || 0, fps: +d.fps || 0, decod: Array.isArray(d.decod) ? d.decod : null, sfu: d.sfu === 1 });
       const pronto = esperandoPedido.get(conn.peer);
       if (pronto) { esperandoPedido.delete(conn.peer); pronto(); return; }
+      // pelo servidor e baixou a qualidade (miniatura, internet ruim): volta pra direta, que manda a qualidade que ela pediu
+      if (SFU.assistindo.has(id) && !querCheio(id)) {
+        try { conn.send({ tipo: 'sfu-sair' }); } catch {}
+        ligarPara(id); sfuRevisar(); return;
+      }
+      if (SFU.assistindo.has(id)) return;
+      // direta e subiu pra qualidade cheia (virou a tela grande do grupo): vê se vale ir pro servidor
+      if (querCheio(id) && d.sfu === 1 && !SFU.falhou.has(id) && (SFU.pc || cheiosAgora(id) + 1 >= SFU_A_PARTIR_DE)) { conectarViewer(id); return; }
       // o pedido chegou depois da ligação sair: se agora dá pra usar um formato melhor, refaz a ligação nele
       const atual = chamadas.get(conn.peer);
       if (atual && atual.__formato && atual.__formato !== formatoPara(conn.peer)) { ligarPara(conn.peer); return; }
@@ -2169,6 +2230,7 @@ async function abrirSala(novo) {
     conn.on('close', () => {
       if (conexoes.get(conn.peer) === conn) conexoes.delete(conn.peer);
       pedidos.delete(conn.peer);
+      if (SFU.assistindo.delete(conn.peer)) { SFU.ok.delete(conn.peer); sfuRevisar(); }
       const c = chamadas.get(conn.peer);
       if (c) { try { c.close(); } catch {} chamadas.delete(conn.peer); }
     });
@@ -2176,8 +2238,136 @@ async function abrirSala(novo) {
   });
 }
 
+// a pessoa quer a qualidade cheia? (AUTO no máximo ou um nível >= ao que está saindo)
+function alturaSaindo() {
+  const vt = streamTx && streamTx.getVideoTracks()[0], cfg = vt ? vt.getSettings() : {};
+  const tela = cfg.width && cfg.height ? Math.min(cfg.width, cfg.height) : (qualAtual ? qualAtual.h : 1080);
+  return Math.min(tela, qualAtual && qualAtual.h ? qualAtual.h : tela);
+}
+function querCheio(id) {
+  const ped = pedidos.get(id);
+  return !ped || !ped.altura || ped.altura >= alturaSaindo() * 0.95;
+}
+const SFU = { pc: null, sessao: '', faixas: null, pronto: null, assistindo: new Set(), ok: new Set(), falhou: new Set(), timer: 0 };
+async function sfuPublicar() {
+  if (SFU.pronto) return SFU.pronto;
+  SFU.pronto = (async () => {
+    if (!streamTx || !(await sfuDisponivel())) return false;
+    const pc = new RTCPeerConnection(await sfuConfigIce());
+    pc.__sfu = true;
+    SFU.pc = pc;
+    const vt = streamTx.getVideoTracks()[0], at = streamTx.getAudioTracks()[0];
+    const tv = pc.addTransceiver(vt, { direction: 'sendonly', streams: [streamTx] });
+    // H.264: todo aparelho decodifica (no servidor, todo mundo recebe o mesmo vídeo)
+    try {
+      const cs = RTCRtpSender.getCapabilities('video').codecs;
+      const perfil = c => { const m = (c.sdpFmtpLine || '').match(/profile-level-id=([0-9a-f]{2})/i); return m ? ({ '64': 0, '4d': 1 }[m[1].toLowerCase()] ?? 2) : 3; };
+      const h = cs.filter(c => /h264/i.test(c.mimeType) && /packetization-mode=1/.test(c.sdpFmtpLine || '')).sort((a, b) => perfil(a) - perfil(b));
+      if (h.length) tv.setCodecPreferences([...h, ...cs.filter(c => !h.includes(c))]);
+    } catch {}
+    const ta = at ? pc.addTransceiver(at, { direction: 'sendonly', streams: [streamTx] }) : null;
+    const of = await pc.createOffer();
+    await pc.setLocalDescription({ type: 'offer', sdp: ajustarSDP(of.sdp, null) });
+    const sess = await sfuApi('nova');
+    if (SFU.pc !== pc) return false;
+    SFU.sessao = sess.sessionId;
+    const tracks = [{ location: 'local', mid: tv.mid, trackName: 'v' }];
+    if (ta) tracks.push({ location: 'local', mid: ta.mid, trackName: 'a' });
+    const r = await sfuApi('faixas', SFU.sessao, { sessionDescription: { type: 'offer', sdp: pc.localDescription.sdp }, tracks });
+    if (!r.sessionDescription || (r.tracks || []).some(t => t.errorCode)) throw new Error('sfu: faixas recusadas');
+    // piso e começo da taxa (valem pra quem envia quando estão na resposta)
+    const alvo = qualAtual ? kbpsDe(qualAtual) : 8000;
+    const dicas = ';x-google-start-bitrate=' + Math.round(Math.max(2500, Math.min(20000, alvo * .7))) + (alvo >= 3000 ? ';x-google-min-bitrate=' + Math.round(Math.min(6000, alvo * .3)) : '');
+    const h264 = [...r.sessionDescription.sdp.matchAll(/a=rtpmap:(\d+) H264\/90000/gi)].map(m => m[1]);
+    const sdp = r.sessionDescription.sdp.split('\r\n').map(l => {
+      const m = l.match(/^a=fmtp:(\d+) /);
+      return m && h264.includes(m[1]) && !/x-google-/.test(l) ? l + dicas : l;
+    }).join('\r\n');
+    await pc.setRemoteDescription({ type: 'answer', sdp });
+    await sfuConectado(pc, 10000);
+    SFU.faixas = { v: 'v', a: ta ? 'a' : '' };
+    sfuParametros();
+    pc.addEventListener('connectionstatechange', () => {
+      if (SFU.pc === pc && pc.connectionState === 'failed') sfuCaiu();
+    });
+    return true;
+  })().catch(e => { console.warn(e); sfuParar(); return false; });
+  return SFU.pronto;
+}
+async function sfuParametros() {
+  const pc = SFU.pc; if (!pc || !qualAtual) return;
+  for (const snd of pc.getSenders()) {
+    if (!snd.track) continue;
+    const p = snd.getParameters(); if (!p.encodings || !p.encodings.length) continue;
+    if (snd.track.kind === 'video') {
+      p.encodings[0].maxBitrate = kbpsDe(qualAtual) * 1000;
+      p.encodings[0].maxFramerate = qualAtual.fps;
+      const vt = snd.track.getSettings(), tela = vt.width && vt.height ? Math.min(vt.width, vt.height) : qualAtual.h;
+      p.encodings[0].scaleResolutionDownBy = qualAtual.h && tela > qualAtual.h ? tela / qualAtual.h : 1;
+      p.degradationPreference = 'maintain-resolution';
+    } else p.encodings[0].maxBitrate = 160000;
+    p.encodings[0].priority = 'high'; p.encodings[0].networkPriority = 'high';
+    try { await snd.setParameters(p); } catch (e) { console.warn('sfu setParameters', e); }
+  }
+}
+function sfuParar() {
+  clearTimeout(SFU.timer);
+  if (SFU.pc) try { SFU.pc.close(); } catch {}
+  SFU.pc = null; SFU.sessao = ''; SFU.faixas = null; SFU.pronto = null;
+  SFU.assistindo.clear(); SFU.ok.clear();
+}
+// o servidor caiu: todo mundo que estava nele volta pra ligação direta
+function sfuCaiu() {
+  const ids = [...SFU.assistindo];
+  sfuParar();
+  for (const id of ids) { SFU.falhou.add(id); ligarPara(id); }
+}
+// quantas pessoas estão (ou vão estar) na qualidade cheia, contando as diretas
+function cheiosAgora(excluir) {
+  let n = 0;
+  for (const id of conexoes.keys()) if (id !== excluir && querCheio(id) && (SFU.assistindo.has(id) || chamadas.has(id))) n++;
+  return n;
+}
+async function conectarViewer(id) {
+  const conn = conexoes.get(id), ped = pedidos.get(id);
+  const pode = conn && ped && ped.sfu && !SFU.falhou.has(id) && querCheio(id) && streamTx;
+  if (pode && (SFU.pc || cheiosAgora(id) + 1 >= SFU_A_PARTIR_DE) && await sfuPublicar()) {
+    sfuMandar(id);
+    // quem já estava direto na qualidade cheia passa pro servidor também (o PC de quem transmite faz 1 vídeo só)
+    for (const outro of conexoes.keys()) {
+      const po = pedidos.get(outro);
+      if (outro !== id && !SFU.assistindo.has(outro) && chamadas.has(outro) && po && po.sfu && !SFU.falhou.has(outro) && querCheio(outro)) sfuMandar(outro);
+    }
+    return;
+  }
+  ligarPara(id);
+}
+function sfuMandar(id) {
+  const conn = conexoes.get(id);
+  if (!conn || !conn.open || !SFU.sessao) { ligarPara(id); return; }
+  SFU.assistindo.add(id);
+  clearTimeout(SFU.timer);
+  try { conn.send({ tipo: 'sfu', sessao: SFU.sessao, faixas: SFU.faixas }); } catch { SFU.assistindo.delete(id); ligarPara(id); }
+}
+// a pessoa saiu do servidor (baixou a qualidade, foi embora): se sobrou 0 ou 1, desliga ele (economiza o limite grátis)
+function sfuRevisar() {
+  clearTimeout(SFU.timer);
+  if (!SFU.pc) return;
+  SFU.timer = setTimeout(() => {
+    if (!SFU.pc) return;
+    if (SFU.assistindo.size >= SFU_A_PARTIR_DE) return;
+    for (const id of [...SFU.assistindo]) {
+      const conn = conexoes.get(id);
+      try { conn && conn.open && conn.send({ tipo: 'sfu-sair' }); } catch {}
+      ligarPara(id);
+    }
+    sfuParar();
+  }, 20000);
+}
+
 function ligarPara(id) {
   if (!streamTx || !peerTx) return;
+  SFU.assistindo.delete(id); SFU.ok.delete(id);
   const antiga = chamadas.get(id);
   if (antiga) try { antiga.close(); } catch {}
   const formato = formatoPara(id);
@@ -2238,6 +2428,7 @@ async function trocarQualidade() {
   try { vt.contentHint = radio('dica'); } catch {}
   if (!EH_WEBKIT) try { await vt.applyConstraints({ frameRate: { ideal: qualAtual.fps, max: qualAtual.fps }, width: { max: qualAtual.w }, height: { max: qualAtual.h } }); } catch {}
   for (const [id, c] of chamadas) if (c.peerConnection) aplicarParametros(c.peerConnection, id);
+  sfuParametros();
 }
 
 function pararTx() {
@@ -2248,6 +2439,7 @@ function pararTx() {
   $('#bt-cam-onoff').classList.add('hidden');
   for (const c of chamadas.values()) try { c.close(); } catch {}
   chamadas.clear();
+  sfuParar(); SFU.falhou.clear();
   if (peerTx) { const p = peerTx; peerTx = null; try { p.destroy(); } catch {} }
   if (streamTx) {
     streamTx.getVideoTracks().forEach(t => t.stop());
@@ -2359,6 +2551,7 @@ function abrirCanal() {
   conRx = con;
   con.on('open', () => { if (!callRx) esperar('Conectado. Recebendo a imagem...'); enviarPedido(); });
   con.on('data', d => {
+    if (d && d.tipo === 'sfu' && con === conRx) { sfuAssistir(d, con); return; }
     if (!d || d.tipo !== 'info') return;
     infoTx = { ...d, quando: Date.now() };
     // quem transmite pelo celular disse que o jogo está deitado: gira sozinho (se a pessoa não girou na mão)
@@ -2431,7 +2624,7 @@ if (qRx.auto) qRx.nivel = TETO_AUTO;
 function enviarPedido() {
   if (!conRx || !conRx.open) return;
   const n = NIVEIS_RX[qRx.nivel];
-  formatosDec.then(dec => { try { conRx && conRx.open && conRx.send({ tipo: 'pedido', kbps: n.kbps, altura: n.altura, fps: n.fps, decod: dec }); } catch {} });
+  formatosDec.then(dec => { try { conRx && conRx.open && conRx.send({ tipo: 'pedido', kbps: n.kbps, altura: n.altura, fps: n.fps, decod: dec, sfu: 1 }); } catch {} });
   mostrarQualidadeRx();
 }
 function mostrarQualidadeRx() {
@@ -3107,10 +3300,70 @@ function ajustarFolga(st) {
   }
 }
 
-function receberChamada(call) {
+// Puxa a imagem do servidor de repasse. A ligação direta (se tiver) continua tocando até a do servidor chegar,
+// então a troca não pisca. Se der errado, avisa quem transmite, que manda direto.
+let sfuRxTentativa = 0;
+async function sfuAssistir(d, con) {
+  const minha = ++sfuRxTentativa;
+  let pc = null;
+  try {
+    if (!d.sessao || !d.faixas || !d.faixas.v) throw new Error('sfu: pedido inválido');
+    pc = new RTCPeerConnection(await sfuConfigIce());
+    pc.__sfu = true;
+    const stream = new MediaStream();
+    let temVideo = null;
+    const chegouVideo = new Promise(ok => { temVideo = ok; });
+    pc.addEventListener('track', e => {
+      stream.addTrack(e.track);
+      aplicarFolga(e.receiver);
+      if (e.track.kind === 'video') temVideo();
+    });
+    const sess = await sfuApi('nova');
+    const tracks = [{ location: 'remote', sessionId: d.sessao, trackName: d.faixas.v }];
+    if (d.faixas.a) tracks.push({ location: 'remote', sessionId: d.sessao, trackName: d.faixas.a });
+    const r = await sfuApi('faixas', sess.sessionId, { tracks });
+    if (!r.sessionDescription || (r.tracks || []).some(t => t.errorCode)) throw new Error('sfu: faixas recusadas');
+    await pc.setRemoteDescription(r.sessionDescription);
+    const ans = await pc.createAnswer();
+    await pc.setLocalDescription({ type: 'answer', sdp: ajustarSDP(ans.sdp, null) });
+    await sfuApi('renegociar', sess.sessionId, { sessionDescription: { type: 'answer', sdp: pc.localDescription.sdp } });
+    await Promise.all([sfuConectado(pc, 10000), Promise.race([chegouVideo, new Promise((_, f) => setTimeout(() => f(new Error('sfu: sem vídeo')), 10000))])]);
+    // espera o primeiro quadro de verdade antes de trocar (senão fica preto um instante)
+    const vt = stream.getVideoTracks()[0];
+    if (vt && vt.muted) await Promise.race([new Promise(ok => vt.addEventListener('unmute', ok, { once: true })), new Promise(ok => setTimeout(ok, 4000))]);
+    if (minha !== sfuRxTentativa || !rxAtivo || con !== conRx) { pc.close(); return; }
+    receberChamada(chamadaSfu(pc), stream);
+    try { con.send({ tipo: 'sfu-ok' }); } catch {}
+  } catch (e) {
+    console.warn(e);
+    if (pc) try { pc.close(); } catch {}
+    if (minha === sfuRxTentativa && con === conRx) try { con.send({ tipo: 'sfu-falhou' }); } catch {}
+  }
+}
+// imita a "chamada" do PeerJS pra o resto do player não precisar saber de onde vem a imagem
+function chamadaSfu(pc) {
+  const ouvintes = {};
+  const c = {
+    __sfu: true, peerConnection: pc, open: true,
+    answer() {},
+    on(ev, fn) { (ouvintes[ev] = ouvintes[ev] || []).push(fn); },
+    emitir(ev, ...a) { (ouvintes[ev] || []).forEach(f => f(...a)); },
+    close() {
+      if (!c.open) return;
+      c.open = false;
+      try { pc.close(); } catch {}
+      setTimeout(() => c.emitir('close'), 0);
+    },
+  };
+  return c;
+}
+
+function receberChamada(call, streamPronto) {
   if (!rxAtivo) { try { call.close(); } catch {} return; }
-  if (callRx && callRx !== call) try { callRx.close(); } catch {}
+  // a nova vira a atual ANTES de fechar a velha: assim a velha não apaga a imagem nem agenda reconexão
+  const velha = callRx;
   callRx = call;
+  if (velha && velha !== call) try { velha.close(); } catch {}
   // vale o formato que quem transmite escolheu; copia pra resposta as dicas de taxa da oferta
   call.answer(undefined, { sdpTransform: s => ajustarSDP(s, null, (call.peerConnection && call.peerConnection.remoteDescription || {}).sdp || '') });
   const pc = call.peerConnection;
@@ -3145,6 +3398,13 @@ function receberChamada(call) {
     agendarReconexao(2500, 'A transmissão parou. Esperando voltar...');
   });
   call.on('error', () => {});
+  if (streamPronto) { // veio do servidor: já está conectada e com imagem
+    qRx.conectouEm = Date.now();
+    qRx.perdasAntes = qRx.recebAntes = qRx.travAntes = 0; qRx.historico = [];
+    travadasAntes = 0;
+    tocar(streamPronto);
+    esconderEspera();
+  }
 }
 
 let faixasTocando = '';
@@ -3389,14 +3649,31 @@ setInterval(async () => {
   try {
     if (streamTx) {
       const ativos = [...chamadas.values()].filter(c => c.peerConnection && c.peerConnection.connectionState === 'connected');
-      $('#pill-viewers').textContent = ativos.length;
+      const total = ativos.length + SFU.ok.size;
+      $('#pill-viewers').textContent = total;
       const m = $('#metricas');
       m.innerHTML = '';
-      m.append(chip(ativos.length ? `${ativos.length} assistindo` : 'ninguém assistindo ainda', '', 'i-usuarios'));
+      m.append(chip(total ? `${total} assistindo` : 'ninguém assistindo ainda', '', 'i-usuarios'));
+      if (SFU.ok.size) { const c = chip(`${SFU.ok.size} pelo servidor`, 'bom'); c.title = 'Essas pessoas recebem pelo servidor de repasse: seu PC manda a imagem uma vez só pra todas.'; m.append(c); }
       const vs = streamTx.getVideoTracks()[0] && streamTx.getVideoTracks()[0].getSettings();
       if (vs && vs.width) { $('#tag-res').textContent = `${vs.width}×${vs.height}`; $('#tag-res').classList.remove('hidden'); }
       // stats de cada pessoa; os chips mostram a primeira, e cada uma recebe as suas pelo canal de dados
       const todas = [];
+      const infoPara = (s, ids) => {
+        for (const id of ids) {
+          const conn = conexoes.get(id);
+          if (conn && conn.open) try {
+            conn.send({ tipo: 'info', capW: vs ? vs.width : 0, capH: vs ? vs.height : 0, w: s.w, h: s.h, limite: s.limite,
+                        qualidade: qualAtual ? qualAtual.nome : '', dica: radio('dica'), encoder: (tipoEncoder(s.encoder) || [''])[0], codec: s.codec,
+                        fps: s.fps, fpsCaptura: s.fpsCaptura, fpsAlvo: qualAtual ? qualAtual.fps : 0,
+                        giro: CELULAR_TX ? +(radio('giro') || 0) : null });
+          } catch {}
+        }
+      };
+      if (SFU.pc && SFU.pc.connectionState === 'connected') {
+        const s = await lerStats(SFU.pc, 'outbound-rtp');
+        if (s) { todas.push(s); infoPara(s, SFU.ok); }
+      }
       for (const [id, c] of chamadas) {
         if (!c.peerConnection || c.peerConnection.connectionState !== 'connected') continue;
         const s = await lerStats(c.peerConnection, 'outbound-rtp');

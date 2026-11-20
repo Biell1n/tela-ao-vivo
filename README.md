@@ -9,6 +9,10 @@ Compartilhe a tela com áudio direto pelo navegador, sem configurar porta nem fi
 - **Qualidade de quem transmite:** Leve (720p · 30 fps · 3 Mbps), Moderado (1080p · 60 fps · 8 Mbps), Alto (2K · 60 fps · 18 Mbps), Máximo (4K · 60 fps · 35 Mbps) ou Personalizado (resolução, fps de 24 a 144 e taxa de 1 a 50 Mbps). Dá pra trocar com a transmissão rolando.
 - **Quem assiste** escolhe a qualidade que recebe (até 4K), a super resolução (rápida ou por IA, só no PC), o volume extra e, no grupo, o modo cinema (tecla T) e a luz ambiente.
 
+## Servidor de repasse (opcional)
+
+Com 2 ou mais pessoas assistindo na qualidade cheia, quem transmite manda a imagem uma vez só pro servidor da Cloudflare (Realtime SFU) e ele repassa pra cada um, igual ao Discord. Miniaturas do grupo e quem está com qualidade menor continuam direto. Pra ligar: crie um app em Cloudflare > Realtime > Serverless SFU e coloque `CF_SFU_APP_ID` e `CF_SFU_APP_SECRET` nas variáveis da Vercel. Grátis até 1.000 GB por mês (somando com o TURN), depois US$ 0,05 por GB.
+
 ## Áudio
 
 | Opção | O que vai junto |
