@@ -301,6 +301,7 @@ kbd,code{font:12px var(--mono);background:var(--sup-3);border:1px solid var(--li
 .seg input:focus-visible+span{outline:2px solid var(--acento)}
 .dica{font-size:12.5px;color:var(--fraco);margin:10px 0 0;text-wrap:pretty}
 .dica.aviso{color:var(--aviso)}
+.cam-liga small.aviso{color:var(--aviso)}
 .niveis{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:6px}
 .nivel{position:relative;cursor:pointer;min-width:0}
 .nivel input{position:absolute;opacity:0;pointer-events:none}
@@ -840,6 +841,8 @@ html.transp body::before{display:none}
           <label class="op-l"><input type="radio" name="audio" value="app"><span class="radio"></span>
             <span><b>Pelo programa Tela ao Vivo Áudio</b><span class="etq rec">RECOMENDADO</span>
             <small>Tira o Discord sozinho, ou manda só os apps que você marcar. Sem configurar nada no Windows.</small></span></label>
+          <label class="cam-liga hidden" id="op-app-aba"><input type="checkbox" id="app-com-aba"><span><b>Juntar o som da aba também</b>
+            <small id="app-aba-desc">O som da aba vem direto do Chrome e entra junto com o do programa.</small></span></label>
           <label class="op-l"><input type="radio" name="audio" value="captura"><span class="radio"></span>
             <span><b id="cap-titulo">Som do Windows inteiro</b><span id="cap-etq" class="etq alerta">INCLUI A CALL</span>
             <small id="cap-desc">Pega tudo, inclusive a voz dos seus amigos. Bom só quando você não está em call.</small></span></label>
@@ -1494,7 +1497,7 @@ async function listarAudio() {
 async function trocarTrilha(nova) {
   const velha = trilhaAudio;
   trilhaAudio = nova;
-  if (micLigado()) ligarBaseNoMix(nova); // a saída continua sendo a mistura; só troca o que entra nela
+  if (micLigado() || somAba) ligarBaseNoMix(nova); // a saída continua sendo a mistura; só troca o que entra nela
   else await trocarSaida(nova);
   if (velha && velha !== nova) velha.stop();
 }
@@ -1574,10 +1577,17 @@ function desligarMic() {
   mix.srcMic = mix.mic = null;
 }
 // a trilha que vai pra quem assiste: a mistura (com microfone) ou o som escolhido puro
+let somAba = null, srcAba = null; // som da aba junto com o do programa
 function audioSaida() {
-  if (!micLigado()) return trilhaAudio;
+  if (!micLigado() && !somAba) return trilhaAudio;
   ligarBaseNoMix(trilhaAudio);
+  if (somAba && !srcAba && somAba.readyState === 'live') { srcAba = mix.ctx.createMediaStreamSource(new MediaStream([somAba])); srcAba.connect(mix.gBase); }
   return mix.saida;
+}
+function desligarSomAba() {
+  if (srcAba) try { srcAba.disconnect(); } catch {}
+  if (somAba) somAba.stop();
+  srcAba = somAba = null;
 }
 async function mudouMic() {
   guardar.set('micJunto', $('#mic-junto').checked ? '1' : '0');
@@ -1589,7 +1599,7 @@ async function mudouMic() {
     await trocarSaida(audioSaida());
   } else {
     desligarMic();
-    await trocarSaida(trilhaAudio);
+    await trocarSaida(audioSaida());
   }
 }
 
@@ -1680,10 +1690,23 @@ function prepararCelular() {
 // escolheu "Aba": o natural é mandar o som da própria aba (o Chrome entrega certinho)
 function trocouFonte() {
   atualizarFonte();
-  if (radio('fonte') === 'browser' && radio('audio') !== 'none' && radio('audio') !== 'captura') {
+  // cabo virtual com Aba: o natural é o som da própria aba. Com o programa, a escolha da pessoa continua valendo.
+  if (radio('fonte') === 'browser' && radio('audio') === 'device') {
     marcar('audio', 'captura');
     atualizarModoAudio();
   }
+  mostrarOpAppAba();
+}
+// "Juntar o som da aba": só faz sentido com Aba + programa. Se o programa manda tudo (ou tudo menos o Discord),
+// ele já pega o som do navegador: aí o som da aba sairia em dobro, então avisa e sugere "só os apps marcados".
+function mostrarOpAppAba() {
+  const vale = radio('fonte') === 'browser' && radio('audio') === 'app' && !CELULAR_TX;
+  $('#op-app-aba').classList.toggle('hidden', !vale);
+  const dobro = prog.modo !== 'incluir';
+  $('#app-aba-desc').textContent = dobro
+    ? 'Atenção: o programa está mandando o som do PC todo (tirando o Discord), e isso já inclui o navegador. Ligando isto, o som da aba sai em dobro. Pra juntar a aba com outros apps, escolha "Só os apps que eu marcar" no programa e marque os apps (sem o navegador).'
+    : 'O som da aba vem direto do Chrome e entra junto com o dos apps marcados no programa (não marque o navegador lá, senão sai em dobro).';
+  $('#app-aba-desc').classList.toggle('aviso', dobro && $('#app-com-aba').checked);
 }
 
 async function atualizarModoAudio() {
@@ -1691,7 +1714,8 @@ async function atualizarModoAudio() {
   guardar.set('modoAudio', modo);
   $('#painel-disp').classList.toggle('hidden', modo !== 'device');
   $('#painel-prog').classList.toggle('hidden', modo !== 'app');
-  $('#bloco-nivel').classList.toggle('hidden', modo !== 'device' && modo !== 'app');
+  $('#bloco-nivel').classList.toggle('hidden', modo !== 'device' && modo !== 'app' && !(modo === 'captura' && audioDaCaptura && streamTx));
+  mostrarOpAppAba();
   if (modo !== 'device') $('#aviso-disp').classList.add('hidden');
   if (modo === 'device') { await listarAudio(); return; }
   if (modo === 'app') {
@@ -1914,7 +1938,7 @@ function notaAudio(msg) {
 }
 
 function travarConfig(travar) {
-  document.querySelectorAll('input[name="fonte"], input[name="audio"]').forEach(i => i.disabled = travar);
+  document.querySelectorAll('input[name="fonte"], input[name="audio"], #app-com-aba').forEach(i => i.disabled = travar);
   $('#cam-junto').disabled = travar;
   $('#sel-cam').disabled = travar;
 }
@@ -2097,7 +2121,8 @@ async function comecar() {
   if (typeof Peer === 'undefined') { statusTx('O componente de conexão não carregou. Confira a internet e aperte F5.', 'erro'); return; }
   qualAtual = qualidadeEscolhida();
   const fonte = radio('fonte'), modo = radio('audio'), dica = radio('dica');
-  const pedeAudio = modo === 'captura';
+  const abaJunto = modo === 'app' && fonte === 'browser' && $('#app-com-aba').checked && !CELULAR_TX;
+  const pedeAudio = modo === 'captura' || abaJunto;
   const opcoes = {
     // Safari/iPhone: pedir qualquer tamanho faz ele capturar em ~640 px (bug do WebKit); lá vai sem restrição
     video: EH_WEBKIT ? true : { displaySurface: fonte, frameRate: { ideal: qualAtual.fps, max: qualAtual.fps },
@@ -2157,6 +2182,7 @@ async function comecar() {
       if (trilhaAudio) trilhaAudio.stop();
       trilhaAudio = at; audioDaCaptura = true;
       medir(at);
+      $('#bloco-nivel').classList.remove('hidden'); // dá pra ver se o som da aba está chegando
     } else {
       trilhaAudio = trilhaSilenciosa(); audioDaCaptura = false;
       notaAudio(fonte === 'window'
@@ -2168,8 +2194,13 @@ async function comecar() {
     trilhaAudio = trilhaSilenciosa(); audioDaCaptura = false;
   } else if (modo === 'app') {
     if (prog.conectado) await usarAudioPrograma();
-    else notaAudio('O Tela ao Vivo Áudio não está aberto: a transmissão começou sem som. Quando você abrir o programa, o som entra sozinho.');
+    else notaAudio('O Tela ao Vivo Áudio não está aberto: a transmissão começou sem som' + (abaJunto ? ' do programa (o da aba vai)' : '') + '. Quando você abrir o programa, o som entra sozinho.');
     if (!trilhaAudio) trilhaAudio = trilhaSilenciosa();
+    if (abaJunto) {
+      const at = tela.getAudioTracks()[0];
+      if (at) { try { at.contentHint = 'music'; } catch {} somAba = at; }
+      else notaAudio('O Chrome não entregou o som da aba: no seletor, deixe marcado "Compartilhar áudio da aba". O som do programa continua indo.');
+    }
   } else if (!trilhaAudio) {
     await selecionarAudio();
     if (!trilhaAudio) trilhaAudio = trilhaSilenciosa();
@@ -2485,6 +2516,7 @@ async function trocarQualidade() {
 function pararTx() {
   if (salaTx) { salaTx = null; if (grupo.ativo) avisarSala(null); }
   desligarMic();
+  desligarSomAba();
   if (composicao) { const c = composicao; composicao = null; c.parar(); }
   $('#cam-caixa').classList.add('hidden');
   $('#bt-cam-onoff').classList.add('hidden');
@@ -4892,7 +4924,9 @@ $('#qc-mbps').onchange = () => trocarQualidade();
 
 marcar('fonte', ['monitor', 'window', 'browser', 'camera'].includes(guardar.get('fonte')) ? guardar.get('fonte') : 'monitor');
 marcar('audio', ['app', 'device', 'captura', 'none'].includes(guardar.get('modoAudio')) ? guardar.get('modoAudio') : 'app');
-document.querySelectorAll('input[name="progmodo"]').forEach(i => i.onchange = () => { prog.modo = radio('progmodo'); progConfig(); progDesenharLista(); });
+document.querySelectorAll('input[name="progmodo"]').forEach(i => i.onchange = () => { prog.modo = radio('progmodo'); progConfig(); progDesenharLista(); mostrarOpAppAba(); });
+$('#app-com-aba').checked = guardar.get('appComAba') === '1';
+$('#app-com-aba').onchange = () => { guardar.set('appComAba', $('#app-com-aba').checked ? '1' : '0'); mostrarOpAppAba(); };
 marcar('dica', guardar.get('dica') === 'detail' ? 'detail' : 'motion');
 atualizarFonte();
 prepararCelular();
