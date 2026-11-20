@@ -673,6 +673,15 @@ html.com-fundo .bloco{background:none;-webkit-backdrop-filter:none;backdrop-filt
 #fundo[data-tema=sinal].animado .c2,#fundo[data-tema=sinal].animado .c3{display:none}
 #fundo:not([data-tema=sinal]) .ondas{display:none}
 @media (prefers-reduced-motion:reduce){.tela.entrando,#tx.entrando *,.acao-tx.ligando,.espera-barras i{animation:none!important}}
+
+/* ícones de perfil do grupo */
+.avatares{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:8px;margin:0 0 18px}
+.avatares button{aspect-ratio:1;border-radius:50%;padding:0;overflow:hidden;border:2px solid transparent;transition:transform .15s,border-color .15s}
+.avatares button:hover{transform:scale(1.06)}
+.avatares button[aria-checked=true]{border-color:var(--acento);box-shadow:0 0 0 3px var(--acento-suave)}
+.avatares img,.av-img{width:100%;height:100%;object-fit:cover;display:block}
+.av-img{width:26px;height:26px;border-radius:50%;flex:none}
+.chat-msgs li .av-img{width:20px;height:20px;display:inline-block;vertical-align:-5px;margin-right:6px}
 </style>
 <script>
 // cor de destaque que muda com a hora do dia: violeta de madrugada, coral no amanhecer, amarelo de manhã,
@@ -1192,6 +1201,8 @@ html.com-fundo .bloco{background:none;-webkit-backdrop-filter:none;backdrop-filt
     <span class="passo" style="--cor:var(--b5)">Todo mundo mostra</span>
     <h2 id="titulo-entrar-grupo">Entrar no grupo</h2>
     <p class="lead" id="sub-entrar-grupo">Escolha como seu nome vai aparecer pros outros do grupo.</p>
+    <span class="rotulo-campo" style="margin-top:18px">Seu ícone</span>
+    <div id="avatares" class="avatares" role="radiogroup" aria-label="Seu ícone"></div>
     <form id="form-nome" class="campo-codigo" novalidate>
       <input id="in-nome" type="text" placeholder="Seu nome" maxlength="24" autocomplete="nickname" spellcheck="false">
       <button class="btn primario" type="submit">Entrar</button>
@@ -4823,6 +4834,23 @@ function criarGrupo() {
   guardar.set('grupoChave-' + c, chave);
   abrirEntradaGrupo(c, true);
 }
+
+// ícones de perfil do grupo (avatares/0..15.webp); quem não escolheu ganha um aleatório
+const N_AVATARES = 16;
+const avValido = v => Number.isInteger(+v) && +v >= 0 && +v < N_AVATARES ? +v : null;
+let meuAvatar = avValido(guardar.get('avatar'));
+if (meuAvatar == null) { meuAvatar = Math.floor(Math.random() * N_AVATARES); guardar.set('avatar', String(meuAvatar)); }
+function imgAvatar(v) { const i = document.createElement('img'); i.className = 'av-img'; i.alt = ''; i.loading = 'lazy'; i.src = `avatares/${avValido(v) ?? 0}.webp`; return i; }
+(function montarAvatares() {
+  const box = $('#avatares'); if (!box) return;
+  for (let k = 0; k < N_AVATARES; k++) {
+    const b = document.createElement('button'); b.type = 'button'; b.setAttribute('role', 'radio'); b.setAttribute('aria-label', 'Ícone ' + (k + 1));
+    b.setAttribute('aria-checked', String(k === meuAvatar));
+    const im = document.createElement('img'); im.src = `avatares/${k}.webp`; im.alt = ''; im.loading = 'lazy'; b.append(im);
+    b.onclick = () => { meuAvatar = k; guardar.set('avatar', String(k)); box.querySelectorAll('button').forEach((x, j) => x.setAttribute('aria-checked', String(j === k))); };
+    box.append(b);
+  }
+})();
 function entrarNoGrupo() {
   const nome = $('#in-nome').value.trim();
   if (!nome) { $('#erro-nome').classList.remove('hidden'); $('#in-nome').focus(); return; }
@@ -4833,7 +4861,7 @@ function iniciarGrupo(codigo, nome) {
   if (grupo.codigo !== codigo || !grupo.ativo) limparChat();
   desligarGrupo(); // estava em outro grupo (ou reentrando): fecha as conexões antigas antes
   guardar.set('meuNome', nome);
-  Object.assign(grupo, { ativo: true, codigo, nome: nomeLimpo(nome), expulso: false, membros: [], foco: null, host: false });
+  Object.assign(grupo, { ativo: true, codigo, nome: nomeLimpo(nome), av: meuAvatar, expulso: false, membros: [], foco: null, host: false });
   lembrarGrupo();
   history.replaceState(null, '', '?g=' + encodeURIComponent(codigo));
   mostrar('grupo');
@@ -4874,7 +4902,7 @@ function conectarAoHost() {
     // a conexão pode falhar por baixo sem o PeerJS avisar (aba fechada sem despedida): escuta direto
     const pc = con.peerConnection;
     if (pc) pc.addEventListener('connectionstatechange', () => { if (['failed', 'closed'].includes(pc.connectionState) && grupo.con === con) try { con.close(); } catch {} });
-    con.send({ tipo: 'entrar', nome: grupo.nome, sala: salaTx, chave: chaveDono(grupo.codigo) || undefined, versao: VERSAO_GRUPO });
+    con.send({ tipo: 'entrar', nome: grupo.nome, av: grupo.av, sala: salaTx, chave: chaveDono(grupo.codigo) || undefined, versao: VERSAO_GRUPO });
     statusGrupo('Você está no grupo. Clique em "Compartilhar minha tela" pra todos verem a sua.', 'ok');
   });
   con.on('data', d => {
@@ -4952,7 +4980,8 @@ setInterval(() => {
 }, 3000);
 function garantirEu() {
   let eu = grupo.membros.find(m => m.id === grupo.meuId);
-  if (!eu) { eu = { id: grupo.meuId, nome: grupo.nome, sala: salaTx, dono: false }; grupo.membros.unshift(eu); }
+  if (!eu) { eu = { id: grupo.meuId, nome: grupo.nome, av: grupo.av, sala: salaTx, dono: false }; grupo.membros.unshift(eu); }
+  eu.av = grupo.av;
   eu.nome = grupo.nome; eu.sala = salaTx; eu.dono = souDono();
 }
 const banido = (id, nome) => grupo.banidos.includes(id) || grupo.banidos.includes('nome:' + String(nome || '').toLowerCase());
@@ -4969,7 +4998,7 @@ function conexaoDoMembro(conn) {
       const nome = nomeLimpo(d.nome);
       if (banido(conn.peer, nome)) { try { conn.send({ tipo: 'expulso' }); } catch {} setTimeout(() => conn.close(), 300); return; }
       if (!m) { m = { id: conn.peer, nome, sala: null, dono: false }; grupo.membros.push(m); }
-      m.nome = nome; m.visto = Date.now();
+      m.nome = nome; m.av = avValido(d.av); m.visto = Date.now();
       if ((+d.versao || 0) > VERSAO_GRUPO) avisarSiteNovo();
       if (chatGrupo.msgs.length) try { conn.send({ tipo: 'historico', msgs: chatGrupo.msgs.slice(-60) }); } catch {}
       if (d.sala !== undefined) m.sala = typeof d.sala === 'string' ? d.sala.slice(0, 40) : null;
@@ -5001,7 +5030,7 @@ function conexaoDoMembro(conn) {
 function difundir() {
   if (grupo.host) {
     garantirEu();
-    const msg = { tipo: 'estado', lista: grupo.membros.map(m => ({ id: m.id, nome: m.nome, sala: m.sala, dono: !!m.dono })), banidos: grupo.banidos, donoHash: grupo.donoHash, versao: VERSAO_GRUPO, host: grupo.meuId };
+    const msg = { tipo: 'estado', lista: grupo.membros.map(m => ({ id: m.id, nome: m.nome, av: m.av, sala: m.sala, dono: !!m.dono })), banidos: grupo.banidos, donoHash: grupo.donoHash, versao: VERSAO_GRUPO, host: grupo.meuId };
     for (const c of grupo.conns.values()) if (c.open) try { c.send(msg); } catch {}
   }
   renderGrupo();
@@ -5120,7 +5149,8 @@ function desenharMsg(m, emLote, enviando) {
   if (m.de === grupo.meuId) li.className = 'eu';
   if (enviando) li.classList.add('enviando');
   const b = document.createElement('b'); b.textContent = m.de === grupo.meuId ? 'Você' : m.nome;
-  li.append(b, document.createTextNode(m.texto));
+  const quem = m.de === grupo.meuId ? { av: grupo.av } : (grupo.membros.find(x => x.id === m.de) || {});
+  li.append(imgAvatar(quem.av), b, document.createTextNode(m.texto));
   li.title = new Date(m.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   ol.append(li);
   while (ol.children.length > 150) ol.firstChild.remove();
@@ -5270,7 +5300,7 @@ function renderGrupo() {
     const nome = document.createElement('span');
     nome.className = 'membro-nome';
     nome.textContent = m.nome + (m.id === grupo.meuId ? ' (você)' : '');
-    li.append(nome);
+    li.append(imgAvatar(m.id === grupo.meuId ? grupo.av : m.av), nome);
     if (m.dono) { const t = document.createElement('span'); t.className = 'etq rec'; t.textContent = 'DONO'; li.append(t); }
     if (m.sala) { const t = document.createElement('span'); t.className = 'etq vivo'; t.textContent = 'AO VIVO'; li.append(t); }
     if (souDono() && m.id !== grupo.meuId) {
