@@ -1347,11 +1347,30 @@ function resumoStats(st) {
 // (igual ao Discord): o upload e a placa de vídeo de quem transmite fazem 1 vídeo em vez de 1 por pessoa.
 // Miniaturas do grupo e quem está com a internet ruim (qualidade menor) continuam direto, que é de graça.
 const SFU_A_PARTIR_DE = 2; // quantas pessoas na qualidade cheia ligam o servidor
-let sfuLigado = null; // promessa: a Vercel tem o servidor configurado?
-function sfuDisponivel() {
-  if (!sfuLigado) sfuLigado = fetch('/api/sfu', { cache: 'no-store' }).then(r => r.status === 200).catch(() => false);
+// O servidor só vale se estiver configurado E o mês ainda estiver dentro do grátis (a Vercel confere o contador).
+let sfuLigado = null, sfuLigadoHora = 0;
+function sfuDisponivel(deNovo) {
+  if (!sfuLigado || deNovo || Date.now() - sfuLigadoHora > 5 * 60e3) {
+    sfuLigadoHora = Date.now();
+    sfuLigado = fetch('/api/sfu', { cache: 'no-store' }).then(r => r.status === 200 ? r.json() : { ok: false }).then(j => !!(j && j.ok)).catch(() => false);
+  }
   return sfuLigado;
 }
+// quem assiste pelo servidor avisa quanto recebeu (é assim que o site sabe quando parar antes do limite grátis)
+const sfuConta = new WeakMap();
+async function sfuContar(pc, saindo) {
+  if (!pc || !pc.__sfu) return;
+  let total = 0;
+  try { (await pc.getStats()).forEach(r => { if (r.type === 'inbound-rtp') total += (r.bytesReceived || 0) + (r.headerBytesReceived || 0); }); } catch { return; }
+  const antes = sfuConta.get(pc) || 0, delta = total - antes;
+  if (delta <= 0) return;
+  sfuConta.set(pc, total);
+  const corpo = JSON.stringify({ op: 'uso', bytes: delta });
+  if (saindo && navigator.sendBeacon) navigator.sendBeacon('/api/sfu', corpo);
+  else fetch('/api/sfu', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: corpo, keepalive: true }).catch(() => {});
+}
+setInterval(() => { if (callRx && callRx.__sfu) sfuContar(callRx.peerConnection); }, 60e3);
+addEventListener('pagehide', () => { if (callRx && callRx.__sfu) sfuContar(callRx.peerConnection, true); });
 async function sfuApi(op, sessao, dados) {
   const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 8000);
   try {
@@ -2258,7 +2277,9 @@ async function sfuPublicar() {
     pc.__sfu = true;
     SFU.pc = pc;
     const vt = streamTx.getVideoTracks()[0], at = streamTx.getAudioTracks()[0];
-    const tv = pc.addTransceiver(vt, { direction: 'sendonly', streams: [streamTx] });
+    // acima de 1080p manda junto uma cópia 1080p ("b"): quem tem tela 1080p recebe ela (12 Mbps em vez de 20)
+    const sim = alturaSaindo() > 1100;
+    const tv = pc.addTransceiver(vt, { direction: 'sendonly', streams: [streamTx], sendEncodings: sim ? [{ rid: 'a' }, { rid: 'b', scaleResolutionDownBy: alturaSaindo() / 1080 }] : undefined });
     // H.264: todo aparelho decodifica (no servidor, todo mundo recebe o mesmo vídeo)
     try {
       const cs = RTCRtpSender.getCapabilities('video').codecs;
@@ -2286,7 +2307,7 @@ async function sfuPublicar() {
     }).join('\r\n');
     await pc.setRemoteDescription({ type: 'answer', sdp });
     await sfuConectado(pc, 10000);
-    SFU.faixas = { v: 'v', a: ta ? 'a' : '' };
+    SFU.faixas = { v: 'v', a: ta ? 'a' : '', sim: sim ? ['a', 'b'] : null };
     sfuParametros();
     pc.addEventListener('connectionstatechange', () => {
       if (SFU.pc === pc && pc.connectionState === 'failed') sfuCaiu();
@@ -2305,12 +2326,30 @@ async function sfuParametros() {
       p.encodings[0].maxFramerate = qualAtual.fps;
       const vt = snd.track.getSettings(), tela = vt.width && vt.height ? Math.min(vt.width, vt.height) : qualAtual.h;
       p.encodings[0].scaleResolutionDownBy = qualAtual.h && tela > qualAtual.h ? tela / qualAtual.h : 1;
+      if (p.encodings[1]) { // a cópia 1080p só fica ligada enquanto a principal for maior que 1080p
+        const saindo = Math.min(tela, qualAtual.h || tela);
+        p.encodings[1].active = saindo > 1100;
+        p.encodings[1].maxBitrate = Math.min(12000, kbpsDe(qualAtual)) * 1000;
+        p.encodings[1].maxFramerate = qualAtual.fps;
+        p.encodings[1].scaleResolutionDownBy = Math.max(1, tela / 1080);
+      }
       p.degradationPreference = 'maintain-resolution';
     } else p.encodings[0].maxBitrate = 160000;
     p.encodings[0].priority = 'high'; p.encodings[0].networkPriority = 'high';
     try { await snd.setParameters(p); } catch (e) { console.warn('sfu setParameters', e); }
   }
 }
+setInterval(async () => {
+  if (!SFU.pc) return;
+  if (await sfuDisponivel(true)) return;
+  SFU.bloqueadoAte = Date.now() + 30 * 60e3;
+  for (const id of [...SFU.assistindo]) {
+    const conn = conexoes.get(id);
+    try { conn && conn.open && conn.send({ tipo: 'sfu-sair' }); } catch {}
+    ligarPara(id);
+  }
+  sfuParar();
+}, 120e3);
 function sfuParar() {
   clearTimeout(SFU.timer);
   if (SFU.pc) try { SFU.pc.close(); } catch {}
@@ -2331,7 +2370,7 @@ function cheiosAgora(excluir) {
 }
 async function conectarViewer(id) {
   const conn = conexoes.get(id), ped = pedidos.get(id);
-  const pode = conn && ped && ped.sfu && !SFU.falhou.has(id) && querCheio(id) && streamTx;
+  const pode = conn && ped && ped.sfu && !SFU.falhou.has(id) && querCheio(id) && streamTx && !(SFU.bloqueadoAte > Date.now());
   if (pode && (SFU.pc || cheiosAgora(id) + 1 >= SFU_A_PARTIR_DE) && await sfuPublicar()) {
     sfuMandar(id);
     // quem já estava direto na qualidade cheia passa pro servidor também (o PC de quem transmite faz 1 vídeo só)
@@ -3556,6 +3595,11 @@ async function sfuAssistir(d, con) {
     });
     const sess = await sfuApi('nova');
     const tracks = [{ location: 'remote', sessionId: d.sessao, trackName: d.faixas.v }];
+    // transmissão em 4K: tela até ~1080p pega a cópia 1080p ("b"); se ela não existir, cai pra principal
+    if (Array.isArray(d.faixas.sim)) {
+      const telaGrande = Math.max(screen.width, screen.height) * (devicePixelRatio || 1) >= 2500;
+      tracks[0].simulcast = { preferredRid: telaGrande ? 'a' : 'b', priorityOrdering: 'asciibetical', ridNotAvailable: 'asciibetical' };
+    }
     if (d.faixas.a) tracks.push({ location: 'remote', sessionId: d.sessao, trackName: d.faixas.a });
     const r = await sfuApi('faixas', sess.sessionId, { tracks });
     if (!r.sessionDescription || (r.tracks || []).some(t => t.errorCode)) throw new Error('sfu: faixas recusadas');
@@ -3587,7 +3631,7 @@ function chamadaSfu(pc) {
     close() {
       if (!c.open) return;
       c.open = false;
-      try { pc.close(); } catch {}
+      sfuContar(pc).finally(() => { try { pc.close(); } catch {} });
       setTimeout(() => c.emitir('close'), 0);
     },
   };
