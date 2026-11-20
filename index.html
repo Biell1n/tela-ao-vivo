@@ -3028,7 +3028,7 @@ function girarRx() {
 // 1º passo (EASU): amplia seguindo a direção das bordas (sem serrilhado nem borrão).
 // 2º passo (RCAS): nitidez com limite, pra não criar contorno branco nos personagens.
 const SR = { modo: +(guardar.get('superRes') || 0) > 0 ? 1 : 0, alvo: [-1, 0, 1080, 1440, 2160].includes(+(guardar.get('superResAlvo') ?? -1)) ? +(guardar.get('superResAlvo') ?? -1) : -1,
-  motor: guardar.get('superResMotor2') || 'fsr', // 'fsr' = neural (FSRCNNX) com a rápida antiga de reserva; 'ia' = Anime4K
+  motor: (m => m === 'esr' ? 'fsr' : m)(guardar.get('superResMotor2')) || 'fsr', // a IA realista saiu do menu (não ficou boa o bastante) // 'fsr' = neural (FSRCNNX) com a rápida antiga de reserva; 'ia' = Anime4K
   forte: guardar.get('superResForte') === '1' || guardar.get('superRes') === '2', gl: null, cv: null, ok: true, progD: null, texN: null, fbo2: null, nw: 0, nh: 0,
   progE: null, progR: null, texV: null, texM: null, fbo: null, mw: 0, mh: 0, laco: 0, gen: 0, ativo: false, info: '' };
 const srGPU = () => SR.motor === 'ia' || SR.motor === 'esr';
@@ -4079,12 +4079,12 @@ function iaQuadro() {
 function escolherMotorSR(k) {
   if (k === SR.motor) return;
   if (k !== 'fsr' && !('gpu' in navigator)) { avisoRx('Esse tipo precisa de WebGPU (Chrome ou Edge atualizado no PC).'); return; }
-  SR.motor = { esr: 'fsr', ia: 'esr', fsr: 'ia' }[k]; // o alternar abaixo avança um passo: cai exatamente no escolhido
+  SR.motor = { ia: 'fsr', fsr: 'ia' }[k]; // o alternar abaixo avança um passo: cai exatamente no escolhido
   alternarMotorSR();
 }
 function alternarMotorSR() {
   if (SR.motor === 'fsr' && !('gpu' in navigator)) { avisoRx('A IA precisa de WebGPU (Chrome ou Edge atualizado no PC).'); return; }
-  SR.motor = SR.motor === 'fsr' ? 'esr' : SR.motor === 'esr' ? 'ia' : 'fsr';
+  SR.motor = SR.motor === 'fsr' ? 'ia' : 'fsr';
   if (srGPU() && IA.estado === 'erro') IA.estado = 'nada'; // tenta de novo
   if (SR.motor === 'esr' && RES.estado === 'erro') RES.estado = 'nada';
   guardar.set('superResMotor2', SR.motor);
@@ -4176,7 +4176,6 @@ function renderMenu(vista) {
     m.append(cabMenu('Tipo de super resolução', 'superres'));
     const TIPOS = [
       ['fsr', 'Neural', 'Jogo, filme, tudo. Leve e fiel.'],
-      ['esr', 'IA realista', 'Vídeo pequeno (144p–480p) esticado na tela. Pesa mais.'],
       ['ia', 'Anime', 'Desenho, anime e animação 3D. Deixa o traço nítido.'],
     ];
     for (const [k, rot, desc] of TIPOS) {
