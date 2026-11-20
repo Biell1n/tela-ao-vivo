@@ -700,6 +700,14 @@ html.com-fundo .bloco{background:none;-webkit-backdrop-filter:none;backdrop-filt
 .chat-msgs li{animation:msgEntra .3s cubic-bezier(.2,.8,.2,1) both}
 @keyframes msgEntra{from{opacity:0;transform:translateY(6px)}}
 @media (prefers-reduced-motion:reduce){.chat-msgs li{animation:none}}
+
+/* reações com a carinha do ícone de quem mandou */
+.reacao.com-carinha img{width:72px;height:72px;display:block}
+.chat-reagir button.com-carinha,.tile-reagir button.com-carinha{padding:0;overflow:visible}
+.chat-reagir button{flex:1 1 0;min-width:0;width:auto;max-width:40px}
+.chat-reagir button.com-carinha img,.tile-reagir button.com-carinha img{width:100%;max-width:34px;height:auto;aspect-ratio:1;display:block;pointer-events:none;transition:transform .15s}
+.chat-reagir button.com-carinha:hover img,.tile-reagir button.com-carinha:hover img{transform:scale(1.25)}
+@media (max-width:560px){.reacao.com-carinha img{width:58px;height:58px}}
 </style>
 <script>
 // cor de destaque que muda com a hora do dia: violeta de madrugada, coral no amanhecer, amarelo de manhã,
@@ -4856,8 +4864,11 @@ function criarGrupo() {
   abrirEntradaGrupo(c, true);
 }
 
-// ícones de perfil do grupo (avatares/0..15.webp); quem não escolheu ganha um aleatório
-const N_AVATARES = 16;
+// ícones de perfil do grupo (avatares/0..16.webp); quem não escolheu ganha um aleatório
+const N_AVATARES = 17;
+const ORDEM_AVATARES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 15]; // a foto da turma no fim
+// ícones que têm as 7 carinhas de reação (reacoes/<ícone>_<0..6>.webp); os outros usam o emoji normal
+const AV_COM_REACOES = new Set([6, 7, 8, 9, 10, 11, 12, 13, 16]);
 const avValido = v => v == null || v === '' ? null : Number.isInteger(+v) && +v >= 0 && +v < N_AVATARES ? +v : null;
 let meuAvatar = avValido(guardar.get('avatar'));
 if (meuAvatar == null) { meuAvatar = Math.floor(Math.random() * N_AVATARES); guardar.set('avatar', String(meuAvatar)); }
@@ -4881,11 +4892,11 @@ function zoomAvatar(k) {
 }
 (function montarAvatares() {
   const box = $('#avatares'); if (!box) return;
-  for (let k = 0; k < N_AVATARES; k++) {
-    const b = document.createElement('button'); b.type = 'button'; b.setAttribute('role', 'radio'); b.setAttribute('aria-label', 'Ícone ' + (k + 1));
+  for (const k of ORDEM_AVATARES) {
+    const b = document.createElement('button'); b.type = 'button'; b.setAttribute('role', 'radio'); b.setAttribute('aria-label', 'Ícone ' + (k + 1)); b.dataset.k = k;
     b.setAttribute('aria-checked', String(k === meuAvatar));
     const im = document.createElement('img'); im.src = `avatares/p${k}.webp`; im.alt = ''; im.loading = 'lazy'; b.append(im);
-    b.onclick = () => { meuAvatar = k; guardar.set('avatar', String(k)); box.querySelectorAll('button').forEach((x, j) => x.setAttribute('aria-checked', String(j === k))); previa(k); };
+    b.onclick = () => { meuAvatar = k; guardar.set('avatar', String(k)); box.querySelectorAll('button').forEach(x => x.setAttribute('aria-checked', String(+x.dataset.k === k))); previa(k); desenharBotoesReacao(); };
     b.onmouseenter = b.onfocus = () => previa(k);
     b.onmouseleave = b.onblur = () => previa(meuAvatar);
     box.append(b);
@@ -5137,7 +5148,7 @@ function difundirChat(msg) {
 }
 function reacaoNoHost(m, d) {
   if (!EMOJIS.includes(d.emoji) || !limiteTaxa(m, 'taxaReacao', 8, 3000)) return;
-  const msg = { tipo: 'reacao', de: m.id, nome: m.nome, emoji: d.emoji };
+  const msg = { tipo: 'reacao', de: m.id, nome: m.nome, emoji: d.emoji, av: m.id === grupo.meuId ? grupo.av : m.av };
   for (const c of grupo.conns.values()) if (c.open && c.peer !== m.id) try { c.send(msg); } catch {}
   receberReacao(msg);
 }
@@ -5221,21 +5232,47 @@ function reagir(emoji) {
   chatGrupo.ultimaReacao = Date.now();
   if (grupo.host) { const eu = grupo.membros.find(x => x.id === grupo.meuId) || { id: grupo.meuId, nome: grupo.nome }; reacaoNoHost(eu, { emoji }); return; }
   if (grupo.con && grupo.con.open) try { grupo.con.send({ tipo: 'reacao', emoji }); } catch {}
-  soltarEmoji(emoji); // a sua aparece na hora
+  soltarEmoji(emoji, grupo.av); // a sua aparece na hora
 }
 function receberReacao(d) {
   if (!d || !EMOJIS.includes(d.emoji)) return;
   if (d.de === grupo.meuId && !grupo.host) return; // a própria já apareceu
   if (d.de !== grupo.meuId && !verReacoes) return; // escolheu não ver as dos outros
-  soltarEmoji(d.emoji);
+  const quem = grupo.membros.find(x => x.id === d.de);
+  soltarEmoji(d.emoji, d.de === grupo.meuId ? grupo.av : avValido(d.av) ?? (quem && quem.av));
+}
+// a carinha do ícone pra esse emoji (ou nada, se o ícone não tem as reações)
+function srcReacao(emoji, av) {
+  const i = EMOJIS.indexOf(emoji); av = avValido(av);
+  return i >= 0 && av != null && AV_COM_REACOES.has(av) ? `reacoes/${av}_${i}.webp` : null;
+}
+function conteudoReacao(el, emoji, av) {
+  const src = srcReacao(emoji, av);
+  if (!src) { el.textContent = emoji; return; }
+  const im = document.createElement('img'); im.src = src; im.alt = emoji; im.draggable = false;
+  el.replaceChildren(im); el.classList.add('com-carinha');
+}
+// os botões de reagir mostram as carinhas do seu ícone
+function preencherBotoesReacao(box, aoClicar) {
+  box.replaceChildren();
+  for (const e of EMOJIS) {
+    const b = document.createElement('button'); b.type = 'button'; b.setAttribute('aria-label', 'Reagir com ' + e); b.title = e;
+    conteudoReacao(b, e, meuAvatar);
+    b.onclick = ev => aoClicar(ev, e);
+    box.append(b);
+  }
+}
+function desenharBotoesReacao() {
+  const box = $('.chat-reagir'); if (box) preencherBotoesReacao(box, (ev, e) => reagir(e));
+  if (AV_COM_REACOES.has(meuAvatar)) EMOJIS.forEach(e => { new Image().src = srcReacao(e, meuAvatar); }); // já deixa carregado
 }
 const MENOS_MOVIMENTO = matchMedia('(prefers-reduced-motion: reduce)').matches;
-function soltarEmoji(emoji) {
+function soltarEmoji(emoji, av) {
   const t = telaDasReacoes();
   const camada = t ? t.querySelector('.reacoes-camada') : document.querySelector('.grupo-chat .reacoes-camada');
   if (!camada || document.hidden) return;
   if (camada.childElementCount > 40) return; // chuva de cliques: não acumula
-  const el = document.createElement('span'); el.className = 'reacao'; el.textContent = emoji;
+  const el = document.createElement('span'); el.className = 'reacao'; conteudoReacao(el, emoji, av);
   el.style.right = (4 + Math.random() * 10) + '%';
   camada.append(el);
   const altura = Math.max(160, camada.clientHeight * (0.55 + Math.random() * 0.25));
@@ -5254,11 +5291,7 @@ function alternarReagirTile(t) {
   const aberto = t.querySelector('.tile-reagir');
   if (aberto) { aberto.remove(); return; }
   const box = document.createElement('div'); box.className = 'tile-reagir';
-  for (const e of EMOJIS) {
-    const b = document.createElement('button'); b.type = 'button'; b.textContent = e; b.setAttribute('aria-label', 'Reagir com ' + e);
-    b.onclick = ev => { ev.stopPropagation(); reagir(e); };
-    box.append(b);
-  }
+  preencherBotoesReacao(box, (ev, e) => { ev.stopPropagation(); reagir(e); });
   box.onclick = ev => ev.stopPropagation();
   t.append(box);
 }
@@ -5268,12 +5301,7 @@ function aplicarVerReacoes() {
   b.querySelector('b').textContent = verReacoes ? 'visíveis' : 'escondidas';
 }
 (function iniciarChat() {
-  const box = $('.chat-reagir');
-  for (const e of EMOJIS) {
-    const b = document.createElement('button'); b.type = 'button'; b.textContent = e; b.setAttribute('aria-label', 'Reagir com ' + e);
-    b.onclick = () => reagir(e);
-    box.append(b);
-  }
+  desenharBotoesReacao();
   const camada = document.createElement('div'); camada.className = 'reacoes-camada';
   $('.grupo-chat').append(camada);
   $('#form-chat').onsubmit = e => { e.preventDefault(); const i = $('#in-chat'); if (enviarChat(i.value)) i.value = ''; };
