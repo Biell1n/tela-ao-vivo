@@ -4437,8 +4437,39 @@ function atualizarLuz() {
     const x = c.getContext('2d');
     // mistura com o quadro anterior: a cor muda devagar, sem piscar
     x.globalAlpha = c.classList.contains('viva') ? 0.25 : 1;
-    try { x.drawImage(v, 0, 0, 32, 18); c.classList.add('viva'); } catch {}
+    try { x.drawImage(luzEquilibrada(v), 0, 0); c.classList.add('viva'); } catch {}
   }
+}
+// A luz vem das beiradas da imagem; se um lado da tela é claro e o outro escuro, ela fica torta.
+// Aqui mistura um pouco da cor geral e iguala o brilho das colunas: os dois lados brilham parecido,
+// mas ainda com um toque da cor de cada lado.
+const luzTmp = document.createElement('canvas'); luzTmp.width = 32; luzTmp.height = 18;
+const luzCtx = luzTmp.getContext('2d', { willReadFrequently: true });
+function luzEquilibrada(v) {
+  luzCtx.globalAlpha = 1;
+  luzCtx.drawImage(v, 0, 0, 32, 18);
+  let img;
+  try { img = luzCtx.getImageData(0, 0, 32, 18); } catch { return luzTmp; }
+  const d = img.data, W = 32, H = 18, lum = (r, g, b) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  let mr = 0, mg = 0, mb = 0;
+  const col = new Array(W).fill(0);
+  for (let y = 0; y < H; y++) for (let xx = 0; xx < W; xx++) {
+    const i = (y * W + xx) * 4;
+    mr += d[i]; mg += d[i + 1]; mb += d[i + 2];
+    col[xx] += lum(d[i], d[i + 1], d[i + 2]) / H;
+  }
+  const n = W * H; mr /= n; mg /= n; mb /= n;
+  const media = Math.max(1, lum(mr, mg, mb));
+  for (let y = 0; y < H; y++) for (let xx = 0; xx < W; xx++) {
+    const i = (y * W + xx) * 4;
+    // 40% da cor geral da imagem
+    let r = d[i] * .6 + mr * .4, g = d[i + 1] * .6 + mg * .4, b = d[i + 2] * .6 + mb * .4;
+    // brilho da coluna puxado pro brilho médio (limitado, pra não estourar uma coluna preta)
+    const ganho = Math.min(2.5, Math.max(.6, media / Math.max(4, col[xx] * .6 + media * .4)));
+    d[i] = Math.min(255, r * ganho); d[i + 1] = Math.min(255, g * ganho); d[i + 2] = Math.min(255, b * ganho);
+  }
+  luzCtx.putImageData(img, 0, 0);
+  return luzTmp;
 }
 setInterval(atualizarLuz, 200);
 // celular: o som só pode ligar dentro de um toque. Qualquer toque na tela do grupo tenta de novo nas janelinhas.
