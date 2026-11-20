@@ -4725,6 +4725,16 @@ setInterval(async () => {
         ajustarQualidadeRx(st);
         await medirSomRx(callRx.peerConnection);
         sfuDisponivel(); // atualiza o gasto do mês (a cada 5 min no máximo)
+        // caindo de verdade = chega menos do que a tela dele gera (não conta vídeo de 30 fps nem tela parada)
+        function fpsCaiu(st, i) {
+          if (!i || !i.fpsAlvo) return '';
+          const gera = i.fpsCaptura != null ? Math.min(i.fpsCaptura, i.fpsAlvo) : i.fpsAlvo;
+          if (gera < 8 || st.fps >= gera * 0.8) return '';
+          if (i.limite === 'bandwidth') return 'a internet (upload) de quem transmite';
+          if (i.limite === 'cpu') return 'o PC de quem transmite (comprimindo o vídeo)';
+          if (i.fps >= gera * 0.8) return 'o caminho até você (sua internet/Wi-Fi)';
+          return 'o PC de quem transmite';
+        }
         function causaFps(i) {
           if (i.limite === 'bandwidth') return 'internet (upload) de quem transmite';
           if (i.limite === 'cpu') return 'processador de quem transmite';
@@ -4740,15 +4750,16 @@ setInterval(async () => {
           (porque ? `Por quê      ${porque.replace('reduzido: ', '')}\n` : '') +
           (it && it.qualidade ? `Qualidade   ${it.qualidade}\n` : '') +
           (st.codec ? `Formato     ${st.codec}${/vp8/i.test(st.codec) ? ' (antigo, sem placa de vídeo: pesa no PC dele)' : /h265|av1/i.test(st.codec) ? ' (moderno: mais imagem com menos internet)' : ''}\n` : '') +
-          `FPS         ${st.fps}${it && it.fpsAlvo ? ` de ${it.fpsAlvo}` : ''}${it && it.fpsCaptura != null ? ` (captura dele: ${it.fpsCaptura})` : ''}\n` +
-          (it && it.fpsAlvo && st.fps < it.fpsAlvo * 0.8 ? `FPS caindo  ${causaFps(it)}\n` : '') +
+          `FPS         ${st.fps}${it && it.fpsAlvo ? ` de ${it.fpsAlvo}` : ''}` + (it && it.fpsCaptura != null && it.fpsAlvo && it.fpsCaptura < it.fpsAlvo * 0.8
+            ? ` · a tela dele está gerando ${it.fpsCaptura} fps (normal em vídeo de 24/30 fps ou tela parada)` : '') + `\n` +
+          (fpsCaiu(st, it) ? `FPS caindo  por causa d${fpsCaiu(st, it)}\n` : '') +
           `Taxa        ${st.mbps.toFixed(2)} Mbps\n` +
           `Ping        ${st.ping != null ? st.ping + ' ms' : '?'} (${st.rota || '?'})\n` +
           `Perdidos    ${st.perdidos} pacotes${st.recebidos ? ` (${(100 * st.perdidos / (st.perdidos + st.recebidos)).toFixed(1)}%)` : ''}\n` +
           `Travadas    ${st.travadas}${st.jitter != null ? ` · variação ${st.jitter} ms` : ''}\n` +
           `Folga       ${FOLGAS[folgaNivel] == null ? 'automática' : FOLGAS[folgaNivel] + ' ms'}\n` +
           `Você pediu  ${qRx.auto ? 'AUTO · ' : ''}${NIVEIS_RX[qRx.nivel].nome}\n` +
-          (it && it.capH && NIVEIS_RX[qRx.nivel].altura > it.capH ? `Limite      chega em ${it.capH}p: com Tela inteira ou Janela não passa do monitor de quem transmite. Pra 4K, ele precisa compartilhar uma Aba (o Chrome desenha a aba em 2x)
+          (it && it.capH && it.capH < 1200 && NIVEIS_RX[qRx.nivel].altura > it.capH * 1.1 ? `Limite      ${it.capH}p: é o monitor dele. Pra 4K, ele precisa compartilhar uma Aba
 ` : '') +
           (SR.modo ? `Super res.  ${SR.info || (SR.motor === 'ia' ? 'ligada' : 'parada: a imagem já chega do tamanho da sua tela (pra restaurar vídeo esticado, use o tipo Anime ou escolha 2K/4K)')}
 ` : '') +
