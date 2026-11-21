@@ -1,4 +1,7 @@
 {
+  "1.3.1": [
+    "Captura \"Pelo programa\" muito mais rápida quando o jogo deixa a placa de vídeo no limite: a compressão ficou umas 7 vezes mais rápida (nos testes, de ~36 pra ~56 fps com a placa no 100%)."
+  ],
   "1.3.0": [
     "Nova opção \"Pelo programa\" no Passo 1: o programa captura a tela e comprime o vídeo na placa de vídeo, como o Discord, e o processador fica livre pro jogo.",
     "Escolha o que vem primeiro quando o jogo pesar: Fluidez pra quem assiste ou Desempenho do jogo.",

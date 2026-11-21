@@ -70,6 +70,11 @@ namespace TelaAoVivoAudio
         [UnmanagedFunctionPointer(CallingConvention.StdCall)] public delegate int Reset(IntPtr s, IntPtr dev, uint token);
         [UnmanagedFunctionPointer(CallingConvention.StdCall)] public delegate int CodecSet(IntPtr s, ref Guid api, IntPtr v);
         [UnmanagedFunctionPointer(CallingConvention.StdCall)] public delegate int SetMT(IntPtr s, int on);
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)] public delegate int OpenShared(IntPtr s, IntPtr handle, ref Guid iid, out IntPtr o);
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)] public delegate int AcquireSync(IntPtr s, ulong key, uint ms);
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)] public delegate int CreateQuery(IntPtr s, IntPtr desc, out IntPtr q);
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)] public delegate int GetData(IntPtr s, IntPtr q, IntPtr data, uint size, uint flags);
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)] public delegate int ReleaseSync(IntPtr s, ulong key);
     }
 
     static class G // GUIDs do Media Foundation / Direct3D
@@ -106,6 +111,8 @@ namespace TelaAoVivoAudio
         public static readonly Guid ID3D11Texture2D = new Guid("6f15aaf2-d208-4e89-9ab4-489535d34f9c");
         public static readonly Guid ID3D10Multithread = new Guid("9b7e4e00-342c-4106-a19f-4f2704f689f0");
         public static readonly Guid IDXGIDevice = new Guid("54ec77fa-1377-44e6-8c32-88fd5f44c84c");
+        public static readonly Guid IDXGIResource = new Guid("035f3ab4-482e-4e50-b41f-8a7f8bd8960b");
+        public static readonly Guid IDXGIKeyedMutex = new Guid("9d8e1289-d7b3-465f-8126-250e349af85d");
         public static readonly Guid LowLatency = new Guid("9c27891a-ed7a-40e1-88e8-b22727a024ee");
         public static readonly Guid RateControl = new Guid("1c0608e9-370c-4710-8a58-cb6181c42423");
         public static readonly Guid MeanBitRate = new Guid("f7222374-2144-4815-b550-a37f8e12ee52");
@@ -206,9 +213,20 @@ namespace TelaAoVivoAudio
         }
 
         // ------------------------------------------------------------------ placa de vídeo
+        // Dois dispositivos, como o navegador: um só pra capturar, outro pra converter e comprimir. Com um só, a
+        // captura, o conversor e o encoder disputavam a mesma fila na placa e, com o jogo no 100%, um esperava o outro.
+        IntPtr devCap, ctxCap;
+        const int ANEL = 4;                          // imagens compartilhadas entre os dois (na placa, sem sair dela)
+        IntPtr[] texCap = new IntPtr[ANEL], texEnc = new IntPtr[ANEL], kmCap = new IntPtr[ANEL], kmEnc = new IntPtr[ANEL];
+        int anelIdx = -1, ultimoAnel = -1;
+        readonly int[] emUso = new int[ANEL];       // 1 = a conversão ainda não terminou essa imagem
+        IntPtr consulta;                             // pergunta: a cópia já terminou na placa?
+        readonly System.Collections.Concurrent.BlockingCollection<long[]> filaConv = new System.Collections.Concurrent.BlockingCollection<long[]>(ANEL);
+
         void CriarPlaca()
         {
             int lvl;
+            Com.Ok(D3D11CreateDevice(IntPtr.Zero, 1, IntPtr.Zero, 0x20, IntPtr.Zero, 0, 7, out devCap, out lvl, out ctxCap), "D3D11CreateDevice (captura)");
             // BGRA + VIDEO_SUPPORT (o conversor e o encoder usam o mesmo dispositivo)
             Com.Ok(D3D11CreateDevice(IntPtr.Zero, 1, IntPtr.Zero, 0x20 | 0x800, IntPtr.Zero, 0, 7, out dev, out lvl, out ctx), "D3D11CreateDevice");
             var mt = Com.QI(dev, G.ID3D10Multithread);
@@ -220,7 +238,7 @@ namespace TelaAoVivoAudio
         void CriarCaptura()
         {
             Com.Rel(ref dup);
-            var dxdev = Com.QI(dev, G.IDXGIDevice);
+            var dxdev = Com.QI(devCap, G.IDXGIDevice);
             IntPtr adapter, output;
             try
             {
@@ -228,7 +246,7 @@ namespace TelaAoVivoAudio
                 try
                 {
                     Com.Ok(Com.F<D.IdxPtr>(adapter, 7)(adapter, 0, out output), "EnumOutputs");
-                    try { Com.Ok(Com.F<D.DupOut>(output, 22)(output, dev, out dup), "DuplicateOutput"); } // IDXGIOutput1::DuplicateOutput
+                    try { Com.Ok(Com.F<D.DupOut>(output, 22)(output, devCap, out dup), "DuplicateOutput"); } // IDXGIOutput1::DuplicateOutput
                     finally { Com.Rel(ref output); }
                 }
                 finally { Com.Rel(ref adapter); }
@@ -237,6 +255,62 @@ namespace TelaAoVivoAudio
             var desc = Marshal.AllocHGlobal(64);
             try { Com.F<D.VoidPtr>(dup, 7)(dup, desc); telaW = Marshal.ReadInt32(desc, 0); telaH = Marshal.ReadInt32(desc, 4); }
             finally { Marshal.FreeHGlobal(desc); }
+        }
+
+        void CriarAnel()
+        {
+            for (int i = 0; i < ANEL; i++)
+            {
+                var d = Marshal.AllocHGlobal(44);
+                try
+                {
+                    int[] v = { telaW, telaH, 1, 1, 87 /*B8G8R8A8*/, 1, 0, 0, 0x28 /*SHADER_RESOURCE|RENDER_TARGET*/, 0, 0x2 /*SHARED*/ };
+                    Marshal.Copy(v, 0, d, 11);
+                    Com.Ok(Com.F<D.CreateTex>(devCap, 5)(devCap, d, IntPtr.Zero, out texCap[i]), "textura compartilhada");
+                }
+                finally { Marshal.FreeHGlobal(d); }
+                var res = Com.QI(texCap[i], G.IDXGIResource); IntPtr handle;
+                try { Com.Ok(Com.F<D.Ptr>(res, 8)(res, out handle), "GetSharedHandle"); } finally { Com.Rel(ref res); }
+                Guid iid = G.ID3D11Texture2D;
+                Com.Ok(Com.F<D.OpenShared>(dev, 28)(dev, handle, ref iid, out texEnc[i]), "OpenSharedResource");
+            }
+            var qd = Marshal.AllocHGlobal(8);
+            try { Marshal.WriteInt32(qd, 0, 0 /*EVENT*/); Marshal.WriteInt32(qd, 4, 0); Com.Ok(Com.F<D.CreateQuery>(devCap, 24)(devCap, qd, out consulta), "CreateQuery"); }
+            finally { Marshal.FreeHGlobal(qd); }
+            var t = new Thread(LacoConversao) { IsBackground = true, Name = "conversao", Priority = ThreadPriority.AboveNormal };
+            t.SetApartmentState(ApartmentState.MTA); t.Start();
+        }
+
+        // pega as imagens que a captura soltou (chave 1), converte e devolve pra captura (chave 0)
+        void LacoConversao()
+        {
+            CoInitializeEx(IntPtr.Zero, 0);
+            var bufs = Marshal.AllocHGlobal(32);
+            try
+            {
+                while (rodando)
+                {
+                    long[] item;
+                    if (!filaConv.TryTake(out item, 200)) continue;
+                    int i = (int)item[0];
+                    double tc = relogio.Elapsed.TotalMilliseconds;
+                    try { Converter(bufs, item[1], texEnc[i]); }
+                    finally { Volatile.Write(ref emUso[i], 0); }
+                    tConverter = tConverter * 0.95 + (relogio.Elapsed.TotalMilliseconds - tc) * 0.05;
+                }
+            }
+            catch (Exception e) { Falha("conversão: " + e.Message); }
+            finally { Marshal.FreeHGlobal(bufs); }
+        }
+
+        // espera a cópia (no dispositivo da captura) terminar na placa, pra conversão nunca ler meia imagem
+        void EsperarCopia()
+        {
+            var ctx2 = ctxCap;
+            Com.F<D.VoidPtr>(ctx2, 28)(ctx2, consulta);   // End(consulta)
+            Com.F<D.Int0>(ctx2, 111)(ctx2);               // Flush
+            var sw = Stopwatch.StartNew();
+            while (Com.F<D.GetData>(ctx2, 29)(ctx2, consulta, IntPtr.Zero, 0, 0) == 1 && sw.ElapsedMilliseconds < 100) Thread.Sleep(0);
         }
 
         IntPtr CriarTextura(int w, int h, int formato, int bind)
@@ -280,7 +354,7 @@ namespace TelaAoVivoAudio
             larg &= ~1; alt &= ~1;
             Largura = larg; AlturaSaida = alt;
 
-            if (larg == (telaW & ~1) && alt == (telaH & ~1) && Environment.GetEnvironmentVariable("TVA_DIRETO") == "1")
+            if (false)
             {
                 try
                 {
@@ -323,7 +397,7 @@ namespace TelaAoVivoAudio
             }
             Com.F<D.ProcMsg>(vp, 23)(vp, 0x10000000, IntPtr.Zero); // BEGIN_STREAMING
 
-            copia = CriarTextura(telaW, telaH, 87 /*B8G8R8A8*/, 0x28 /*SHADER_RESOURCE|RENDER_TARGET*/);
+            CriarAnel();
             MontarEncoder(larg, alt, fps, false);
             if (string.IsNullOrEmpty(Caminho)) Caminho = "conversor";
         }
@@ -626,34 +700,48 @@ namespace TelaAoVivoAudio
                         if (Marshal.ReadInt64(info, 0) != 0 && agora >= proximo - 1.5)
                         {
                             IntPtr tex = Com.QI(res, G.ID3D11Texture2D);
-                            if (tex != IntPtr.Zero) { Com.F<D.Copy>(ctx, 47)(ctx, encDireto ? poolBgra[poolBgraIdx = (poolBgraIdx + 1) % poolBgra.Length] : copia, tex); Com.Rel(ref tex); novo = true; }
+                            if (tex != IntPtr.Zero)
+                            {
+                                int i = (anelIdx + 1) % ANEL;
+                                // a imagem ainda está com a conversão (ela está atrasada): pula este quadro
+                                if (Volatile.Read(ref emUso[i]) == 0)
+                                {
+                                    Com.F<D.Copy>(ctxCap, 47)(ctxCap, texCap[i], tex);
+                                    EsperarCopia();
+                                    anelIdx = ultimoAnel = i; novo = true;
+                                }
+                                Com.Rel(ref tex);
+                            }
                         }
                         Com.Rel(ref res);
                         Com.F<D.Int0>(dup, 14)(dup); // ReleaseFrame
                     }
                     else if (hr != DXGI_TIMEOUT) throw new Exception("AcquireNextFrame 0x" + hr.ToString("x8"));
                     // tela parada não manda nada (o WebRTC aguenta); mas um pedido de quadro-chave reenvia a última imagem
-                    if (!novo && !(pedirChave && agora >= proximo)) { Estatistica(); continue; }
+                    if (!novo && pedirChave && agora >= proximo && ultimoAnel >= 0)
+                    {
+                        // tela parada e alguém pediu quadro completo: reenvia a última imagem (se ela estiver livre)
+                        if (Volatile.Read(ref emUso[ultimoAnel]) == 0) { anelIdx = ultimoAnel; novo = true; }
+                    }
+                    if (!novo) { Estatistica(); continue; }
                     proximo = Math.Max(proximo + intervalo, agora + intervalo * 0.5);
                     Interlocked.Increment(ref contCap);
-                    double tc = relogio.Elapsed.TotalMilliseconds;
-                    if (encDireto) EntregarDireto((long)(agora * 10000));
-                    else Converter(bufs, (long)(agora * 10000));
-                    tConverter = tConverter * 0.95 + (relogio.Elapsed.TotalMilliseconds - tc) * 0.05;
+                    Volatile.Write(ref emUso[anelIdx], 1);
+                    if (!filaConv.TryAdd(new long[] { anelIdx, (long)(agora * 10000) })) Volatile.Write(ref emUso[anelIdx], 0);
                     Estatistica();
                 }
             }
             finally { Marshal.FreeHGlobal(info); Marshal.FreeHGlobal(bufs); }
         }
 
-        void Converter(IntPtr bufs, long tempo100ns)
+        void Converter(IntPtr bufs, long tempo100ns, IntPtr imagem)
         {
             IntPtr entrada, buf;
             Com.Ok(MFCreateSample(out entrada), "MFCreateSample");
             try
             {
                 Guid iid = G.ID3D11Texture2D;
-                Com.Ok(MFCreateDXGISurfaceBuffer(ref iid, copia, 0, 0, out buf), "MFCreateDXGISurfaceBuffer");
+                Com.Ok(MFCreateDXGISurfaceBuffer(ref iid, imagem, 0, 0, out buf), "MFCreateDXGISurfaceBuffer");
                 Com.F<D.VoidPtr>(entrada, 42)(entrada, buf); Com.Rel(ref buf);
                 Com.F<D.SetI64>(entrada, 36)(entrada, tempo100ns);
                 Com.F<D.SetI64>(entrada, 38)(entrada, 10000000L / Math.Max(10, Fps));
@@ -745,7 +833,10 @@ namespace TelaAoVivoAudio
             Com.Rel(ref vp);
             for (int i = 0; i < poolNv12.Length; i++) Com.Rel(ref poolNv12[i]);
             for (int i = 0; i < poolBgra.Length; i++) Com.Rel(ref poolBgra[i]);
-            Com.Rel(ref copia); Com.Rel(ref dup); Com.Rel(ref mgr); Com.Rel(ref ctx); Com.Rel(ref dev);
+            for (int i = 0; i < ANEL; i++) { Com.Rel(ref texEnc[i]); Com.Rel(ref texCap[i]); emUso[i] = 0; }
+            Com.Rel(ref consulta);
+            long[] lixo; while (filaConv.TryTake(out lixo)) { }
+            Com.Rel(ref copia); Com.Rel(ref dup); Com.Rel(ref mgr); Com.Rel(ref ctx); Com.Rel(ref dev); Com.Rel(ref ctxCap); Com.Rel(ref devCap);
             precisaEntrada = 0;
         }
     }
