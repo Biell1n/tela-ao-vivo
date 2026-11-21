@@ -178,7 +178,7 @@ namespace TelaAoVivoAudio
                 {
                     c.Fechar();
                     bool ninguem; lock (videoClientes) { videoClientes.Remove(c); ninguem = videoClientes.Count == 0; }
-                    if (ninguem) PararVideo(); // o site fechou: para de capturar na hora
+                    if (ninguem) { PararVideo(); Camera.Parar(); } // o site fechou: para de capturar na hora (e solta a câmera)
                 }
                 else if (c != null)
                 {
@@ -303,10 +303,24 @@ namespace TelaAoVivoAudio
                 new Thread(() =>
                 {
                     string txt;
-                    try { txt = json.Serialize(new Dictionary<string, object> { { "tipo", "janelas" }, { "telas", Janelas.Telas() }, { "janelas", Janelas.Lista() } }); }
+                    try { txt = json.Serialize(new Dictionary<string, object> { { "tipo", "janelas" }, { "telas", Janelas.Telas() }, { "janelas", Janelas.Lista() }, { "cameras", Camera.Listar() } }); }
                     catch (Exception e) { txt = json.Serialize(new Dictionary<string, object> { { "tipo", "janelas" }, { "erro", e.Message } }); }
                     lock (videoClientes) foreach (var c in videoClientes) EnviarTexto(c, txt);
                 }) { IsBackground = true, Name = "janelas" }.Start();
+                return;
+            }
+            if (tipo == "camera")
+            {   // câmera por cima: liga/desliga, qual, e o jeito (posição, tamanho, forma, espelho)
+                object v;
+                if (m.TryGetValue("x", out v)) Camera.X = Convert.ToSingle(v);
+                if (m.TryGetValue("y", out v)) Camera.Y = Convert.ToSingle(v);
+                if (m.TryGetValue("w", out v)) Camera.W = Convert.ToSingle(v);
+                if (m.TryGetValue("forma", out v)) Camera.Circulo = (v as string) == "circ";
+                if (m.TryGetValue("espelho", out v) && v is bool) Camera.Espelho = (bool)v;
+                if (m.TryGetValue("visivel", out v) && v is bool) Camera.Visivel = (bool)v;
+                bool ligar = m.TryGetValue("ligar", out v) && v is bool && (bool)v;
+                int id = Num(m, "id", 0);
+                new Thread(() => Camera.Configurar(ligar, id)) { IsBackground = true, Name = "camera config" }.Start();
                 return;
             }
             lock (travaVideo)
@@ -382,7 +396,7 @@ namespace TelaAoVivoAudio
                 }
                 var est = v == null ? new Dictionary<string, object> { { "tipo", "video-estado" }, { "ligado", false } }
                     : new Dictionary<string, object> { { "tipo", "video-estado" }, { "ligado", string.IsNullOrEmpty(v.Erro) }, { "encoder", v.Encoder },
-                        { "w", v.Largura }, { "h", v.AlturaSaida }, { "cap", v.Capturados }, { "env", v.Enviados }, { "erro", v.Erro }, { "fluida", v.Fluida }, { "dbg", v.Dbg }, { "aviso", v.Aviso }, { "janela", v.AlvoJanela != IntPtr.Zero } };
+                        { "w", v.Largura }, { "h", v.AlturaSaida }, { "cap", v.Capturados }, { "env", v.Enviados }, { "erro", v.Erro }, { "fluida", v.Fluida }, { "dbg", v.Dbg }, { "aviso", v.Aviso }, { "janela", v.AlvoJanela != IntPtr.Zero }, { "camera", Camera.Ligada ? (string.IsNullOrEmpty(Camera.Erro) ? Camera.Nome : "erro: " + Camera.Erro) : "" }, { "camAsp", Camera.QW > 0 ? (double)Camera.QH / Camera.QW : 0.5625 } };
                 EstadoVideo = v == null ? "" : string.IsNullOrEmpty(v.Erro) ? "Vídeo: " + v.Largura + "×" + v.AlturaSaida + " · " + v.Enviados + " fps" : "Vídeo: " + v.Erro;
                 var txt = json.Serialize(est);
                 lock (videoClientes) foreach (var c in videoClientes) EnviarTexto(c, txt);

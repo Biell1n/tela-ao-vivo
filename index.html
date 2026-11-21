@@ -1123,7 +1123,7 @@ html.com-fundo .bloco{background:none;-webkit-backdrop-filter:none;backdrop-filt
         <div id="bloco-cam" class="bloco-cam">
           <label class="cam-liga" id="op-cam-junto"><input type="checkbox" id="cam-junto"><span><b>Câmera por cima da tela</b><span class="etq rec">ESTILO OBS</span>
             <small>Sua câmera num cantinho da transmissão. Depois de começar, arraste ela na prévia pra posicionar.</small></span></label>
-          <p id="nota-cam-prog" class="dica hidden">A câmera por cima da tela ainda não funciona "Pelo programa". Se quiser a câmera junto, escolha Tela inteira, Janela ou Aba.</p>
+          <p id="nota-cam-prog" class="dica hidden">Pra ter a câmera por cima "Pelo programa", atualize o Tela ao Vivo Áudio (aviso no topo). Ou escolha Tela inteira, Janela ou Aba.</p>
           <div id="cam-opcoes" class="cam-opcoes hidden">
             <label class="rotulo-campo" for="sel-cam">Câmera</label>
             <select id="sel-cam"><option value="">Carregando...</option></select>
@@ -2709,7 +2709,33 @@ function travarConfig(travar) {
 const camLayout = Object.assign({ x: 0.73, y: 0.66, w: 0.25, forma: 'ret', espelho: true },
   (() => { try { return JSON.parse(guardar.get('camLayout') || '{}'); } catch { return {}; } })());
 let camVisivel = true, composicao = null, camerasListadas = false;
-function salvarLayout() { guardar.set('camLayout', JSON.stringify(camLayout)); posicionarCaixaCam(); }
+function salvarLayout() { guardar.set('camLayout', JSON.stringify(camLayout)); posicionarCaixaCam(); if (PV.ativo) pvCamera(); }
+let camListaDe = '';
+// pelo programa: as câmeras que o programa enxerga (os nomes são os mesmos do Windows)
+async function pvListarCameras() {
+  const sel = $('#sel-cam');
+  sel.innerHTML = ''; sel.add(new Option('Carregando...', ''));
+  let lista = [];
+  try { lista = (await pvListar()).cameras || []; } catch {}
+  sel.innerHTML = '';
+  if (!lista.length) sel.add(new Option('Nenhuma câmera encontrada', ''));
+  lista.forEach(c => sel.add(new Option(c.nome, 'p' + c.id)));
+  const salvo = guardar.get('camDevProg');
+  if (lista.some(c => 'p' + c.id === salvo)) sel.value = salvo;
+  camerasListadas = true;
+  if (PV.ativo) pvCamera();
+}
+// manda pro programa o jeito da câmera (liga/desliga, qual, posição, tamanho, forma, espelho)
+let pvCamUltimo = 0, pvCamTimer = 0;
+function pvCamera(ja) {
+  if (!PV.ativo) return;
+  const agora = performance.now();
+  if (!ja && agora - pvCamUltimo < 50) { clearTimeout(pvCamTimer); pvCamTimer = setTimeout(() => pvCamera(true), 60); return; }
+  pvCamUltimo = agora;
+  const v = $('#sel-cam').value, id = /^p\d+$/.test(v) ? +v.slice(1) : 0;
+  pvEnviar({ tipo: 'camera', ligar: $('#cam-junto').checked && radio('fonte') === 'programa' && /^p\d+$/.test(v), id,
+             x: camLayout.x, y: camLayout.y, w: camLayout.w, forma: camLayout.forma, espelho: !!camLayout.espelho, visivel: camVisivel });
+}
 
 async function listarCameras() {
   const sel = $('#sel-cam');
@@ -2821,18 +2847,19 @@ function retanguloPrevia() {
 }
 function posicionarCaixaCam() {
   const cx = $('#cam-caixa');
-  const R = composicao && retanguloPrevia();
+  const progCam = PV.ativo && $('#cam-junto').checked && radio('fonte') === 'programa';
+  const R = (composicao || progCam) && retanguloPrevia();
   if (!R || !camVisivel) { cx.classList.add('hidden'); return; }
   const circ = camLayout.forma === 'circ';
   const w = camLayout.w * R.w;
-  const h = circ ? w : w * composicao.camAsp;
+  const h = circ ? w : w * (composicao ? composicao.camAsp : (PV.estado && PV.estado.camAsp) || 9 / 16);
   const x = Math.min(Math.max(camLayout.x, 0), 1 - camLayout.w) * R.w;
   const y = Math.min(Math.max(camLayout.y, 0), 1 - h / R.h) * R.h;
   Object.assign(cx.style, { left: R.x + x + 'px', top: R.y + y + 'px', width: w + 'px', height: h + 'px' });
   cx.classList.toggle('circ', circ);
   cx.classList.remove('hidden');
 }
-setInterval(() => { if (composicao) posicionarCaixaCam(); }, 400);
+setInterval(() => { if (composicao || PV.ativo) posicionarCaixaCam(); }, 400);
 window.addEventListener('resize', posicionarCaixaCam);
 (function arrastarCam() {
   const cx = $('#cam-caixa');
@@ -2856,6 +2883,7 @@ window.addEventListener('resize', posicionarCaixaCam);
       $('#cam-tam-txt').textContent = Math.round(camLayout.w * 100) + '%';
     }
     posicionarCaixaCam();
+    if (PV.ativo) pvCamera(); // pelo programa: a câmera acompanha o arrasto
   });
   const soltar = () => { if (modo) { modo = null; salvarLayout(); } };
   cx.addEventListener('pointerup', soltar);
@@ -2870,13 +2898,17 @@ function cantoCam(c) {
 function mostrarOpcoesCamera() {
   const fonte = radio('fonte');
   const soCamera = fonte === 'camera', prog = fonte === 'programa';
-  const junto = !soCamera && !prog && $('#cam-junto').checked;
-  // celular e navegador sem a montagem: só "câmera" como fonte. Pelo programa: ainda não dá (o navegador não mexe na imagem)
-  $('#op-cam-junto').classList.toggle('hidden', soCamera || prog || CELULAR_TX || !PODE_COMPOR);
-  $('#nota-cam-prog').classList.toggle('hidden', !prog || CELULAR_TX || !PODE_COMPOR);
+  const progSemCam = prog && PV.versao && versaoMenor(PV.versao, '1.3.5'); // programa antigo: sem câmera
+  const junto = !soCamera && !progSemCam && $('#cam-junto').checked;
+  // celular e navegador sem a montagem: só "câmera" como fonte. Pelo programa, quem desenha a câmera é o programa
+  $('#op-cam-junto').classList.toggle('hidden', soCamera || progSemCam || CELULAR_TX || (!prog && !PODE_COMPOR));
+  $('#nota-cam-prog').classList.toggle('hidden', !progSemCam || CELULAR_TX);
   $('#cam-opcoes').classList.toggle('hidden', !(soCamera || junto));
   $('#cam-layout').classList.toggle('hidden', soCamera);
-  if ((soCamera || junto) && !camerasListadas && !$('#tx').classList.contains('hidden')) listarCameras();
+  // a lista certa: as câmeras do navegador, ou (pelo programa) as que o programa enxerga
+  const de = prog ? 'prog' : 'nav';
+  if ((soCamera || junto) && (!camerasListadas || camListaDe !== de) && !$('#tx').classList.contains('hidden')) { camListaDe = de; prog ? pvListarCameras() : listarCameras(); }
+  if (PV.ativo) pvCamera();
 }
 
 
@@ -2909,7 +2941,7 @@ async function comecar() {
       if (!alvo) { statusTx('Você cancelou a escolha do que compartilhar.', 'aviso'); return; }
     }
     statusTx('Ligando a captura pelo programa...');
-    try { tela = new MediaStream([await pvIniciar()]); }
+    try { tela = new MediaStream([await pvIniciar()]); if ($('#cam-junto').checked) { camVisivel = true; pvCamera(true); $('#bt-cam-onoff').classList.remove('hidden'); $('#bt-cam-onoff span').textContent = 'Esconder câmera'; } }
     catch (e) {
       pvParar();
       statusTx('Não deu pra capturar pelo programa: ' + e.message + '. Abra o Tela ao Vivo Áudio (versão nova, botão "Baixar programa de áudio") ou escolha Tela inteira.', 'erro');
@@ -6078,7 +6110,7 @@ for (const [id, chave] of [['vol-mic', 'volMic'], ['vol-pc', 'volPc']]) {
 }
 $('#cam-junto').checked = guardar.get('camJunto') === '1';
 $('#cam-junto').onchange = () => { guardar.set('camJunto', $('#cam-junto').checked ? '1' : '0'); mostrarOpcoesCamera(); };
-$('#sel-cam').onchange = () => guardar.set('camDev', $('#sel-cam').value);
+$('#sel-cam').onchange = () => { const v = $('#sel-cam').value; if (/^p\d+$/.test(v)) { guardar.set('camDevProg', v); pvCamera(); } else guardar.set('camDev', v); };
 $('#cam-tam').value = Math.round(camLayout.w * 100);
 $('#cam-tam-txt').textContent = Math.round(camLayout.w * 100) + '%';
 $('#cam-tam').oninput = () => { camLayout.w = +$('#cam-tam').value / 100; $('#cam-tam-txt').textContent = $('#cam-tam').value + '%'; salvarLayout(); };
@@ -6091,6 +6123,7 @@ $('#bt-cam-onoff').onclick = () => {
   camVisivel = !camVisivel;
   $('#bt-cam-onoff span').textContent = camVisivel ? 'Esconder câmera' : 'Mostrar câmera';
   posicionarCaixaCam();
+  if (PV.ativo) pvCamera(true);
 };
 $('#bt-direta').onclick = liberarConexaoDireta;
 $('#bt-parar').onclick = pararTx;

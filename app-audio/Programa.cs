@@ -10,14 +10,14 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("Tela ao Vivo Áudio")]
 [assembly: AssemblyProduct("Tela ao Vivo Áudio")]
 [assembly: AssemblyDescription("Manda pro site Tela ao Vivo o som do PC sem o Discord, ou só dos apps escolhidos.")]
-[assembly: AssemblyVersion("1.3.4.0")]
-[assembly: AssemblyFileVersion("1.3.4.0")]
+[assembly: AssemblyVersion("1.3.5.0")]
+[assembly: AssemblyFileVersion("1.3.5.0")]
 
 namespace TelaAoVivoAudio
 {
     static class Programa
     {
-        public const string Versao = "1.3.4";
+        public const string Versao = "1.3.5";
         public const string Site = "https://tela-ao-vivo.vercel.app/";
         public static bool WindowsSuporta;
         public static bool NaBandeja;

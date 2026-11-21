@@ -1,4 +1,8 @@
 {
+  "1.3.5": [
+    "Compartilhar uma janela agora pega a janela de verdade, mesmo se outra estiver na frente dela (igual ao Discord).",
+    "Câmera por cima da tela também \"Pelo programa\": escolha a câmera, o tamanho e a forma, e arraste ela na prévia."
+  ],
   "1.3.4": [
     "Escolha o que compartilhar, igual ao Discord: a tela ou só uma janela, com a miniatura de cada uma.",
     "Escolhendo uma janela, o som já fica só daquele programa (dá pra marcar mais no Passo 2).",

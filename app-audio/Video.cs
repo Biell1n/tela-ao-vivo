@@ -161,6 +161,7 @@ namespace TelaAoVivoAudio
             if (ClasseAtual == 4) D3DKMTSetProcessSchedulingPriorityClass(GetCurrentProcess(), 4);
         }
         public volatile int ClasseAtual;
+        public volatile string Etapa = "";
         public Action<byte[], bool, long> AoQuadro;  // (H.264 Annex B, é quadro-chave, tempo em microssegundos)
         public Action<string> AoAviso;               // texto pro site/janela
         public volatile string Encoder = "", Erro = "";
@@ -169,7 +170,7 @@ namespace TelaAoVivoAudio
         public volatile int Capturados, Enviados;   // por segundo (pra estatística)
         public volatile int VpFlags;
         public int nPede, nSaida, nEntrega, nRecusa, nEventoOutro, nVpOk, nVpFalha, nVpRecusa, nVpIncompleto; public volatile string UltimoHr = "", UltimoVp = "";
-        public string Dbg { get { return "pede " + nPede + " saída " + nSaida + " entregas " + nEntrega + " recusas " + nRecusa + " outros " + nEventoOutro + " hr " + UltimoHr + " | vp ok " + nVpOk + " falha " + nVpFalha + " recusa " + nVpRecusa + " incompleto " + nVpIncompleto + " " + UltimoVp + " | " + Tamanhos + " | caminho " + Caminho + " | aceita " + EntradasAceitas + " | " + Tempos + " | prioridade " + ClasseAtual; } }
+        public string Dbg { get { return "pede " + nPede + " saída " + nSaida + " entregas " + nEntrega + " recusas " + nRecusa + " outros " + nEventoOutro + " hr " + UltimoHr + " | vp ok " + nVpOk + " falha " + nVpFalha + " recusa " + nVpRecusa + " incompleto " + nVpIncompleto + " " + UltimoVp + " | " + Tamanhos + " | caminho " + Caminho + " | aceita " + EntradasAceitas + " | " + Tempos + " | prioridade " + ClasseAtual + " | etapa " + Etapa; } }
 
         Thread laco; volatile bool rodando; volatile bool pedirChave; volatile int novaTaxa;
         IntPtr dev, ctx, mgr; uint token;
@@ -211,11 +212,11 @@ namespace TelaAoVivoAudio
             {
                 CoInitializeEx(IntPtr.Zero, 0);
                 if (Interlocked.Exchange(ref mfIniciado, 1) == 0) Com.Ok(MFStartup(0x00020070, 0), "MFStartup");
-                CriarPlaca();
+                Etapa = "placa"; CriarPlaca();
                 AplicarPrioridade();
-                CriarCaptura();
-                MontarCompressao();
-                Capturar();
+                Etapa = "captura"; CriarCaptura();
+                Etapa = "compressão"; MontarCompressao();
+                Etapa = "rodando"; Capturar();
             }
             catch (Exception e) { Erro = e.Message; if (AoAviso != null) AoAviso("erro: " + e.Message); }
             finally { Desmontar(); D3DKMTSetProcessSchedulingPriorityClass(GetCurrentProcess(), 2); rodando = false; }
@@ -244,8 +245,29 @@ namespace TelaAoVivoAudio
             Com.Ok(Com.F<D.Reset>(mgr, 7)(mgr, dev, token), "ResetDevice");
         }
 
+        CapturaJanela cj; // janela: a captura de janela do Windows (pega a janela mesmo coberta por outra)
+
         void CriarCaptura()
         {
+            if (AlvoJanela != IntPtr.Zero)
+            {
+                if (cj == null) cj = new CapturaJanela(devCap, AlvoJanela);
+                // o tamanho que vale é o do conteúdo do primeiro quadro (o "tamanho da janela" do Windows pode ser um pouco
+                // diferente; sem isso, ele achava que a janela mudou de tamanho e se remontava sem parar)
+                var t = cj.Tamanho;
+                var sw = Stopwatch.StartNew();
+                while (sw.ElapsedMilliseconds < 800)
+                {
+                    IntPtr tx, q; TamanhoInt ct;
+                    if (cj.Proximo(out tx, out ct, out q)) { Com.Rel(ref tx); CapturaJanela.Soltar(ref q); if (ct.W > 0 && ct.H > 0) t = ct; break; }
+                    Thread.Sleep(5);
+                }
+                if (t.W != cj.Tamanho.W || t.H != cj.Tamanho.H) cj.Recriar(t);
+                regX = regY = 0; regW = t.W & ~1; regH = t.H & ~1;
+                telaW = t.W; telaH = t.H;
+                if (regW < 32 || regH < 32) throw new Exception("a janela está pequena demais (ou minimizada)");
+                return;
+            }
             Com.Rel(ref dup);
             var dxdev = Com.QI(devCap, G.IDXGIDevice);
             IntPtr adapter, output;
@@ -778,6 +800,106 @@ namespace TelaAoVivoAudio
             finally { Marshal.FreeHGlobal(buf); Marshal.FreeHGlobal(si); }
         }
 
+        // ---- câmera por cima (igual ao "estilo OBS" do site): x, y = canto de cima à esquerda; W = largura (tudo relativo)
+        byte[] camCamada = new byte[0]; byte[] camFonte; string camChave = ""; IntPtr camTex; int camTexW, camTexH;
+
+        void DesenharCamera(IntPtr destino)
+        {
+            if (!Camera.Ligada || !Camera.Visivel) return;
+            byte[] q; int qw, qh;
+            lock (Camera.Trava) { q = Camera.Quadro; qw = Camera.QW; qh = Camera.QH; }
+            if (q == null || qw < 8 || qh < 8) return;
+            bool circ = Camera.Circulo, esp = Camera.Espelho;
+            float fw = Math.Max(0.05f, Math.Min(0.8f, Camera.W));
+            int w = Math.Max(16, (int)Math.Round(regW * fw)) & ~1, h = (circ ? w : (int)Math.Round(w * (double)qh / qw)) & ~1;
+            if (w > regW || h > regH) return;
+            int x = (int)Math.Round(Math.Min(Math.Max(Camera.X, 0f), 1f - (float)w / regW) * regW);
+            int y = (int)Math.Round(Math.Min(Math.Max(Camera.Y, 0f), 1f - (float)h / regH) * regH);
+            x = Math.Max(0, Math.Min(regW - w, x)); y = Math.Max(0, Math.Min(regH - h, y));
+            // a camada (câmera redimensionada + recorte + borda) só é refeita quando chega quadro novo ou muda o jeito
+            string chave = w + "x" + h + (circ ? "c" : "r") + (esp ? "e" : "");
+            if (!ReferenceEquals(q, camFonte) || chave != camChave) { MontarCamada(q, qw, qh, w, h, circ, esp); camFonte = q; camChave = chave; }
+            if (camTex == IntPtr.Zero || camTexW < w || camTexH < h)
+            {
+                Com.Rel(ref camTex); camTexW = Math.Max(w, 64); camTexH = Math.Max(h, 64);
+                var d = Marshal.AllocHGlobal(44);
+                try { int[] v = { camTexW, camTexH, 1, 1, 87, 1, 0, 3 /*STAGING*/, 0, 0x30000, 0 }; Marshal.Copy(v, 0, d, 11); if (Com.F<D.CreateTex>(devCap, 5)(devCap, d, IntPtr.Zero, out camTex) < 0) { camTex = IntPtr.Zero; return; } }
+                finally { Marshal.FreeHGlobal(d); }
+            }
+            var box = Marshal.AllocHGlobal(24); var map = Marshal.AllocHGlobal(16);
+            try
+            {
+                int[] bx = { x, y, 0, x + w, y + h, 1 }; Marshal.Copy(bx, 0, box, 6);
+                Com.F<D.CopyRegion>(ctxCap, 46)(ctxCap, camTex, 0, 0, 0, 0, destino, 0, box);
+                if (Com.F<D.MapCtx>(ctxCap, 14)(ctxCap, camTex, 0, 3, 0, map) < 0) return;
+                IntPtr px = Marshal.ReadIntPtr(map, 0); int pitch = Marshal.ReadInt32(map, 8);
+                var linha = new byte[w * 4]; var cam = camCamada;
+                for (int yy = 0; yy < h; yy++)
+                {
+                    IntPtr lp = px + yy * pitch; Marshal.Copy(lp, linha, 0, w * 4);
+                    int o = yy * w * 4;
+                    for (int i = 0; i < w * 4; i += 4)
+                    {
+                        int a = cam[o + i + 3]; if (a == 0) continue;
+                        if (a == 255) { linha[i] = cam[o + i]; linha[i + 1] = cam[o + i + 1]; linha[i + 2] = cam[o + i + 2]; continue; }
+                        int na = 255 - a;
+                        linha[i] = (byte)((cam[o + i] * a + linha[i] * na + 127) / 255);
+                        linha[i + 1] = (byte)((cam[o + i + 1] * a + linha[i + 1] * na + 127) / 255);
+                        linha[i + 2] = (byte)((cam[o + i + 2] * a + linha[i + 2] * na + 127) / 255);
+                    }
+                    Marshal.Copy(linha, 0, lp, w * 4);
+                }
+                Com.F<D.UnmapCtx>(ctxCap, 15)(ctxCap, camTex, 0);
+                int[] bx2 = { 0, 0, 0, w, h, 1 }; Marshal.Copy(bx2, 0, box, 6);
+                Com.F<D.CopyRegion>(ctxCap, 46)(ctxCap, destino, 0, (uint)x, (uint)y, 0, camTex, 0, box);
+            }
+            finally { Marshal.FreeHGlobal(box); Marshal.FreeHGlobal(map); }
+        }
+
+        // câmera redimensionada (bilinear), recortada (círculo ou cantos arredondados) e com a borda branca fina
+        void MontarCamada(byte[] q, int qw, int qh, int w, int h, bool circ, bool esp)
+        {
+            if (camCamada.Length != w * h * 4) camCamada = new byte[w * h * 4];
+            var c = camCamada;
+            double sx0 = 0, sy0 = 0, sw = qw, sh = qh;
+            if (circ) { double lado = Math.Min(qw, qh); sx0 = (qw - lado) / 2; sy0 = (qh - lado) / 2; sw = sh = lado; }
+            else { double asp = (double)w / h; if (qw / (double)qh > asp) { sw = qh * asp; sx0 = (qw - sw) / 2; } else { sh = qw / asp; sy0 = (qh - sh) / 2; } }
+            double raio = circ ? w / 2.0 : Math.Round(w * 0.05), borda = Math.Max(2, Math.Round(regW * 0.002));
+            double cx = w / 2.0, cy = h / 2.0;
+            for (int yy = 0; yy < h; yy++)
+            {
+                double fy = sy0 + (yy + 0.5) * sh / h - 0.5; int y0 = (int)Math.Floor(fy); double ty = fy - y0;
+                int ya = Math.Max(0, Math.Min(qh - 1, y0)), yb = Math.Max(0, Math.Min(qh - 1, y0 + 1));
+                for (int xx = 0; xx < w; xx++)
+                {
+                    // distância até a borda da forma (negativa = dentro), pra recortar e desenhar o contorno suave
+                    double dist;
+                    if (circ) { double dx = xx + 0.5 - cx, dy = yy + 0.5 - cy; dist = Math.Sqrt(dx * dx + dy * dy) - raio; }
+                    else
+                    {
+                        double qx = Math.Max(Math.Abs(xx + 0.5 - cx) - (cx - raio), 0), qy = Math.Max(Math.Abs(yy + 0.5 - cy) - (cy - raio), 0);
+                        double dentroX = Math.Abs(xx + 0.5 - cx) - cx, dentroY = Math.Abs(yy + 0.5 - cy) - cy;
+                        dist = (qx > 0 && qy > 0) ? Math.Sqrt(qx * qx + qy * qy) - raio : Math.Max(dentroX, dentroY);
+                    }
+                    int o = (yy * w + xx) * 4;
+                    double cobre = Math.Max(0, Math.Min(1, 0.5 - dist));            // dentro da forma (com 1 px suave)
+                    if (cobre <= 0) { c[o + 3] = 0; continue; }
+                    int sxI = esp ? w - 1 - xx : xx;
+                    double fx = sx0 + (sxI + 0.5) * sw / w - 0.5; int x0 = (int)Math.Floor(fx); double tx = fx - x0;
+                    int xa = Math.Max(0, Math.Min(qw - 1, x0)), xb = Math.Max(0, Math.Min(qw - 1, x0 + 1));
+                    int p00 = (ya * qw + xa) * 4, p01 = (ya * qw + xb) * 4, p10 = (yb * qw + xa) * 4, p11 = (yb * qw + xb) * 4;
+                    double anel = Math.Max(0, Math.Min(1, 0.5 - Math.Abs(dist + borda / 2) + borda / 2)); // a borda branca, por dentro
+                    for (int k = 0; k < 3; k++)
+                    {
+                        double v = (q[p00 + k] * (1 - tx) + q[p01 + k] * tx) * (1 - ty) + (q[p10 + k] * (1 - tx) + q[p11 + k] * tx) * ty;
+                        v = v * (1 - anel * 0.85) + 255 * anel * 0.85;
+                        c[o + k] = (byte)Math.Max(0, Math.Min(255, v));
+                    }
+                    c[o + 3] = (byte)Math.Round(cobre * 255);
+                }
+            }
+        }
+
         void DesenharCursor(IntPtr destino)
         {
             if (!curVisivel || curForma.Length == 0 || curW <= 0) return;
@@ -852,6 +974,7 @@ namespace TelaAoVivoAudio
                 try { int[] v = { regW, regH, 1, 1, 87, 1, 0, 0, 0, 0, 0 }; Marshal.Copy(v, 0, d, 11); Com.F<D.CreateTex>(devCap, 5)(devCap, d, IntPtr.Zero, out texLimpa); }
                 finally { Marshal.FreeHGlobal(d); }
             }
+            if (cj != null) { Marshal.FreeHGlobal(info); CapturarJanela(); return; }
             try
             {
                 while (rodando)
@@ -876,7 +999,10 @@ namespace TelaAoVivoAudio
                     }
                     else if (hr != DXGI_TIMEOUT) throw new Exception("AcquireNextFrame 0x" + hr.ToString("x8"));
 
-                    bool precisa = devido && visivel && (mudou || limpaSuja || (pedirChave && ultimoAnel >= 0));
+                    // com a câmera ligada, a imagem muda mesmo com a tela parada (a câmera mexe): manda no ritmo da câmera
+                    bool camMexeu = Camera.Ligada && Camera.Visivel && !ReferenceEquals(Camera.Quadro, camFonte) && texLimpa != IntPtr.Zero;
+                    if (camMexeu && tex == IntPtr.Zero && !limpaSuja) limpaSuja = ultimoAnel >= 0;
+                    bool precisa = devido && visivel && (mudou || limpaSuja || camMexeu || (pedirChave && ultimoAnel >= 0));
                     if (precisa)
                     {
                         int i = (anelIdx + 1) % ANEL;
@@ -886,8 +1012,11 @@ namespace TelaAoVivoAudio
                             if (fonte != IntPtr.Zero)
                             {
                                 if (fonte == tex) CopiarDaTela(texCap[i], tex); else Com.F<D.Copy>(ctxCap, 47)(ctxCap, texCap[i], fonte);
+                                // com a câmera ligada, guarda a tela limpa atual (a câmera redesenha por cima mesmo sem a tela mudar)
+                                if (fonte == tex && Camera.Ligada && texLimpa != IntPtr.Zero) CopiarDaTela(texLimpa, tex);
                                 if (tex != IntPtr.Zero && texLimpa != IntPtr.Zero && fonte == tex) limpaSuja = false;
                                 if (fonte == texLimpa) limpaSuja = false;
+                                DesenharCamera(texCap[i]);
                                 DesenharCursor(texCap[i]);
                                 EsperarCopia();
                                 anelIdx = ultimoAnel = i; novo = true;
@@ -905,6 +1034,64 @@ namespace TelaAoVivoAudio
                 }
             }
             finally { Marshal.FreeHGlobal(info); }
+        }
+
+        // copia o conteúdo da janela (canto de cima à esquerda da textura da captura) pro destino
+        void CopiarJanela(IntPtr destino, IntPtr tex, TamanhoInt ct)
+        {
+            var box = Marshal.AllocHGlobal(24);
+            try
+            {
+                int w = Math.Min(regW, ct.W), h = Math.Min(regH, ct.H);
+                int[] bx = { 0, 0, 0, w, h, 1 }; Marshal.Copy(bx, 0, box, 6);
+                Com.F<D.CopyRegion>(ctxCap, 46)(ctxCap, destino, 0, 0, 0, 0, tex, 0, box);
+            }
+            finally { Marshal.FreeHGlobal(box); }
+        }
+
+        // captura de JANELA: os quadros vêm da própria janela (mesmo coberta), já com o cursor
+        void CapturarJanela()
+        {
+            double proximo = 0;
+            while (rodando)
+            {
+                double intervalo = 1000.0 / Math.Max(10, Math.Min(240, Fps));
+                double agora = relogio.Elapsed.TotalMilliseconds;
+                bool devido = agora >= proximo - 1.5, novo = false;
+                if (!Janelas.IsWindow(AlvoJanela)) { Falha("a janela escolhida foi fechada"); rodando = false; break; }
+                if (Janelas.Minimizada(AlvoJanela)) { Aviso = "a janela está minimizada (quem assiste vê a última imagem)"; Thread.Sleep(30); Estatistica(); continue; }
+                Aviso = "";
+                IntPtr tex, quadro; TamanhoInt ct;
+                bool chegou = cj.Proximo(out tex, out ct, out quadro);
+                try
+                {
+                    if (chegou && (Math.Abs((ct.W & ~1) - regW) > 2 || Math.Abs((ct.H & ~1) - regH) > 2))
+                    { Remontar = true; rodando = false; break; } // a janela mudou de tamanho: monta de novo no tamanho novo
+                    bool camMexeu = Camera.Ligada && Camera.Visivel && !ReferenceEquals(Camera.Quadro, camFonte);
+                    if (chegou && !devido && texLimpa != IntPtr.Zero) { CopiarJanela(texLimpa, tex, ct); limpaSuja = true; }
+                    bool precisa = devido && (chegou || limpaSuja || camMexeu || (pedirChave && ultimoAnel >= 0));
+                    if (precisa)
+                    {
+                        int i = (anelIdx + 1) % ANEL;
+                        if (Volatile.Read(ref emUso[i]) == 0)
+                        {
+                            if (chegou) { CopiarJanela(texCap[i], tex, ct); if (Camera.Ligada && texLimpa != IntPtr.Zero) CopiarJanela(texLimpa, tex, ct); }
+                            else if (texLimpa != IntPtr.Zero) Com.F<D.Copy>(ctxCap, 47)(ctxCap, texCap[i], texLimpa);
+                            limpaSuja = false;
+                            DesenharCamera(texCap[i]);
+                            EsperarCopia();
+                            anelIdx = ultimoAnel = i; novo = true;
+                        }
+                    }
+                }
+                finally { if (tex != IntPtr.Zero) Com.Rel(ref tex); CapturaJanela.Soltar(ref quadro); }
+                if (!novo) { if (!chegou) Thread.Sleep(1); Estatistica(); continue; }
+                proximo = Math.Max(proximo + intervalo, agora + intervalo * 0.5);
+                Interlocked.Increment(ref contCap);
+                Volatile.Write(ref emUso[anelIdx], 1);
+                if (!filaConv.TryAdd(new long[] { anelIdx, (long)(agora * 10000) })) Volatile.Write(ref emUso[anelIdx], 0);
+                Estatistica();
+            }
         }
 
         void Converter(IntPtr bufs, long tempo100ns, IntPtr imagem)
@@ -1007,8 +1194,9 @@ namespace TelaAoVivoAudio
             for (int i = 0; i < poolNv12.Length; i++) Com.Rel(ref poolNv12[i]);
             for (int i = 0; i < poolBgra.Length; i++) Com.Rel(ref poolBgra[i]);
             for (int i = 0; i < ANEL; i++) { Com.Rel(ref texEnc[i]); Com.Rel(ref texCap[i]); emUso[i] = 0; }
-            Com.Rel(ref consulta); Com.Rel(ref curTex); Com.Rel(ref texLimpa); curTexLado = 0; limpaSuja = false;
+            Com.Rel(ref consulta); Com.Rel(ref curTex); Com.Rel(ref camTex); camTexW = camTexH = 0; camFonte = null; camChave = ""; Com.Rel(ref texLimpa); curTexLado = 0; limpaSuja = false;
             long[] lixo; while (filaConv.TryTake(out lixo)) { }
+            if (cj != null) { try { cj.Dispose(); } catch { } cj = null; }
             Com.Rel(ref copia); Com.Rel(ref dup); Com.Rel(ref mgr); Com.Rel(ref ctx); Com.Rel(ref dev); Com.Rel(ref ctxCap); Com.Rel(ref devCap);
             precisaEntrada = 0;
         }
