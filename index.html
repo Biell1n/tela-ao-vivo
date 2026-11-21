@@ -1619,7 +1619,7 @@ function resumoStats(st) {
 // Com 2+ pessoas assistindo na qualidade cheia, quem transmite manda a imagem UMA vez pro servidor e ele repassa
 // (igual ao Discord): o upload e a placa de vídeo de quem transmite fazem 1 vídeo em vez de 1 por pessoa.
 // Miniaturas do grupo e quem está com a internet ruim (qualidade menor) continuam direto, que é de graça.
-const SFU_A_PARTIR_DE = 2; // quantas pessoas na qualidade cheia ligam o servidor
+const SFU_A_PARTIR_DE = 2; // a partir de quantas pessoas assistindo o servidor liga
 const SFU_MAX_MBPS = 20;   // acima disso (personalizado) o servidor não é usado: gastaria o grátis do mês rápido demais
 const sfuTaxaOk = () => !qualAtual || kbpsDe(qualAtual) <= SFU_MAX_MBPS * 1000;
 // O servidor só vale se estiver configurado E o mês ainda estiver dentro do grátis (a Vercel confere o contador).
@@ -2595,14 +2595,11 @@ async function abrirSala(novo) {
       pedidos.set(conn.peer, { kbps: +d.kbps || 0, altura: +d.altura || 0, fps: +d.fps || 0, decod: Array.isArray(d.decod) ? d.decod : null, sfu: d.sfu === 1 });
       const pronto = esperandoPedido.get(conn.peer);
       if (pronto) { esperandoPedido.delete(conn.peer); pronto(); return; }
-      // pelo servidor e baixou a qualidade (miniatura, internet ruim): volta pra direta, que manda a qualidade que ela pediu
-      if (SFU.assistindo.has(id) && !querCheio(id)) {
-        try { conn.send({ tipo: 'sfu-sair' }); } catch {}
-        ligarPara(id); sfuRevisar(); return;
-      }
+      // Pelo servidor, quem baixa a qualidade (miniatura, internet ruim) CONTINUA no servidor: cada ligação direta é mais
+      // uma compressão inteira no PC de quem transmite (com 4 pessoas, o processador dele ia pro 100% e travava pra todo mundo).
       if (SFU.assistindo.has(id)) return;
-      // direta e subiu pra qualidade cheia (virou a tela grande do grupo): vê se vale ir pro servidor
-      if (querCheio(id) && d.sfu === 1 && !SFU.falhou.has(id) && sfuTaxaOk() && (SFU.pc || cheiosAgora(id) + 1 >= SFU_A_PARTIR_DE)) { conectarViewer(id); return; }
+      // direta: vê se vale ir pro servidor
+      if (d.sfu === 1 && !SFU.falhou.has(id) && sfuTaxaOk() && (SFU.pc || cheiosAgora(id) + 1 >= SFU_A_PARTIR_DE)) { conectarViewer(id); return; }
       // o pedido chegou depois da ligação sair: se agora dá pra usar um formato melhor, refaz a ligação nele
       const atual = chamadas.get(conn.peer);
       if (atual && atual.__formato && atual.__formato !== formatoPara(conn.peer)) { ligarPara(conn.peer); return; }
@@ -2724,21 +2721,21 @@ function sfuCaiu() {
   sfuParar();
   for (const id of ids) { SFU.falhou.add(id); ligarPara(id); }
 }
-// quantas pessoas estão (ou vão estar) na qualidade cheia, contando as diretas
+// quantas pessoas estão (ou vão estar) assistindo, contando as diretas
 function cheiosAgora(excluir) {
   let n = 0;
-  for (const id of conexoes.keys()) if (id !== excluir && querCheio(id) && (SFU.assistindo.has(id) || chamadas.has(id))) n++;
+  for (const id of conexoes.keys()) if (id !== excluir && (SFU.assistindo.has(id) || chamadas.has(id))) n++;
   return n;
 }
 async function conectarViewer(id) {
   const conn = conexoes.get(id), ped = pedidos.get(id);
-  const pode = conn && ped && ped.sfu && !SFU.falhou.has(id) && querCheio(id) && streamTx && !(SFU.bloqueadoAte > Date.now()) && sfuTaxaOk();
+  const pode = conn && ped && ped.sfu && !SFU.falhou.has(id) && streamTx && !(SFU.bloqueadoAte > Date.now()) && sfuTaxaOk();
   if (pode && (SFU.pc || cheiosAgora(id) + 1 >= SFU_A_PARTIR_DE) && await sfuPublicar()) {
     sfuMandar(id);
     // quem já estava direto na qualidade cheia passa pro servidor também (o PC de quem transmite faz 1 vídeo só)
     for (const outro of conexoes.keys()) {
       const po = pedidos.get(outro);
-      if (outro !== id && !SFU.assistindo.has(outro) && chamadas.has(outro) && po && po.sfu && !SFU.falhou.has(outro) && querCheio(outro)) sfuMandar(outro);
+      if (outro !== id && !SFU.assistindo.has(outro) && chamadas.has(outro) && po && po.sfu && !SFU.falhou.has(outro)) sfuMandar(outro);
     }
     return;
   }
@@ -2805,9 +2802,11 @@ async function aplicarParametros(pc, id) {
       p.encodings[0].maxBitrate = kbps * 1000;
       p.encodings[0].priority = 'high';
       p.encodings[0].networkPriority = 'high';
-      p.encodings[0].maxFramerate = ped && ped.fps ? Math.min(qualAtual.fps, ped.fps) : qualAtual.fps;
+      // compressão no processador e já tem outra compressão rodando (servidor ou outra direta): essa vai leve (720p 30)
+      const leve = encSoftware && (SFU.pc || [...chamadas.keys()].some(o => o !== id));
+      p.encodings[0].maxFramerate = Math.min(ped && ped.fps ? Math.min(qualAtual.fps, ped.fps) : qualAtual.fps, leve ? 30 : Infinity);
       // teto: o nível escolhido por quem transmite e o que a pessoa pediu (o que for menor). Vale até no iPhone, que ignora o limite na captura
-      const tetoAltura = Math.min(qualAtual && qualAtual.h ? qualAtual.h : alturaTela, ped && ped.altura ? ped.altura : Infinity);
+      const tetoAltura = Math.min(qualAtual && qualAtual.h ? qualAtual.h : alturaTela, ped && ped.altura ? ped.altura : Infinity, leve ? 720 : Infinity);
       p.encodings[0].scaleResolutionDownBy = alturaTela > tetoAltura ? alturaTela / tetoAltura : 1;
       // segura a resolução escolhida: se a rede apertar, perde uns quadros em vez de borrar.
       // Baixar de verdade a qualidade é decisão do player de quem assiste (AUTO), e só se a rede ficar ruim por um tempo.
@@ -2886,6 +2885,7 @@ async function recapturar() {
 }
 // avisa quem transmite quando o fps cai por causa do PC dele (uma vez por transmissão; a captura baixa de novo após 10 min)
 const avisoFpsTx = { soft: false, baixa: 0, hora: 0 };
+let encSoftware = false; // o navegador de quem transmite comprime no processador (cada compressão a mais pesa muito)
 // uso do PC de quem transmite (vem do programa Tela ao Vivo Áudio; some se ele fechar)
 const desempenhoPC = () => prog.desempenho && Date.now() - prog.desempenho.t < 7000 ? prog.desempenho : null;
 function avisarQuemTransmite(txt) {
@@ -2893,6 +2893,7 @@ function avisarQuemTransmite(txt) {
 }
 function conferirFpsTx(st, alvo) {
   const soft = st.encoder && (tipoEncoder(st.encoder) || [])[1] === 'ruim';
+  if (soft && !encSoftware) { encSoftware = true; for (const [id, c] of chamadas) if (c.peerConnection) aplicarParametros(c.peerConnection, id); }
   if (!avisoFpsTx.soft && soft && PLACA.semAcel) {
     avisoFpsTx.soft = true;
     avisarQuemTransmite('Seu navegador está comprimindo a tela no processador, sem usar a placa de vídeo' + (PLACA.nome ? ` (${PLACA.nome})` : '') +
@@ -2909,7 +2910,7 @@ function conferirFpsTx(st, alvo) {
   }
 }
 function pararTx() {
-  avisoFpsTx.soft = false; avisoFpsTx.baixa = 0; avisoFpsTx.hora = 0;
+  avisoFpsTx.soft = false; avisoFpsTx.baixa = 0; avisoFpsTx.hora = 0; encSoftware = false;
   capturaCaiu = 0; clearTimeout(capturaTimer); capturaOpcoes = null;
   $('#aviso-captura').classList.add('hidden');
   if (salaTx) { salaTx = null; if (grupo.ativo) avisarSala(null); }
