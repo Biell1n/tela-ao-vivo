@@ -9,5 +9,10 @@ FW='C:\Windows\Microsoft.NET\Framework64\v4.0.30319'
   -win32icon:icone.ico -win32manifest:app.manifest -out:../TelaAoVivoAudio.exe \
   -r:"$FW\\mscorlib.dll" -r:"$FW\\System.dll" -r:"$FW\\System.Core.dll" -r:"$FW\\System.Drawing.dll" \
   -r:"$FW\\System.Windows.Forms.dll" -r:"$FW\\System.Web.Extensions.dll" \
-  Programa.cs Audio.cs Motor.cs Janela.cs Desempenho.cs
+  Programa.cs Audio.cs Motor.cs Janela.cs Desempenho.cs Video.cs Atualizador.cs
 ls -la ../TelaAoVivoAudio.exe
+# versao.json: o programa confere aqui se tem versão nova (e o SHA-256 pra saber se baixou inteiro)
+V=$(grep -o 'Versao = "[0-9.]*"' Programa.cs | grep -o '[0-9.]*')
+S=$(sha256sum ../TelaAoVivoAudio.exe | cut -c1-64)
+printf '{"versao":"%s","sha256":"%s"}' "$V" "$S" > ../versao.json
+cat ../versao.json

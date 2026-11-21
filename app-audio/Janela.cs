@@ -121,6 +121,8 @@ namespace TelaAoVivoAudio
             string est = motor.Estado, det = motor.Detalhe;
             Color cor = motor.Conectado ? Ok : Fraco;
             if (!Programa.WindowsSuporta) { est = "Windows antigo demais"; det = "Precisa do Windows 10 versão 2004 (maio de 2020) ou mais novo."; cor = Aviso; }
+            else if (Atualizador.Estado.StartsWith("Baixando") || Atualizador.Estado.StartsWith("Atualizado")) { det = Atualizador.Estado; cor = Ok; }
+            else if (!string.IsNullOrEmpty(motor.EstadoVideo)) det = motor.EstadoVideo + (string.IsNullOrEmpty(det) ? "" : " · " + det);
             else if (motor.ErroPorta != null) { est = "Não consegui abrir a porta " + Motor.Porta; det = "Outro programa está usando. Feche cópias antigas e abra de novo."; cor = Aviso; }
             if (estado.Text != est) estado.Text = est;
             if (detalhe.Text != det) detalhe.Text = det;

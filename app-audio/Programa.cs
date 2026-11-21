@@ -10,22 +10,31 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("Tela ao Vivo Áudio")]
 [assembly: AssemblyProduct("Tela ao Vivo Áudio")]
 [assembly: AssemblyDescription("Manda pro site Tela ao Vivo o som do PC sem o Discord, ou só dos apps escolhidos.")]
-[assembly: AssemblyVersion("1.1.0.0")]
-[assembly: AssemblyFileVersion("1.1.0.0")]
+[assembly: AssemblyVersion("1.3.0.0")]
+[assembly: AssemblyFileVersion("1.3.0.0")]
 
 namespace TelaAoVivoAudio
 {
     static class Programa
     {
-        public const string Versao = "1.2.0";
+        public const string Versao = "1.3.0";
         public const string Site = "https://tela-ao-vivo.vercel.app/";
         public static bool WindowsSuporta;
+        public static bool NaBandeja;
+        // fecha o programa pela thread da janela (o atualizador chama depois de pôr o .exe novo no lugar)
+        public static void Sair()
+        {
+            try { var f = Application.OpenForms.Count > 0 ? Application.OpenForms[0] : null; if (f != null) f.BeginInvoke(new Action(Application.Exit)); else Application.Exit(); }
+            catch { Environment.Exit(0); }
+        }
 
         [DllImport("user32.dll")] static extern bool SetProcessDPIAware();
 
         [STAThread]
         static void Main(string[] args)
         {
+            Atualizador.DepoisDeAtualizar(args); // se veio de uma atualização: espera o antigo fechar
+            NaBandeja = args.Contains("--bandeja");
             bool novo;
             using (var unico = new Mutex(true, "TelaAoVivoAudio-1", out novo))
             {
@@ -41,6 +50,8 @@ namespace TelaAoVivoAudio
                 Application.SetCompatibleTextRenderingDefault(false);
                 var motor = new Motor();
                 if (WindowsSuporta) motor.Iniciar();
+                // confere se tem versão nova (ao abrir, e a cada 6 horas); só atualiza se ninguém estiver usando
+                new Thread(() => { Thread.Sleep(5000); while (true) { Atualizador.Tentar(motor, true); Thread.Sleep(6 * 3600 * 1000); } }) { IsBackground = true, Name = "atualizar" }.Start();
                 Application.Run(new Janela(motor, args.Contains("--bandeja")));
                 motor.Parar();
             }

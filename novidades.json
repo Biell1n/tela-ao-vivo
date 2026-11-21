@@ -1,0 +1,8 @@
+{
+  "1.3.0": [
+    "Nova opção \"Pelo programa\" no Passo 1: o programa captura a tela e comprime o vídeo na placa de vídeo, como o Discord, e o processador fica livre pro jogo.",
+    "Escolha o que vem primeiro quando o jogo pesar: Fluidez pra quem assiste ou Desempenho do jogo.",
+    "O programa agora se atualiza sozinho: as próximas versões chegam automáticas.",
+    "Quem assiste vê nas estatísticas o uso da placa de vídeo e do processador de quem transmite, pra achar o que derruba o fps."
+  ]
+}

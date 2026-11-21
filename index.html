@@ -166,7 +166,7 @@ h2,.acao-tx b,.ab-texto{font-stretch:116%}
 .num{width:22px;height:22px;border-radius:7px;display:grid;place-items:center;background:var(--sup-3);font:600 11.5px var(--mono);color:var(--sub)}
 .bloco[disabled] .op,.bloco [disabled]+.linha-op{cursor:not-allowed}
 
-.fontes{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.fontes{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:8px}
 .bloco-cam{margin-top:14px}
 .cam-liga{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:var(--r-m);background:var(--bg-2);border:1px solid var(--linha);cursor:pointer;transition:border-color .2s}
 .cam-liga:hover{border-color:var(--linha-2)}
@@ -713,6 +713,9 @@ html.com-fundo .bloco{background:none;-webkit-backdrop-filter:none;backdrop-filt
 @keyframes msgEntra{from{opacity:0;transform:translateY(6px)}}
 @media (prefers-reduced-motion:reduce){.chat-msgs li{animation:none}}
 
+/* aviso de versão nova do programa: o que mudou */
+.novidades{margin:2px 0 4px;padding-left:18px;display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--sub);line-height:1.45}
+.novidades:empty{display:none}
 /* reações com a carinha do ícone de quem mandou */
 .reacao.com-carinha img{width:72px;height:72px;display:block}
 .chat-reagir button.com-carinha,.tile-reagir button.com-carinha{padding:0;overflow:visible}
@@ -1003,6 +1006,13 @@ html.com-fundo .bloco{background:none;-webkit-backdrop-filter:none;backdrop-filt
 
   <div class="estudio">
     <div class="config">
+      <div id="aviso-programa" class="aviso-captura hidden" role="status">
+        <b id="aviso-programa-tit">Tem versão nova do Tela ao Vivo Áudio</b>
+        <span id="aviso-programa-txt"></span>
+        <ul id="aviso-programa-novidades" class="novidades"></ul>
+        <div class="aviso-captura-bts"><button type="button" class="btn" id="bt-programa-atualizar"><svg class="i"><use href="#i-baixar"/></svg><span>Atualizar agora</span></button>
+          <button type="button" class="btn" id="bt-programa-depois"><span>Agora não</span></button></div>
+      </div>
       <fieldset class="bloco" id="bloco-fonte">
         <legend><span class="passo passo-1">Passo 1</span><span class="tit">O que mostrar</span></legend>
         <div class="fontes" role="radiogroup" aria-label="O que mostrar">
@@ -1010,8 +1020,14 @@ html.com-fundo .bloco{background:none;-webkit-backdrop-filter:none;backdrop-filt
           <label class="op"><input type="radio" name="fonte" value="window"><span class="op-caixa"><svg class="i"><use href="#i-janela"/></svg><span><b>Janela</b><small>Só um jogo ou app</small></span></span></label>
           <label class="op"><input type="radio" name="fonte" value="browser"><span class="op-caixa"><svg class="i"><use href="#i-aba"/></svg><span><b>Aba</b><small>Uma aba do Chrome</small></span></span></label>
           <label class="op"><input type="radio" name="fonte" value="camera"><span class="op-caixa"><svg class="i"><use href="#i-camera"/></svg><span><b>Câmera</b><small>Só a câmera</small></span></span></label>
+          <label class="op hidden" id="op-programa"><input type="radio" name="fonte" value="programa"><span class="op-caixa"><svg class="i"><use href="#i-monitor"/></svg><span><b>Pelo programa</b><small>Igual ao Discord: mais fps</small></span></span></label>
         </div>
         <p id="dica-fonte" class="dica"></p>
+        <div id="bloco-prioridade" class="qual-prioridade hidden"><span class="rotulo-campo">Quando o jogo pesar a placa, priorizar</span>
+        <div class="seg" role="radiogroup" aria-label="Prioridade da transmissão">
+          <label><input type="radio" name="prioridade" value="fluida" checked><span>Fluidez<small>pra quem assiste</small></span></label>
+          <label><input type="radio" name="prioridade" value="jogo"><span>Desempenho<small>do jogo</small></span></label>
+        </div></div>
         <div id="bloco-cam" class="bloco-cam">
           <label class="cam-liga" id="op-cam-junto"><input type="checkbox" id="cam-junto"><span><b>Câmera por cima da tela</b><span class="etq rec">ESTILO OBS</span>
             <small>Sua câmera num cantinho da transmissão. Depois de começar, arraste ela na prévia pra posicionar.</small></span></label>
@@ -1430,6 +1446,7 @@ const DICA_FONTE = {
   monitor: 'No seletor do Chrome, vá na aba "Tela inteira". Em jogos como Valorant, use "Janela em tela cheia" pra imagem não congelar.',
   window:  'No seletor do Chrome, vá na aba "Janela" e escolha o jogo ou app. Ele precisa estar aberto e não minimizado.',
   browser: 'No seletor do Chrome, vá na aba "Guia do Chrome" e escolha a aba (YouTube, por exemplo).',
+  programa: 'O Tela ao Vivo Áudio captura a tela inteira e comprime na placa de vídeo, como o Discord: mais fps e quase não pesa no jogo. Deixe o programa aberto. O som continua como você escolher no Passo 2.',
   camera:  'Transmite só a câmera, com o microfone. Pra câmera junto da tela (estilo OBS), escolha Tela inteira, Janela ou Aba e marque "Câmera por cima da tela".',
 };
 
@@ -1596,7 +1613,7 @@ async function lerStats(pc, tipo) {
   return {
     fps: Math.round(v.framesPerSecond || 0), w: v.frameWidth || 0, h: v.frameHeight || 0, mbps,
     ping: par && par.currentRoundTripTime != null ? Math.round(par.currentRoundTripTime * 1000) : null,
-    rota, relay: !!rel,
+    rota, relay: !!rel, alvo: v.targetBitrate || 0,
     encoder: v.encoderImplementation || '', decoder: v.decoderImplementation || '',
     limite: v.qualityLimitationReason || 'none',
     perdidos: v.packetsLost || 0, descartados: v.framesDropped || 0,
@@ -1733,7 +1750,236 @@ async function testarEncoder(track) {
   ENC.impl = impl;
   try { sessionStorage.setItem(chave, JSON.stringify(ENC)); } catch {}
 }
+// ---------- captura pelo programa (estilo Discord): o Tela ao Vivo Áudio (1.3+) captura a tela e comprime NA PLACA.
+// O site põe na conexão uma faixa "falsa" (uma imagem minúscula por quadro do programa) e, logo antes de enviar,
+// troca cada quadro comprimido pelo quadro pronto do programa (RTCRtpScriptTransform). O navegador não captura
+// nem comprime de verdade: quem assiste recebe o H.264 do programa.
+const PV = { ativo: false, ws: null, gen: null, escritor: null, worker: null, oc: null, n: 0, estado: null, w: 0, h: 0,
+             taxa: 0, ids: 0, timer: 0, versao: '', visto: 0, ox: null, ruidos: [], ruido: true, url: '', gens: [], ultimoWorker: null };
+// Regra de ouro: NUNCA descartar quadro na troca. Cada quadro descartado aqui faz o compressor do navegador ir
+// travando até parar de vez (com uma pessoa nova entrando, quem já estava parava). Então:
+//  - quem acabou de entrar só recebe quadros a partir do próximo quadro completo (nada pra descartar);
+//  - fila cresceu (o navegador pulou quadros): vai direto pro quadro completo mais novo da fila;
+//  - o quadro do programa atrasou uns milissegundos: espera ele.
+const PV_TROCA = `
+const s = { fila: [], espera: null, pediu: false, entrou: 0, mandou: 0, semFila: 0, pulos: 0, chaves: 0 };
+onmessage = e => {
+  const m = e.data;
+  if (m.tipo === 'contar') { postMessage({ tipo: 'contagem', r: { entrou: s.entrou, mandou: s.mandou, semFila: s.semFila, pulos: s.pulos, chaves: s.chaves, fila: s.fila.length } }); return; }
+  if (m.tipo !== 'quadro') return;
+  s.fila.push(m);
+  if (s.fila.length > 6) {
+    let k = -1; for (let i = s.fila.length - 1; i > 0; i--) if (s.fila[i].chave) { k = i; break; }
+    if (k > 0) { s.fila.splice(0, k); s.pulos++; }
+    else if (!s.pediu) { s.pediu = true; postMessage({ tipo: 'chave' }); }
+  }
+  if (s.espera) { const r = s.espera; s.espera = null; r(); }
+};
+onrtctransform = ev => {
+  const t = ev.transformer;
+  t.readable.pipeThrough(new TransformStream({
+    async transform(frame, ctl) {
+      s.entrou++;
+      if (frame.type === 'key') { s.chaves++; postMessage({ tipo: 'chave' }); } // quem assiste pediu um quadro completo
+      if (!s.fila.length) await new Promise(r => { s.espera = r; setTimeout(r, 300); });
+      const q = s.fila.shift();
+      if (!q) { s.semFila++; return; }
+      if (q.chave) s.pediu = false;
+      frame.data = q.dados;
+      s.mandou++;
+      ctl.enqueue(frame);
+    }
+  })).pipeTo(t.writable).catch(() => {}).finally(() => postMessage({ tipo: 'fim' }));
+};`;
+// ---------- versão do programa: o site lê a mesma versao.json que o programa usa pra se atualizar
+const versaoMenor = (a, b) => { const x = String(a || '0').split('.').map(Number), y = String(b || '0').split('.').map(Number);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0); } return false; };
+let versaoProgramaNova = '', novidadesPrograma = {};
+fetch('versao.json', { cache: 'no-store' }).then(r => r.json()).then(j => { versaoProgramaNova = j.versao || ''; if (PV.versao) pvProcurar(); }).catch(() => {});
+fetch('novidades.json', { cache: 'no-store' }).then(r => r.json()).then(j => { novidadesPrograma = j || {}; }).catch(() => {});
+let atualizandoDesde = 0;
+function avisoPrograma(versao, seAtualiza, estado) {
+  const box = $('#aviso-programa');
+  // "Agora não": some até sair uma versão mais nova que essa (a pessoa continua com a dela, sem problema)
+  const pulou = guardar.get('pularVersao') === versaoProgramaNova && !atualizandoDesde;
+  if (!versao || !versaoProgramaNova || !versaoMenor(versao, versaoProgramaNova) || pulou) {
+    if (atualizandoDesde && versao) { atualizandoDesde = 0; statusTx('Tela ao Vivo Áudio atualizado pra versão ' + versao + '.', 'ok'); }
+    box.classList.add('hidden'); return;
+  }
+  box.classList.remove('hidden');
+  $('#aviso-programa-tit').textContent = `Tem versão nova do Tela ao Vivo Áudio (${versao} → ${versaoProgramaNova})`;
+  // o que mudou em cada versão entre a dela e a nova (a mais nova primeiro)
+  const ul = $('#aviso-programa-novidades');
+  const itens = Object.keys(novidadesPrograma).filter(v => versaoMenor(versao, v) && !versaoMenor(versaoProgramaNova, v))
+    .sort((a, b) => versaoMenor(a, b) ? 1 : -1).flatMap(v => novidadesPrograma[v] || []);
+  ul.replaceChildren(...itens.map(t => { const li = document.createElement('li'); li.textContent = t; return li; }));
+  $('#bt-programa-depois').onclick = () => { guardar.set('pularVersao', versaoProgramaNova); box.classList.add('hidden'); };
+  const bt = $('#bt-programa-atualizar');
+  if (seAtualiza) {
+    $('#aviso-programa-txt').textContent = atualizandoDesde && Date.now() - atualizandoDesde < 60000
+      ? (estado || 'Atualizando... o programa fecha e abre sozinho em alguns segundos.')
+      : (estado && /Não deu/.test(estado) ? estado : 'Se quiser atualizar, o programa baixa, troca e abre sozinho em alguns segundos. Se não, tudo continua funcionando com a sua versão.');
+    bt.querySelector('span').textContent = 'Atualizar agora';
+    bt.onclick = async () => {
+      atualizandoDesde = Date.now();
+      $('#aviso-programa-txt').textContent = 'Atualizando... o programa fecha e abre sozinho em alguns segundos' + (streamTx ? ' (o som da transmissão para por uns instantes).' : '.');
+      try { await fetch('http://127.0.0.1:47800/atualizar', { method: 'POST', cache: 'no-store' }); } catch {}
+      // confere de novo até o programa novo responder
+      for (let i = 0; i < 20; i++) { await new Promise(r => setTimeout(r, 1500)); pvFalhas = 0; await pvProcurar(); if (!versaoMenor(PV.versao, versaoProgramaNova)) break; }
+    };
+  } else {
+    // versão antiga, que não sabe se atualizar: baixa de novo (última vez manual)
+    $('#aviso-programa-txt').textContent = 'Se quiser atualizar: baixe a nova, feche o programa antigo (ícone perto do relógio › Sair) e abra o novo. Daqui pra frente ele se atualiza sozinho. Se não, tudo continua funcionando com a sua versão.';
+    bt.querySelector('span').textContent = 'Baixar a versão nova';
+    bt.onclick = () => { const a = document.createElement('a'); a.href = 'TelaAoVivoAudio.exe'; a.download = 'TelaAoVivoAudio.exe'; document.body.append(a); a.click(); a.remove(); };
+  }
+}
+const pvSuportado = () => !CELULAR_TX && 'RTCRtpScriptTransform' in window && 'MediaStreamTrackGenerator' in window && 'VideoFrame' in window;
+const pvConfig = () => ({ tipo: 'video', fps: qualAtual ? qualAtual.fps : 60, kbps: qualAtual ? kbpsDe(qualAtual) : 12000,
+                          altura: qualAtual && qualAtual.h ? qualAtual.h : 0, modo: radio('prioridade') === 'jogo' ? 'jogo' : 'fluida' });
+function pvEnviar(m) { try { if (PV.ws && PV.ws.readyState === 1) PV.ws.send(JSON.stringify(m)); } catch {} }
+// o programa novo está aberto? (ele responde um "estou aqui" com a versão)
+let pvFalhas = 0;
+async function pvProcurar() {
+  if (CELULAR_TX) return;
+  // só procura o programa em quem já usou ele (ou escolheu o som pelo programa): sem pedido de permissão pra quem só assiste
+  if (!guardar.get('temPrograma') && !prog.conectado && radio('audio') !== 'app') return;
+  if (pvFalhas > 2 && pvFalhas++ % 3) return; // programa fechado: confere com menos frequência
+  try {
+    const r = await fetch('http://127.0.0.1:47800/', { cache: 'no-store' });
+    const j = await r.json();
+    PV.versao = j.versao || ''; pvFalhas = 0; guardar.set('temPrograma', '1');
+    avisoPrograma(PV.versao, !!j.atualiza, j.atualizacao || '');
+  } catch { pvFalhas++; PV.versao = prog.versao || ''; if (prog.versao) avisoPrograma(prog.versao, false, ''); }
+  const tem = pvSuportado() && !versaoMenor(PV.versao, '1.3');
+  if (tem) PV.visto = Date.now();
+  $('#op-programa').classList.toggle('hidden', !tem && !PV.ativo);
+  // escolheu "pelo programa" outra vez, mas o programa novo não está aberto: volta pra tela inteira
+  if (!tem && !PV.ativo && !streamTx && radio('fonte') === 'programa') { marcar('fonte', 'monitor'); trocouFonte(); }
+  $('#bloco-prioridade').classList.toggle('hidden', radio('fonte') !== 'programa');
+}
+setInterval(() => { if (!$('#tx').classList.contains('hidden') && !streamTx) pvProcurar(); }, 5000);
+function pvConectar() {
+  return new Promise((ok, falha) => {
+    let ws;
+    try { ws = new WebSocket('ws://127.0.0.1:47800/video'); } catch (e) { falha(e); return; }
+    ws.binaryType = 'arraybuffer';
+    let aberto = false;
+    const t = setTimeout(() => { if (!aberto) { try { ws.close(); } catch {} falha(new Error('o programa não respondeu')); } }, 4000);
+    ws.onopen = () => { aberto = true; clearTimeout(t); PV.ws = ws; pvEnviar(pvConfig()); ok(); };
+    ws.onclose = () => {
+      if (!aberto) { clearTimeout(t); falha(new Error('o Tela ao Vivo Áudio não está aberto')); return; }
+      if (PV.ws === ws) { PV.ws = null; if (PV.ativo) pvCaiu(); }
+    };
+    ws.onmessage = e => pvMensagem(e.data);
+  });
+}
+function pvMensagem(d) {
+  if (typeof d === 'string') {
+    let m; try { m = JSON.parse(d); } catch { return; }
+    if (m.tipo === 'video-estado') { PV.estado = m; if (m.w) { PV.w = m.w; PV.h = m.h; } }
+    return;
+  }
+  if (!PV.ativo || !PV.gens.length) return;
+  const b = new Uint8Array(d), chave = b[0] === 1;
+  let us = 0; for (let i = 7; i >= 0; i--) us = us * 256 + b[5 + i];
+  const dados = d.slice(13);
+  PV.n++;
+  // um quadro minúsculo na faixa "falsa" pra cada quadro do programa (é ele que vira o quadro de verdade no envio)
+  // "chuvisco": pesa pro navegador mais ou menos o mesmo que o vídeo de verdade, então a conta de banda dele bate
+  if (PV.ruido && PV.ruidos.length) PV.ox.putImageData(PV.ruidos[PV.n % PV.ruidos.length], 0, 0);
+  let vf; try { vf = new VideoFrame(PV.oc, { timestamp: us }); } catch { return; }
+  for (const g of PV.gens) {
+    if (!g.pronto) { if (!chave) continue; g.pronto = true; } // envio novo começa num quadro completo
+    if (g.worker) g.worker.postMessage({ tipo: 'quadro', chave, dados: g.worker === PV.ultimoWorker ? dados : dados.slice(0) });
+    try { g.escritor.write(vf.clone()).catch(() => {}); } catch {}
+  }
+  vf.close();
+}
+async function pvIniciar() {
+  if (!pvSuportado()) throw new Error('este navegador não tem o que precisa (use Chrome ou Edge atualizado no PC)');
+  if (!PV.url) PV.url = URL.createObjectURL(new Blob([PV_TROCA], { type: 'text/javascript' }));
+  PV.gens = [];
+  PV.gen = pvNovaFaixa(true); // a da prévia e da própria tela no grupo
+  PV.oc = new OffscreenCanvas(192, 108);
+  const x = PV.ox = PV.oc.getContext('2d', { willReadFrequently: true });
+  PV.ruidos = [];
+  for (let k = 0; k < 8; k++) {
+    const im = x.createImageData(192, 108);
+    for (let i = 0; i < im.data.length; i += 4) { const v = 20 + Math.random() * 60 | 0; im.data[i] = v; im.data[i + 1] = v + (Math.random() * 20 | 0); im.data[i + 2] = v + 30; im.data[i + 3] = 255; }
+    PV.ruidos.push(im);
+  }
+  x.putImageData(PV.ruidos[0], 0, 0);
+  PV.ativo = true; PV.n = 0; PV.estado = null; PV.taxa = 0;
+  await pvConectar();
+  for (let i = 0; i < 80 && !PV.n; i++) {
+    await new Promise(r => setTimeout(r, 100));
+    if (PV.estado && PV.estado.erro) throw new Error(PV.estado.erro);
+  }
+  if (!PV.n) throw new Error((PV.estado && PV.estado.erro) || 'o programa não mandou imagem');
+  return PV.gen;
+}
+function pvParar() {
+  PV.ativo = false; clearTimeout(PV.timer);
+  const ws = PV.ws; PV.ws = null;
+  try { ws && ws.close(); } catch {}
+  for (const g of PV.gens.splice(0)) { try { g.escritor.close().catch(() => {}); } catch {} try { g.gen.stop(); } catch {} if (g.worker) try { g.worker.terminate(); } catch {} }
+  PV.escritor = null; PV.gen = null; PV.estado = null; PV.n = 0;
+}
+// o programa fechou ou caiu: tenta voltar sozinho (quem assiste fica com a última imagem)
+function pvCaiu() {
+  if (!PV.ativo) return;
+  statusTx('O Tela ao Vivo Áudio parou de mandar a imagem. Abra ele de novo: a transmissão volta sozinha.', 'aviso');
+  clearTimeout(PV.timer);
+  PV.timer = setTimeout(async () => {
+    if (!PV.ativo || PV.ws) return;
+    try { await pvConectar(); statusTx('Ao vivo de novo, pelo programa.', 'ok'); } catch { pvCaiu(); }
+  }, 2500);
+}
+// Uma faixa falsa por envio: o gerador do navegador só entrega quadros pra ÚLTIMA ligação conectada nele
+// (com duas pessoas, a primeira parava na hora). Todas recebem o mesmo quadro minúsculo, uma cópia cada.
+function pvNovaFaixa(principal) {
+  const gen = new MediaStreamTrackGenerator({ kind: 'video' });
+  try { gen.contentHint = 'motion'; } catch {}
+  PV.gens.push({ gen, escritor: gen.writable.getWriter(), pronto: !!principal, worker: null });
+  if (!principal) pvEnviar({ tipo: 'chave' }); // alguém novo: já pede o quadro completo pra ele começar logo
+  return gen;
+}
+function pvSoltarFaixa(track) {
+  const i = PV.gens.findIndex(g => g.gen === track);
+  if (i < 0) return;
+  const g = PV.gens.splice(i, 1)[0];
+  try { g.escritor.close().catch(() => {}); } catch {}
+  try { g.gen.stop(); } catch {}
+  if (g.worker) try { g.worker.terminate(); } catch {}
+}
+// cada envio de vídeo (servidor ou ligação direta) troca os quadros pelos do programa
+function pvAnexar(sender) {
+  if (!PV.ativo || !sender || !sender.track || sender.track.kind !== 'video') return;
+  // um trocador por envio: um envio lento não segura os outros
+  const g = PV.gens.find(x => x.gen === sender.track);
+  if (!g) return;
+  const w = new Worker(PV.url), id = ++PV.ids;
+  w.onmessage = e => {
+    const d = e.data || {};
+    if (d.tipo === 'chave') pvEnviar({ tipo: 'chave' });
+    else if (d.tipo === 'contagem') (PV.contagem = PV.contagem || {})[id] = d.r;
+    else if (d.tipo === 'fim') { try { w.terminate(); } catch {} if (g.worker === w) g.worker = null; }
+  };
+  g.worker = w;
+  try { sender.transform = new RTCRtpScriptTransform(w, { id }); } catch (e) { console.warn('troca de quadros', e); }
+}
+// estatística: mostra o que o programa faz (não a faixa "falsa")
+function pvAjustarStats(st) {
+  if (!PV.ativo || !st) return st;
+  const e = PV.estado || {};
+  st.encoder = e.encoder ? 'programa: ' + e.encoder : 'programa';
+  if (e.cap != null) st.fpsCaptura = e.cap;
+  if (PV.w && st.w && st.w < 400) { st.w = PV.w; st.h = PV.h; }
+  return st;
+}
 function formatoPara(id) {
+  if (PV.ativo) return 'H264'; // o programa manda H.264
   const ped = pedidos.get(id);
   const dec = ped && ped.decod;
   return (dec && FORMATOS_BONS.find(c => formatosEncLista.includes(c) && dec.includes(c))) || 'H264';
@@ -2005,6 +2251,7 @@ function prepararCelular() {
 // escolheu "Aba": o natural é mandar o som da própria aba (o Chrome entrega certinho)
 function trocouFonte() {
   atualizarFonte();
+  $('#bloco-prioridade').classList.toggle('hidden', radio('fonte') !== 'programa');
   // cabo virtual com Aba: o natural é o som da própria aba. Com o programa, a escolha da pessoa continua valendo.
   if (radio('fonte') === 'browser' && radio('audio') === 'device') {
     marcar('audio', 'captura');
@@ -2091,7 +2338,7 @@ function progProcurar() {
   ws.onmessage = e => {
     if (typeof e.data !== 'string') { if (prog.no) prog.no.port.postMessage(e.data, [e.data]); return; }
     let m; try { m = JSON.parse(e.data); } catch { return; }
-    if (m.tipo === 'ola') { prog.versao = m.versao || ''; progDesenharLista(); return; }
+    if (m.tipo === 'ola') { prog.versao = m.versao || ''; guardar.set('temPrograma', '1'); progDesenharLista(); pvFalhas = 0; pvProcurar(); return; }
     if (m.tipo === 'desempenho') { prog.desempenho = { cpu: +m.cpu, gpu: +m.gpu, enc: +m.enc, t: Date.now() }; return; }
     if (m.tipo !== 'apps') return;
     for (const a of m.lista) if (a.icone) prog.icones[a.exe] = a.icone;
@@ -2163,7 +2410,6 @@ function progDesenharLista() {
   let nota = '';
   if (prog.erro) nota = 'O Windows recusou capturar um dos apps (' + prog.erro + '). Tente fechar e abrir o programa.';
   else if (tudo && prog.versao && prog.versao < '1.1') nota = 'Seu programa é antigo e não tem "Tudo do PC". Baixe de novo (link abaixo), feche o antigo e abra o novo.';
-  else if (prog.versao && prog.versao < '1.2') nota = 'Tem versão nova do programa: ela mostra pra quem assiste o uso da sua placa de vídeo e do processador (pra achar o que derruba o fps). Baixe de novo (link abaixo), feche o antigo e abra o novo.';
   else if (tudo) nota = 'Vai tudo que tocar no PC, inclusive a call do Discord. Use fone pra não dar eco.';
   else if (excluir && !tudo && !prog.discordAberto) nota = 'O Discord está fechado agora. Quando abrir, ele já fica de fora sozinho.';
   else if (excluir) nota = 'Vai tudo que tocar no PC, menos o Discord. Discord aberto pelo navegador (discord.com) não dá pra separar: use o app.';
@@ -2456,7 +2702,15 @@ async function comecar() {
   }
   notaAudio('');
   let tela;
-  if (fonte === 'camera') {
+  if (fonte === 'programa') {
+    statusTx('Ligando a captura pelo programa...');
+    try { tela = new MediaStream([await pvIniciar()]); }
+    catch (e) {
+      pvParar();
+      statusTx('Não deu pra capturar pelo programa: ' + e.message + '. Abra o Tela ao Vivo Áudio (versão nova, botão "Baixar programa de áudio") ou escolha Tela inteira.', 'erro');
+      return;
+    }
+  } else if (fonte === 'camera') {
     let ct;
     try { ct = await abrirCamera(qualAtual.w, qualAtual.h, Math.min(60, qualAtual.fps)); }
     catch (e) { statusTx(e.name === 'NotAllowedError' ? 'O navegador não deixou usar a câmera. Libere a permissão e tente de novo.' : 'Não consegui abrir a câmera (' + e.name + ').', 'erro'); return; }
@@ -2475,12 +2729,12 @@ async function comecar() {
     return;
   }
   let vt = tela.getVideoTracks()[0];
-  try { vt.contentHint = fonte === 'camera' ? 'motion' : dica; } catch {}
+  try { vt.contentHint = fonte === 'camera' || fonte === 'programa' ? 'motion' : dica; } catch {}
   vt.addEventListener('ended', capturaAcabou);
-  capturaOpcoes = opcoes;
+  capturaOpcoes = fonte === 'programa' ? null : opcoes;
 
   // estilo OBS: junta a tela com a câmera por cima
-  if (fonte !== 'camera' && $('#cam-junto').checked && PODE_COMPOR && !CELULAR_TX) {
+  if (fonte !== 'camera' && fonte !== 'programa' && $('#cam-junto').checked && PODE_COMPOR && !CELULAR_TX) {
     let ct = null;
     try { ct = await abrirCamera(1280, 720, 30); guardar.set('camDev', $('#sel-cam').value); }
     catch (e) { statusTx('Não consegui abrir a câmera (' + e.name + '). Transmitindo só a tela.', 'aviso'); }
@@ -2526,7 +2780,7 @@ async function comecar() {
   }
 
   if (micLigado() && !mix.srcMic) await ligarMic();
-  if (!ENC.modo) { statusTx('Testando a sua placa de vídeo (2 segundos)...'); await testarEncoder(vt); }
+  if (!ENC.modo && !PV.ativo) { statusTx('Testando a sua placa de vídeo (2 segundos)...'); await testarEncoder(vt); }
   streamTx = new MediaStream([vt, audioSaida()]);
   const pv = $('#preview');
   pv.muted = true;
@@ -2620,7 +2874,7 @@ async function abrirSala(novo) {
 // a pessoa quer a qualidade cheia? (AUTO no máximo ou um nível >= ao que está saindo)
 function alturaSaindo() {
   const vt = streamTx && streamTx.getVideoTracks()[0], cfg = vt ? vt.getSettings() : {};
-  const tela = cfg.width && cfg.height ? Math.min(cfg.width, cfg.height) : (qualAtual ? qualAtual.h : 1080);
+  const tela = PV.ativo && PV.h ? Math.min(PV.w, PV.h) : cfg.width && cfg.height ? Math.min(cfg.width, cfg.height) : (qualAtual ? qualAtual.h : 1080);
   return Math.min(tela, qualAtual && qualAtual.h ? qualAtual.h : tela);
 }
 function querCheio(id) {
@@ -2635,10 +2889,11 @@ async function sfuPublicar() {
     const pc = new RTCPeerConnection(await sfuConfigIce());
     pc.__sfu = true;
     SFU.pc = pc;
-    const vt = streamTx.getVideoTracks()[0], at = streamTx.getAudioTracks()[0];
+    const vt = PV.ativo ? (SFU.vtProg = pvNovaFaixa()) : streamTx.getVideoTracks()[0], at = streamTx.getAudioTracks()[0];
     // acima de 1080p manda junto uma cópia 1080p ("b"): quem tem tela 1080p recebe ela (12 Mbps em vez de 20)
-    const sim = alturaSaindo() > 1100;
+    const sim = !PV.ativo && alturaSaindo() > 1100; // pelo programa: um vídeo só
     const tv = pc.addTransceiver(vt, { direction: 'sendonly', streams: [streamTx], sendEncodings: sim ? [{ rid: 'a' }, { rid: 'b', scaleResolutionDownBy: alturaSaindo() / 1080 }] : undefined });
+    pvAnexar(tv.sender);
     // H.264: todo aparelho decodifica (no servidor, todo mundo recebe o mesmo vídeo)
     try {
       const cs = RTCRtpSender.getCapabilities('video').codecs;
@@ -2711,6 +2966,7 @@ setInterval(async () => {
 }, 120e3);
 function sfuParar() {
   clearTimeout(SFU.timer);
+  if (SFU.vtProg) { pvSoltarFaixa(SFU.vtProg); SFU.vtProg = null; }
   if (SFU.pc) try { SFU.pc.close(); } catch {}
   SFU.pc = null; SFU.sessao = ''; SFU.faixas = null; SFU.pronto = null;
   SFU.assistindo.clear(); SFU.ok.clear();
@@ -2772,10 +3028,13 @@ function ligarPara(id) {
   const formato = formatoPara(id);
   const ped = pedidos.get(id);
   const alvo = qualAtual ? (ped && ped.kbps ? Math.min(kbpsDe(qualAtual), ped.kbps) : kbpsDe(qualAtual)) : undefined;
-  const call = peerTx.call(id, streamTx, { sdpTransform: sdp => ajustarSDP(sdp, formato, alvo) });
-  if (!call) return;
+  const fluxo = PV.ativo ? new MediaStream([pvNovaFaixa(), ...streamTx.getAudioTracks()]) : streamTx;
+  const call = peerTx.call(id, fluxo, { sdpTransform: sdp => ajustarSDP(sdp, formato, alvo) });
+  if (!call) { if (fluxo !== streamTx) pvSoltarFaixa(fluxo.getVideoTracks()[0]); return; }
+  if (fluxo !== streamTx) call.on('close', () => pvSoltarFaixa(fluxo.getVideoTracks()[0]));
   call.__formato = formato;
   chamadas.set(id, call);
+  if (PV.ativo && call.peerConnection) call.peerConnection.getSenders().forEach(pvAnexar);
   const pc = call.peerConnection;
   if (pc) pc.addEventListener('connectionstatechange', () => {
     if (pc.connectionState === 'connected') aplicarParametros(pc, id);
@@ -2825,6 +3084,7 @@ async function trocarQualidade() {
   guardar.set('dica', radio('dica'));
   qualAtual = qualidadeEscolhida();
   if (!streamTx) return;
+  if (PV.ativo) pvEnviar(pvConfig()); // o programa refaz no fps/resolução novos
   const vt = streamTx.getVideoTracks()[0];
   try { vt.contentHint = radio('dica'); } catch {}
   if (!EH_WEBKIT) try { await vt.applyConstraints({ frameRate: { ideal: qualAtual.fps, max: qualAtual.fps }, width: { max: qualAtual.w }, height: { max: qualAtual.h } }); } catch {}
@@ -2910,6 +3170,7 @@ function conferirFpsTx(st, alvo) {
   }
 }
 function pararTx() {
+  pvParar();
   avisoFpsTx.soft = false; avisoFpsTx.baixa = 0; avisoFpsTx.hora = 0; encSoftware = false;
   capturaCaiu = 0; clearTimeout(capturaTimer); capturaOpcoes = null;
   $('#aviso-captura').classList.add('hidden');
@@ -2951,6 +3212,7 @@ function pararTx() {
 function tipoEncoder(nome) {
   if (!nome) return null;
   if (/openh264|libvpx|libaom|software/i.test(nome)) return ['encoder por software (CPU)', 'ruim'];
+  if (/^programa/i.test(nome)) return ['placa de vídeo (pelo programa)', 'bom'];
   if (/mediafoundation|accelerator|external|nvenc|amf|qsv|hardware|d3d/i.test(nome)) return ['placa de vídeo', 'bom'];
   return [nome, ''];
 }
@@ -4437,7 +4699,7 @@ setInterval(async () => {
         c.title = t;
         m.append(c);
       }
-      const vs = streamTx.getVideoTracks()[0] && streamTx.getVideoTracks()[0].getSettings();
+      const vs = PV.ativo ? { width: PV.w, height: PV.h, displaySurface: 'programa' } : streamTx.getVideoTracks()[0] && streamTx.getVideoTracks()[0].getSettings();
       if (vs && vs.width) { $('#tag-res').textContent = `${vs.width}×${vs.height}`; $('#tag-res').classList.remove('hidden'); }
       // stats de cada pessoa; os chips mostram a primeira, e cada uma recebe as suas pelo canal de dados
       const todas = [];
@@ -4453,12 +4715,12 @@ setInterval(async () => {
         }
       };
       if (SFU.pc && SFU.pc.connectionState === 'connected') {
-        const s = await lerStats(SFU.pc, 'outbound-rtp');
+        const s = pvAjustarStats(await lerStats(SFU.pc, 'outbound-rtp'));
         if (s) { todas.push(s); infoPara(s, SFU.ok); }
       }
       for (const [id, c] of chamadas) {
         if (!c.peerConnection || c.peerConnection.connectionState !== 'connected') continue;
-        const s = await lerStats(c.peerConnection, 'outbound-rtp');
+        const s = pvAjustarStats(await lerStats(c.peerConnection, 'outbound-rtp'));
         if (!s) continue;
         todas.push(s);
         const conn = conexoes.get(id);
@@ -4468,6 +4730,10 @@ setInterval(async () => {
                       fps: s.fps, fpsCaptura: s.fpsCaptura, fpsAlvo: qualAtual ? qualAtual.fps : 0,
                       giro: CELULAR_TX ? +(radio('giro') || 0) : null });
         } catch {}
+      }
+      if (PV.ativo && todas.length) {
+        const alvo = Math.min(...todas.map(t => t.alvo || Infinity), qualAtual ? kbpsDe(qualAtual) * 1000 : Infinity);
+        if (isFinite(alvo) && alvo > 0 && Math.abs(alvo - PV.taxa) > PV.taxa * 0.12) { PV.taxa = alvo; pvEnviar({ tipo: 'taxa', kbps: Math.round(alvo / 1000) }); }
       }
       if (todas[0]) {
         const st = todas[0];
@@ -4533,7 +4799,7 @@ setInterval(async () => {
         $('#stats-rx-box').textContent =
           `Modo        ${textoModo(!!callRx.__sfu)}\n` +
           `Resolução   ${st.w}×${st.h}\n` +
-          (it && it.capW ? `Tela dele   ${it.capW}×${it.capH}${it.sup === 'monitor' ? ' · tela inteira (em jogo, compartilhar a JANELA do jogo costuma dar mais fps)' : it.sup === 'window' ? ' · janela' : it.sup === 'browser' ? ' · aba' : ''}\n` : '') +
+          (it && it.capW ? `Tela dele   ${it.capW}×${it.capH}${it.sup === 'monitor' ? ' · tela inteira (em jogo, compartilhar a JANELA do jogo costuma dar mais fps)' : it.sup === 'window' ? ' · janela' : it.sup === 'browser' ? ' · aba' : it.sup === 'programa' ? ' · pelo programa (igual ao Discord)' : ''}\n` : '') +
           (porque ? `Por quê      ${porque.replace('reduzido: ', '')}\n` : '') +
           (it && it.qualidade ? `Qualidade   ${it.qualidade}\n` : '') +
           (st.codec ? `Formato     ${st.codec}${/vp8/i.test(st.codec) ? ' (antigo)' : /h265|av1/i.test(st.codec) ? ' (moderno: mais imagem com menos internet)' : ''}\n` : '') +
@@ -5536,6 +5802,8 @@ atualizarFonte();
 prepararCelular();
 if (CELULAR_TX) document.body.classList.add('celular');
 document.querySelectorAll('input[name="fonte"]').forEach(i => i.onchange = trocouFonte);
+document.querySelectorAll('input[name="prioridade"]').forEach(i => i.onchange = () => { guardar.set('prioridade', radio('prioridade')); if (PV.ativo) pvEnviar(pvConfig()); });
+if (guardar.get('prioridade') === 'jogo') marcar('prioridade', 'jogo');
 document.querySelectorAll('input[name="audio"]').forEach(i => i.onchange = atualizarModoAudio);
 document.querySelectorAll('input[name="dica"]').forEach(i => i.onchange = trocarQualidade);
 

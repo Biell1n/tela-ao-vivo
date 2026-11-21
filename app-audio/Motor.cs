@@ -22,11 +22,12 @@ namespace TelaAoVivoAudio
         public readonly HashSet<string> IconesEnviados = new HashSet<string>();
         public volatile bool Fechado;
         public string Origem;
+        public bool EhVideo; // conexão /video (o vídeo da captura pelo programa), separada da do som
 
-        public void Enviar(byte[] quadro)
+        public bool Enviar(byte[] quadro)
         {
-            if (Fechado) return;
-            if (!Fila.TryAdd(quadro)) { } // fila cheia (internet/aba travada): descarta pra não acumular atraso
+            if (Fechado) return false;
+            return Fila.TryAdd(quadro); // fila cheia (internet/aba travada): descarta pra não acumular atraso
         }
         public void Fechar()
         {
@@ -61,6 +62,7 @@ namespace TelaAoVivoAudio
         public volatile string ErroPorta;
 
         public int Clientes { get { lock (clientes) return clientes.Count; } }
+        public bool TransmitindoVideo { get { return video != null; } }
 
         public void Iniciar()
         {
@@ -88,6 +90,8 @@ namespace TelaAoVivoAudio
             parar = true;
             foreach (var l in ouvintes) try { l.Stop(); } catch { }
             lock (clientes) foreach (var c in clientes) c.Fechar();
+            lock (videoClientes) foreach (var c in videoClientes) c.Fechar();
+            PararVideo();
             lock (capturas) foreach (var c in capturas.Values) c.Parar();
         }
 
@@ -129,7 +133,12 @@ namespace TelaAoVivoAudio
                 if (up == null || !up.Equals("websocket", StringComparison.OrdinalIgnoreCase) || chave == null)
                 {
                     // não é WebSocket: responde um "estou aqui" simples (útil pra testar no navegador)
-                    var corpo = Encoding.UTF8.GetBytes("{\"app\":\"tela-ao-vivo-audio\",\"versao\":\"" + Programa.Versao + "\"}");
+                    // "/atualizar" (só do site): o programa se atualiza sozinho
+                    string cam0; cab.TryGetValue("__caminho", out cam0);
+                    if (cam0 != null && cam0.StartsWith("/atualizar") && OrigemPermitida(origem))
+                        new Thread(() => Atualizador.Tentar(this, false)) { IsBackground = true, Name = "atualizar" }.Start();
+                    var corpo = Encoding.UTF8.GetBytes(json.Serialize(new Dictionary<string, object> { { "app", "tela-ao-vivo-audio" }, { "versao", Programa.Versao },
+                        { "atualiza", true }, { "video", true }, { "atualizacao", Atualizador.Estado }, { "disponivel", Atualizador.Disponivel } }));
                     var r = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: " + corpo.Length +
                             (OrigemPermitida(origem) ? "\r\nAccess-Control-Allow-Origin: " + origem + "\r\nAccess-Control-Allow-Private-Network: true" : "") +
                             "\r\nConnection: close\r\n\r\n";
@@ -150,19 +159,28 @@ namespace TelaAoVivoAudio
                 rede.Write(resp, 0, resp.Length);
                 rede.ReadTimeout = Timeout.Infinite;
 
-                c = new Cliente { Tcp = tcp, Rede = rede, Origem = origem };
-                lock (clientes) clientes.Add(c);
+                string caminho; cab.TryGetValue("__caminho", out caminho);
+                bool ehVideo = caminho != null && caminho.StartsWith("/video");
+                c = new Cliente { Tcp = tcp, Rede = rede, Origem = origem, EhVideo = ehVideo };
+                if (ehVideo) lock (videoClientes) videoClientes.Add(c);
+                else lock (clientes) clientes.Add(c);
                 var cc = c;
                 new Thread(() => Escrever(cc)) { IsBackground = true, Name = "escrever" }.Start();
                 EnviarTexto(c, json.Serialize(new Dictionary<string, object> {
-                    { "tipo", "ola" }, { "versao", Programa.Versao }, { "app", "tela-ao-vivo-audio" } }));
-                mudouConfig.Set();
+                    { "tipo", "ola" }, { "versao", Programa.Versao }, { "app", "tela-ao-vivo-audio" }, { "video", true } }));
+                if (!ehVideo) mudouConfig.Set();
                 Ler(c);
             }
             catch { }
             finally
             {
-                if (c != null)
+                if (c != null && c.EhVideo)
+                {
+                    c.Fechar();
+                    bool ninguem; lock (videoClientes) { videoClientes.Remove(c); ninguem = videoClientes.Count == 0; }
+                    if (ninguem) PararVideo(); // o site fechou: para de capturar na hora
+                }
+                else if (c != null)
                 {
                     c.Fechar();
                     lock (clientes) clientes.Remove(c);
@@ -184,6 +202,8 @@ namespace TelaAoVivoAudio
             }
             var linhas = sb.ToString().Split(new[] { "\r\n" }, StringSplitOptions.RemoveEmptyEntries);
             var d = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var pedido = linhas.Length > 0 ? linhas[0].Split(' ') : new string[0];
+            d["__caminho"] = pedido.Length > 1 ? pedido[1] : "/";
             for (int i = 1; i < linhas.Length; i++)
             {
                 int p = linhas[i].IndexOf(':');
@@ -228,6 +248,7 @@ namespace TelaAoVivoAudio
             Dictionary<string, object> m;
             try { m = json.Deserialize<Dictionary<string, object>>(s); } catch { return; }
             object tipo; m.TryGetValue("tipo", out tipo);
+            if (c.EhVideo) { MensagemVideo(m, tipo as string); return; }
             if ((tipo as string) != "config") return;
             lock (travaConfig)
             {
@@ -252,6 +273,86 @@ namespace TelaAoVivoAudio
         }
 
         void EnviarTexto(Cliente c, string s) { c.Enviar(Quadro(1, Encoding.UTF8.GetBytes(s))); }
+
+        // ================================================================== vídeo (captura pelo programa)
+        readonly List<Cliente> videoClientes = new List<Cliente>();
+        readonly object travaVideo = new object();
+        Video video; uint seqVideo;
+        public volatile string EstadoVideo = "";
+
+        static int Num(Dictionary<string, object> m, string k, int padrao)
+        {
+            object v; if (!m.TryGetValue(k, out v) || v == null) return padrao;
+            try { return Convert.ToInt32(v); } catch { return padrao; }
+        }
+
+        void MensagemVideo(Dictionary<string, object> m, string tipo)
+        {
+            lock (travaVideo)
+            {
+                if (tipo == "video")
+                {
+                    object lig; m.TryGetValue("ligar", out lig);
+                    if (lig is bool && !(bool)lig) { PararVideo(); return; }
+                    int fps = Math.Max(10, Math.Min(240, Num(m, "fps", 60))), kbps = Math.Max(500, Math.Min(80000, Num(m, "kbps", 12000)));
+                    int altura = Math.Max(0, Math.Min(4320, Num(m, "altura", 1080)));
+                    object mo; m.TryGetValue("modo", out mo); bool fluida = (mo as string) != "jogo";
+                    // fps/resolução novos: monta de novo (meio segundo, e já começa com quadro-chave)
+                    if (video != null && (video.Fps != fps || video.Altura != altura || !string.IsNullOrEmpty(video.Erro))) PararVideoSemTrava();
+                    if (video == null)
+                    {
+                        video = new Video { Fps = fps, Kbps = kbps, Altura = altura, Fluida = fluida };
+                        video.AoQuadro = EnviarQuadroVideo;
+                        video.Iniciar();
+                        if (!laçoEstadoVideo) { laçoEstadoVideo = true; new Thread(LacoEstadoVideo) { IsBackground = true, Name = "estado video" }.Start(); }
+                    }
+                    else { video.MudarTaxa(kbps); video.Fluida = fluida; video.AplicarPrioridade(); }
+                }
+                else if (tipo == "chave") { if (video != null) video.PedirChave(); }
+                else if (tipo == "taxa") { if (video != null) video.MudarTaxa(Num(m, "kbps", 0)); }
+            }
+        }
+        volatile bool laçoEstadoVideo;
+
+        void PararVideo() { lock (travaVideo) PararVideoSemTrava(); }
+        void PararVideoSemTrava()
+        {
+            var v = video; video = null;
+            if (v != null) { v.AoQuadro = null; v.Parar(); }
+            EstadoVideo = "";
+        }
+
+        // quadro pronto: [1 byte: 1 = chave][4 bytes: número do quadro][8 bytes: tempo em µs][H.264]
+        void EnviarQuadroVideo(byte[] h264, bool chave, long us)
+        {
+            var d = new byte[13 + h264.Length];
+            uint seq = ++seqVideo;
+            d[0] = (byte)(chave ? 1 : 0);
+            for (int i = 0; i < 4; i++) d[1 + i] = (byte)(seq >> (8 * i));
+            for (int i = 0; i < 8; i++) d[5 + i] = (byte)(us >> (8 * i));
+            Buffer.BlockCopy(h264, 0, d, 13, h264.Length);
+            var q = Quadro(2, d);
+            bool perdeu = false;
+            lock (videoClientes) foreach (var c in videoClientes) if (!c.Enviar(q)) perdeu = true;
+            var v = video; if (perdeu && v != null) v.PedirChave(); // perdeu um quadro: o próximo vem completo
+        }
+
+        void LacoEstadoVideo()
+        {
+            while (!parar)
+            {
+                Thread.Sleep(1000);
+                var v = video;
+                int n; lock (videoClientes) n = videoClientes.Count;
+                if (n == 0) continue;
+                var est = v == null ? new Dictionary<string, object> { { "tipo", "video-estado" }, { "ligado", false } }
+                    : new Dictionary<string, object> { { "tipo", "video-estado" }, { "ligado", string.IsNullOrEmpty(v.Erro) }, { "encoder", v.Encoder },
+                        { "w", v.Largura }, { "h", v.AlturaSaida }, { "cap", v.Capturados }, { "env", v.Enviados }, { "erro", v.Erro }, { "fluida", v.Fluida }, { "dbg", v.Dbg } };
+                EstadoVideo = v == null ? "" : string.IsNullOrEmpty(v.Erro) ? "Vídeo: " + v.Largura + "×" + v.AlturaSaida + " · " + v.Enviados + " fps" : "Vídeo: " + v.Erro;
+                var txt = json.Serialize(est);
+                lock (videoClientes) foreach (var c in videoClientes) EnviarTexto(c, txt);
+            }
+        }
 
         // a cada 3 s, com o site conectado: uso do processador e da placa de vídeo (pra estatística de quem assiste)
         void LacoDesempenho()
