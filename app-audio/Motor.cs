@@ -286,8 +286,29 @@ namespace TelaAoVivoAudio
             try { return Convert.ToInt32(v); } catch { return padrao; }
         }
 
+        // "t0", "t1"... = tela; número = janela (HWND)
+        static void LerAlvo(Dictionary<string, object> m, out IntPtr janela, out int tela)
+        {
+            janela = IntPtr.Zero; tela = 0;
+            object a; m.TryGetValue("alvo", out a); var s = a as string;
+            if (string.IsNullOrEmpty(s)) return;
+            if (s.StartsWith("t")) { int.TryParse(s.Substring(1), out tela); return; }
+            long h; if (long.TryParse(s, out h)) janela = new IntPtr(h);
+        }
+
         void MensagemVideo(Dictionary<string, object> m, string tipo)
         {
+            if (tipo == "janelas")
+            {   // a lista do "o que compartilhar" (miniaturas levam uns décimos de segundo: fora da trava)
+                new Thread(() =>
+                {
+                    string txt;
+                    try { txt = json.Serialize(new Dictionary<string, object> { { "tipo", "janelas" }, { "telas", Janelas.Telas() }, { "janelas", Janelas.Lista() } }); }
+                    catch (Exception e) { txt = json.Serialize(new Dictionary<string, object> { { "tipo", "janelas" }, { "erro", e.Message } }); }
+                    lock (videoClientes) foreach (var c in videoClientes) EnviarTexto(c, txt);
+                }) { IsBackground = true, Name = "janelas" }.Start();
+                return;
+            }
             lock (travaVideo)
             {
                 if (tipo == "video")
@@ -297,11 +318,12 @@ namespace TelaAoVivoAudio
                     int fps = Math.Max(10, Math.Min(240, Num(m, "fps", 60))), kbps = Math.Max(500, Math.Min(80000, Num(m, "kbps", 12000)));
                     int altura = Math.Max(0, Math.Min(4320, Num(m, "altura", 1080)));
                     object mo; m.TryGetValue("modo", out mo); bool fluida = (mo as string) != "jogo";
-                    // fps/resolução novos: monta de novo (meio segundo, e já começa com quadro-chave)
-                    if (video != null && (video.Fps != fps || video.Altura != altura || !string.IsNullOrEmpty(video.Erro))) PararVideoSemTrava();
+                    IntPtr janela; int tela; LerAlvo(m, out janela, out tela);
+                    // fps/resolução/o que capturar mudou: monta de novo (meio segundo, e já começa com quadro-chave)
+                    if (video != null && (video.Fps != fps || video.Altura != altura || video.AlvoJanela != janela || video.AlvoTela != tela || !string.IsNullOrEmpty(video.Erro))) PararVideoSemTrava();
                     if (video == null)
                     {
-                        video = new Video { Fps = fps, Kbps = kbps, Altura = altura, Fluida = fluida };
+                        video = new Video { Fps = fps, Kbps = kbps, Altura = altura, Fluida = fluida, AlvoJanela = janela, AlvoTela = tela };
                         video.AoQuadro = EnviarQuadroVideo;
                         video.Iniciar();
                         if (!laçoEstadoVideo) { laçoEstadoVideo = true; new Thread(LacoEstadoVideo) { IsBackground = true, Name = "estado video" }.Start(); }
@@ -345,9 +367,22 @@ namespace TelaAoVivoAudio
                 var v = video;
                 int n; lock (videoClientes) n = videoClientes.Count;
                 if (n == 0) continue;
+                // a janela mudou de tamanho ou de tela: monta de novo com a mesma escolha
+                if (v != null && v.Remontar)
+                {
+                    lock (travaVideo)
+                    {
+                        if (video == v)
+                        {
+                            v.AoQuadro = null; v.Parar();
+                            video = new Video { Fps = v.Fps, Kbps = v.Kbps, Altura = v.Altura, Fluida = v.Fluida, AlvoJanela = v.AlvoJanela, AlvoTela = v.AlvoTela };
+                            video.AoQuadro = EnviarQuadroVideo; video.Iniciar(); v = video;
+                        }
+                    }
+                }
                 var est = v == null ? new Dictionary<string, object> { { "tipo", "video-estado" }, { "ligado", false } }
                     : new Dictionary<string, object> { { "tipo", "video-estado" }, { "ligado", string.IsNullOrEmpty(v.Erro) }, { "encoder", v.Encoder },
-                        { "w", v.Largura }, { "h", v.AlturaSaida }, { "cap", v.Capturados }, { "env", v.Enviados }, { "erro", v.Erro }, { "fluida", v.Fluida }, { "dbg", v.Dbg } };
+                        { "w", v.Largura }, { "h", v.AlturaSaida }, { "cap", v.Capturados }, { "env", v.Enviados }, { "erro", v.Erro }, { "fluida", v.Fluida }, { "dbg", v.Dbg }, { "aviso", v.Aviso }, { "janela", v.AlvoJanela != IntPtr.Zero } };
                 EstadoVideo = v == null ? "" : string.IsNullOrEmpty(v.Erro) ? "Vídeo: " + v.Largura + "×" + v.AlturaSaida + " · " + v.Enviados + " fps" : "Vídeo: " + v.Erro;
                 var txt = json.Serialize(est);
                 lock (videoClientes) foreach (var c in videoClientes) EnviarTexto(c, txt);

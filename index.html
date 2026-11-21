@@ -713,6 +713,39 @@ html.com-fundo .bloco{background:none;-webkit-backdrop-filter:none;backdrop-filt
 @keyframes msgEntra{from{opacity:0;transform:translateY(6px)}}
 @media (prefers-reduced-motion:reduce){.chat-msgs li{animation:none}}
 
+/* janelinha "o que compartilhar" (pelo programa) */
+.escolher{position:fixed;inset:0;z-index:80;display:grid;place-items:center;padding:24px;background:rgba(6,8,12,.72);
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);animation:escolherFundo .2s var(--ease) both}
+@keyframes escolherFundo{from{opacity:0}}
+.escolher-caixa{width:min(920px,100%);max-height:min(760px,calc(100dvh - 48px));display:flex;flex-direction:column;border-radius:var(--r-l);
+  background:linear-gradient(180deg,var(--sup-2),var(--sup));border:1px solid var(--linha-2);box-shadow:0 30px 80px -20px rgba(0,0,0,.8);
+  animation:escolherCaixa .3s var(--ease) both;overflow:hidden}
+@keyframes escolherCaixa{from{opacity:0;transform:translateY(10px) scale(.98)}}
+.escolher-cab{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:20px 22px 14px;border-bottom:1px solid var(--linha)}
+.escolher-etq{font:600 10.5px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--acento)}
+.escolher-cab h3{margin:6px 0 0;font-size:19px;font-weight:650;letter-spacing:-.01em}
+.escolher-x{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:transparent;border:0;color:var(--fraco);cursor:pointer}
+.escolher-x:hover{background:var(--sup-3);color:var(--texto)}
+.escolher-corpo{padding:16px 22px 8px;overflow:auto;display:flex;flex-direction:column;gap:18px}
+.escolher-estado{margin:8px 0;color:var(--sub);font-size:14px}
+.escolher-rot{display:block;margin:0 0 10px;font:600 10.5px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--fraco)}
+.escolher-grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.escolher-op{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;gap:9px;padding:8px 8px 10px;border-radius:var(--r-m);
+  background:var(--bg-2);border:1px solid var(--linha);transition:border-color .15s var(--ease),background .15s var(--ease),transform .12s var(--ease)}
+.escolher-op:hover{border-color:var(--linha-2);background:var(--sup-2)}
+.escolher-op:active{transform:scale(.985)}
+.escolher-op:focus-visible{outline:2px solid var(--acento);outline-offset:2px}
+.escolher-op[aria-checked="true"]{border-color:var(--acento);background:var(--acento-suave);box-shadow:0 0 0 1px var(--acento) inset}
+.escolher-mini{position:relative;aspect-ratio:16/9;border-radius:8px;overflow:hidden;background:#05070b center/contain no-repeat;border:1px solid rgba(255,255,255,.04)}
+.escolher-mini.sem::after{content:"sem prévia";position:absolute;inset:0;display:grid;place-items:center;color:var(--fraco);font-size:12px}
+.escolher-nome{display:flex;align-items:center;gap:8px;min-width:0;font-size:13.5px;line-height:1.3;color:var(--texto)}
+.escolher-nome img{width:18px;height:18px;flex:0 0 auto;border-radius:4px}
+.escolher-nome span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.escolher-sub{font:500 11.5px/1 var(--mono);color:var(--fraco);padding-left:1px}
+.escolher-rodape{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:14px 22px 18px;border-top:1px solid var(--linha)}
+.escolher-dica{flex:1 1 220px;font-size:12.5px;color:var(--sub)}
+@media (max-width:560px){.escolher{padding:10px}.escolher-grade{grid-template-columns:1fr 1fr}.escolher-rodape .btn{flex:1 1 auto}}
+@media (prefers-reduced-motion:reduce){.escolher,.escolher-caixa{animation:none}}
 /* aviso de versão nova do programa */
 .novo-prog{position:relative;margin:0 0 18px;padding:18px 20px 18px;border-radius:var(--r-l);overflow:hidden;
   background:radial-gradient(420px 160px at 0% 0%,rgba(255,210,63,.10),transparent 70%),linear-gradient(180deg,var(--sup-2),var(--sup));
@@ -1309,6 +1342,7 @@ html.com-fundo .bloco{background:none;-webkit-backdrop-filter:none;backdrop-filt
       <div id="resumo-tx" class="resumo-tx" aria-live="polite"></div>
       <button id="bt-comecar" class="btn primario grande">Começar a transmitir</button>
       <button id="bt-comecar-flut" class="btn primario comecar-flut hidden" type="button"><span class="ponto-vivo"></span>Começar a transmitir</button>
+      <button id="bt-trocar-prog" class="btn grande hidden"><svg class="i"><use href="#i-janela"/></svg><span>Trocar o que compartilhar</span></button>
       <button id="bt-parar" class="btn perigo grande hidden">Parar transmissão</button>
     </aside>
   </div>
@@ -1904,7 +1938,8 @@ function avisoPrograma(versao, seAtualiza, estado) {
 }
 const pvSuportado = () => !CELULAR_TX && 'RTCRtpScriptTransform' in window && 'MediaStreamTrackGenerator' in window && 'VideoFrame' in window;
 const pvConfig = () => ({ tipo: 'video', fps: qualAtual ? qualAtual.fps : 60, kbps: qualAtual ? kbpsDe(qualAtual) : 12000,
-                          altura: qualAtual && qualAtual.h ? qualAtual.h : 0, modo: radio('prioridade') === 'jogo' ? 'jogo' : 'fluida' });
+                          altura: qualAtual && qualAtual.h ? qualAtual.h : 0, modo: radio('prioridade') === 'jogo' ? 'jogo' : 'fluida',
+                          alvo: pvEscolha ? pvEscolha.id : '' });
 function pvEnviar(m) { try { if (PV.ws && PV.ws.readyState === 1) PV.ws.send(JSON.stringify(m)); } catch {} }
 // o programa novo está aberto? (ele responde um "estou aqui" com a versão)
 let pvFalhas = 0;
@@ -2058,6 +2093,79 @@ function pvAnexar(sender) {
   };
   g.worker = w;
   try { sender.transform = new RTCRtpScriptTransform(w, { id }); } catch (e) { console.warn('troca de quadros', e); }
+}
+// ---------- "o que compartilhar" (igual ao Discord): o programa manda as telas e janelas abertas com miniatura
+function pvListar() {
+  return new Promise((ok, falha) => {
+    let ws; try { ws = new WebSocket('ws://127.0.0.1:47800/video'); } catch (e) { falha(e); return; }
+    const t = setTimeout(() => { try { ws.close(); } catch {} falha(new Error('o programa não respondeu')); }, 10000);
+    ws.onopen = () => ws.send(JSON.stringify({ tipo: 'janelas' }));
+    ws.onmessage = e => { if (typeof e.data !== 'string') return; let m; try { m = JSON.parse(e.data); } catch { return; }
+      if (m.tipo === 'janelas') { clearTimeout(t); try { ws.close(); } catch {} m.erro ? falha(new Error(m.erro)) : ok(m); } };
+    ws.onerror = () => { clearTimeout(t); falha(new Error('o Tela ao Vivo Áudio não está aberto')); };
+  });
+}
+let pvEscolha = null;
+function pvEscolher() {
+  return new Promise(resolve => {
+    const box = $('#escolher-prog'), ok = $('#escolher-ok');
+    let escolhido = null;
+    const fechar = r => { box.classList.add('hidden'); document.removeEventListener('keydown', tecla); resolve(r); };
+    const tecla = e => { if (e.key === 'Escape') fechar(null); if (e.key === 'Enter' && escolhido) fechar(escolhido); };
+    document.addEventListener('keydown', tecla);
+    const cartao = (item, tipo) => {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'escolher-op'; b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', 'false');
+      const mini = document.createElement('div'); mini.className = 'escolher-mini' + (item.img ? '' : ' sem');
+      if (item.img) mini.style.backgroundImage = `url("${item.img}")`;
+      const nome = document.createElement('div'); nome.className = 'escolher-nome';
+      const ic = item.exe && prog.icones[item.exe];
+      if (ic) { const im = document.createElement('img'); im.src = ic; im.alt = ''; nome.append(im); }
+      const tx = document.createElement('span'); tx.textContent = tipo === 'tela' ? item.nome : item.titulo; nome.append(tx);
+      const sub = document.createElement('div'); sub.className = 'escolher-sub'; sub.textContent = `${item.w}×${item.h}${tipo === 'janela' && item.exe ? ' · ' + item.exe : ''}`;
+      b.append(mini, nome, sub);
+      b.onclick = () => {
+        escolhido = { id: item.id, tipo, exe: item.exe || '', titulo: tipo === 'tela' ? item.nome : item.titulo };
+        box.querySelectorAll('.escolher-op').forEach(x => x.setAttribute('aria-checked', String(x === b)));
+        ok.disabled = false;
+        $('#escolher-dica').textContent = tipo === 'janela' && radio('audio') === 'app'
+          ? `O som vai ficar só do ${item.exe || 'programa dessa janela'} (dá pra marcar mais apps no Passo 2).`
+          : tipo === 'janela' ? 'Se outra janela ficar na frente dela, essa parte aparece na transmissão.' : '';
+      };
+      b.ondblclick = () => { b.onclick(); fechar(escolhido); };
+      return b;
+    };
+    const carregar = async () => {
+      $('#escolher-estado').textContent = 'Procurando as telas e janelas...'; $('#escolher-estado').classList.remove('hidden');
+      ok.disabled = true; escolhido = null; $('#escolher-dica').textContent = '';
+      try {
+        const m = await pvListar();
+        $('#escolher-telas').replaceChildren(...(m.telas || []).map(t => cartao(t, 'tela')));
+        $('#escolher-janelas').replaceChildren(...(m.janelas || []).map(j => cartao(j, 'janela')));
+        $('#escolher-telas-bloco').classList.toggle('hidden', !(m.telas || []).length);
+        $('#escolher-janelas-bloco').classList.toggle('hidden', !(m.janelas || []).length);
+        $('#escolher-estado').classList.add('hidden');
+        // a escolha anterior já vem marcada (se ainda existir)
+        const ant = pvEscolha && [...box.querySelectorAll('.escolher-op')].find((x, i) => ([...(m.telas || []), ...(m.janelas || [])][i] || {}).id === pvEscolha.id);
+        (ant || box.querySelector('#escolher-telas .escolher-op')).click();
+      } catch (e) { $('#escolher-estado').textContent = 'Não deu pra listar: ' + e.message + '. Abra o Tela ao Vivo Áudio e clique em Atualizar lista.'; }
+    };
+    $('#escolher-fechar').onclick = $('#escolher-cancelar').onclick = () => fechar(null);
+    box.onclick = e => { if (e.target === box) fechar(null); };
+    ok.onclick = () => fechar(escolhido);
+    $('#escolher-atualizar').onclick = carregar;
+    box.classList.remove('hidden');
+    carregar();
+  }).then(r => {
+    if (r) {
+      pvEscolha = r;
+      // janela + som pelo programa: o som fica só desse app (a pessoa marca mais, se quiser)
+      if (r.tipo === 'janela' && r.exe && radio('audio') === 'app') {
+        prog.modo = 'incluir'; prog.marcados = new Set([r.exe]);
+        progConfig(); try { progDesenhar(); } catch {}
+      }
+    }
+    return r;
+  });
 }
 // estatística: mostra o que o programa faz (não a faixa "falsa")
 function pvAjustarStats(st) {
@@ -2794,6 +2902,12 @@ async function comecar() {
   notaAudio('');
   let tela;
   if (fonte === 'programa') {
+    // programa antigo (até 1.3.3) não sabe listar as janelas: vai a tela inteira, como antes
+    if (PV.versao && versaoMenor(PV.versao, '1.3.4')) pvEscolha = null;
+    else {
+      const alvo = await pvEscolher();
+      if (!alvo) { statusTx('Você cancelou a escolha do que compartilhar.', 'aviso'); return; }
+    }
     statusTx('Ligando a captura pelo programa...');
     try { tela = new MediaStream([await pvIniciar()]); }
     catch (e) {
@@ -2879,6 +2993,7 @@ async function comecar() {
   $('#quadro-vazio').classList.add('hidden');
   $('#bt-comecar').classList.add('hidden');
   $('#bt-parar').classList.remove('hidden');
+  $('#bt-trocar-prog').classList.toggle('hidden', !PV.ativo);
   travarConfig(true);
   statusTx('Abrindo sala...');
   abrirSala(false);
@@ -3262,6 +3377,7 @@ function conferirFpsTx(st, alvo) {
 }
 function pararTx() {
   pvParar();
+  $('#bt-trocar-prog').classList.add('hidden');
   avisoFpsTx.soft = false; avisoFpsTx.baixa = 0; avisoFpsTx.hora = 0; encSoftware = false;
   capturaCaiu = 0; clearTimeout(capturaTimer); capturaOpcoes = null;
   $('#aviso-captura').classList.add('hidden');
@@ -4799,7 +4915,7 @@ setInterval(async () => {
           const conn = conexoes.get(id);
           if (conn && conn.open) try {
             conn.send({ tipo: 'info', capW: vs ? vs.width : 0, capH: vs ? vs.height : 0, w: s.w, h: s.h, limite: s.limite,
-                        qualidade: qualAtual ? qualAtual.nome : '', kbps: qualAtual ? kbpsDe(qualAtual) : 0, dica: radio('dica'), encoder: (tipoEncoder(s.encoder) || [''])[0], codec: s.codec, placa: PLACA.nome, semAcel: PLACA.semAcel, sup: vs ? vs.displaySurface || '' : '', pc: desempenhoPC(),
+                        qualidade: qualAtual ? qualAtual.nome : '', kbps: qualAtual ? kbpsDe(qualAtual) : 0, dica: radio('dica'), encoder: (tipoEncoder(s.encoder) || [''])[0], codec: s.codec, placa: PLACA.nome, semAcel: PLACA.semAcel, sup: vs ? vs.displaySurface || '' : '', pc: desempenhoPC(), progv: PV.versao || prog.versao || '',
                         fps: s.fps, fpsCaptura: s.fpsCaptura, fpsAlvo: qualAtual ? qualAtual.fps : 0,
                         giro: CELULAR_TX ? +(radio('giro') || 0) : null });
           } catch {}
@@ -4817,7 +4933,7 @@ setInterval(async () => {
         const conn = conexoes.get(id);
         if (conn && conn.open) try {
           conn.send({ tipo: 'info', capW: vs ? vs.width : 0, capH: vs ? vs.height : 0, w: s.w, h: s.h, limite: s.limite,
-                      qualidade: qualAtual ? qualAtual.nome : '', kbps: qualAtual ? kbpsDe(qualAtual) : 0, dica: radio('dica'), encoder: (tipoEncoder(s.encoder) || [''])[0], codec: s.codec, placa: PLACA.nome, semAcel: PLACA.semAcel, sup: vs ? vs.displaySurface || '' : '', pc: desempenhoPC(),
+                      qualidade: qualAtual ? qualAtual.nome : '', kbps: qualAtual ? kbpsDe(qualAtual) : 0, dica: radio('dica'), encoder: (tipoEncoder(s.encoder) || [''])[0], codec: s.codec, placa: PLACA.nome, semAcel: PLACA.semAcel, sup: vs ? vs.displaySurface || '' : '', pc: desempenhoPC(), progv: PV.versao || prog.versao || '',
                       fps: s.fps, fpsCaptura: s.fpsCaptura, fpsAlvo: qualAtual ? qualAtual.fps : 0,
                       giro: CELULAR_TX ? +(radio('giro') || 0) : null });
         } catch {}
@@ -4911,6 +5027,7 @@ setInterval(async () => {
           `Descartados ${st.descartados} quadros\nDecoder     ${st.decoder || '?'}` +
           (it && it.encoder ? `\nEncoder dele ${it.encoder}` : '') +
           (it && it.pc ? `\nPC dele     processador ${it.pc.cpu}% · placa ${it.pc.gpu}%${it.pc.gpu >= 95 ? ' (NO LIMITE: o jogo usa a placa toda e o Windows não consegue capturar a tela a tempo)' : ''}${it.pc.enc > 0 ? ` · compressão na placa ${it.pc.enc}%` : ''}${it.pc.cpu >= 95 ? ' · processador no limite' : ''}` : '') +
+          (it && it.progv ? `\nPrograma    Tela ao Vivo Áudio ${it.progv}${versaoProgramaNova && versaoMenor(it.progv, versaoProgramaNova) ? ` (desatualizado: a nova é a ${versaoProgramaNova})` : ''}` : '') +
           (it && (it.placa || it.semAcel) ? `\nPlaca dele  ${it.semAcel ? 'nenhuma: a aceleração gráfica do navegador dele está DESLIGADA' : it.placa + (/CPU/.test(it.encoder || '') ? ' · mas o navegador dele não está usando ela pra comprimir o vídeo' : '')}` : '') +
           (it && it.dica === 'detail' ? `\nOtimizado   pra nitidez (texto): em vídeo/jogo, ele deve escolher "Movimento"` : '') +
           (it && st.mbps < 4 && (/software|CPU/i.test(it.encoder || '') || /leve/.test(it.qualidade || ''))
@@ -5915,6 +6032,7 @@ document.querySelectorAll('[data-voltar]').forEach(b => b.onclick = () => {
 $('#sel-audio').onchange = selecionarAudio;
 $('#bt-atualizar').onclick = listarAudio;
 $('#bt-comecar').onclick = comecar;
+$('#bt-trocar-prog').onclick = async () => { if (!PV.ativo) return; if (PV.versao && versaoMenor(PV.versao, '1.3.4')) { statusTx('Pra escolher a janela, atualize o Tela ao Vivo Áudio (aviso no topo).', 'aviso'); return; } const r = await pvEscolher(); if (r) { pvEnviar(pvConfig()); statusTx('Agora compartilhando: ' + r.titulo + '.', 'ok'); } };
 $('#bt-recapturar').onclick = recapturar;
 $('#bt-parar-de-vez').onclick = () => pararTx();
 $('#bt-comecar-flut').onclick = comecar;
@@ -6069,5 +6187,24 @@ document.querySelectorAll('input[name="layout"]').forEach(i => i.onchange = () =
 const convite = new URLSearchParams(location.search).get('c');
 if (convite) { $('#in-codigo').value = convite; iniciarAssistir(); }
 </script>
+<div id="escolher-prog" class="escolher hidden" role="dialog" aria-modal="true" aria-labelledby="escolher-tit">
+  <div class="escolher-caixa">
+    <div class="escolher-cab">
+      <div><span class="escolher-etq">Pelo programa</span><h3 id="escolher-tit">O que você quer compartilhar?</h3></div>
+      <button type="button" class="escolher-x" id="escolher-fechar" aria-label="Cancelar"><svg class="i"><use href="#i-x"/></svg></button>
+    </div>
+    <div class="escolher-corpo">
+      <p id="escolher-estado" class="escolher-estado">Procurando as telas e janelas...</p>
+      <div id="escolher-telas-bloco" class="hidden"><span class="escolher-rot">Telas</span><div id="escolher-telas" class="escolher-grade"></div></div>
+      <div id="escolher-janelas-bloco" class="hidden"><span class="escolher-rot">Janelas</span><div id="escolher-janelas" class="escolher-grade"></div></div>
+    </div>
+    <div class="escolher-rodape">
+      <span id="escolher-dica" class="escolher-dica"></span>
+      <button type="button" class="btn" id="escolher-atualizar"><svg class="i"><use href="#i-recarregar"/></svg><span>Atualizar lista</span></button>
+      <button type="button" class="btn novo-prog-depois" id="escolher-cancelar"><span>Cancelar</span></button>
+      <button type="button" class="btn primario" id="escolher-ok" disabled><span>Compartilhar</span></button>
+    </div>
+  </div>
+</div>
 </body>
 </html>

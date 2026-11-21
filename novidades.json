@@ -1,4 +1,9 @@
 {
+  "1.3.4": [
+    "Escolha o que compartilhar, igual ao Discord: a tela ou só uma janela, com a miniatura de cada uma.",
+    "Escolhendo uma janela, o som já fica só daquele programa (dá pra marcar mais no Passo 2).",
+    "Botão \"Trocar o que compartilhar\" pra mudar a tela ou a janela sem parar a transmissão."
+  ],
   "1.3.3": [
     "O cursor do mouse agora aparece na captura \"Pelo programa\".",
     "Quem transmite pelo programa vê a própria imagem na prévia (antes aparecia só um aviso)."

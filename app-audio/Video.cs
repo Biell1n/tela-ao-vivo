@@ -174,6 +174,11 @@ namespace TelaAoVivoAudio
         Thread laco; volatile bool rodando; volatile bool pedirChave; volatile int novaTaxa;
         IntPtr dev, ctx, mgr; uint token;
         IntPtr dup; int telaW, telaH;
+        // o que capturar: AlvoJanela (0 = nenhuma) ou a tela AlvoTela (índice de Screen.AllScreens)
+        public IntPtr AlvoJanela; public int AlvoTela;
+        public volatile bool Remontar; public volatile string Aviso = "";
+        int outX, outY;                 // onde essa tela começa na área de trabalho
+        int regX, regY, regW, regH;     // o pedaço da tela que vai (a janela, ou a tela toda)
         IntPtr copia;                       // nossa cópia do quadro (BGRA, na placa)
         IntPtr vp; bool vpDaSamples; IntPtr[] poolNv12 = new IntPtr[0]; int poolIdx;
         IntPtr enc, encGen, codec; bool encDaSamples; uint encBufTam;
@@ -249,7 +254,7 @@ namespace TelaAoVivoAudio
                 Com.Ok(Com.F<D.Ptr>(dxdev, 7)(dxdev, out adapter), "GetAdapter");
                 try
                 {
-                    Com.Ok(Com.F<D.IdxPtr>(adapter, 7)(adapter, 0, out output), "EnumOutputs");
+                    output = EscolherSaida(adapter);
                     try { Com.Ok(Com.F<D.DupOut>(output, 22)(output, devCap, out dup), "DuplicateOutput"); } // IDXGIOutput1::DuplicateOutput
                     finally { Com.Rel(ref output); }
                 }
@@ -259,6 +264,71 @@ namespace TelaAoVivoAudio
             var desc = Marshal.AllocHGlobal(64);
             try { Com.F<D.VoidPtr>(dup, 7)(dup, desc); telaW = Marshal.ReadInt32(desc, 0); telaH = Marshal.ReadInt32(desc, 4); }
             finally { Marshal.FreeHGlobal(desc); }
+            if (AlvoJanela == IntPtr.Zero) { regX = 0; regY = 0; regW = telaW & ~1; regH = telaH & ~1; }
+            else if (!AtualizarRegiao(true)) throw new Exception("a janela escolhida não está visível nessa tela");
+        }
+
+        // a tela de saída: a escolhida, ou a que tem o meio da janela escolhida
+        IntPtr EscolherSaida(IntPtr adapter)
+        {
+            System.Drawing.Rectangle alvo;
+            if (AlvoJanela != IntPtr.Zero)
+            {
+                Janelas.RECT r; if (!Janelas.Retangulo(AlvoJanela, out r)) throw new Exception("a janela escolhida foi fechada");
+                alvo = new System.Drawing.Rectangle((r.L + r.R) / 2, (r.T + r.B) / 2, 1, 1);
+            }
+            else
+            {
+                var telas = System.Windows.Forms.Screen.AllScreens;
+                alvo = telas[Math.Max(0, Math.Min(telas.Length - 1, AlvoTela))].Bounds;
+            }
+            var d = Marshal.AllocHGlobal(96);
+            IntPtr primeira = IntPtr.Zero;
+            try
+            {
+                for (uint i = 0; i < 16; i++)
+                {
+                    IntPtr o; if (Com.F<D.IdxPtr>(adapter, 7)(adapter, i, out o) < 0) break;
+                    Com.F<D.VoidPtr>(o, 7)(o, d); // IDXGIOutput::GetDesc: nome (64 bytes) e depois o retângulo na área de trabalho
+                    var rc = new System.Drawing.Rectangle(Marshal.ReadInt32(d, 64), Marshal.ReadInt32(d, 68), Marshal.ReadInt32(d, 72) - Marshal.ReadInt32(d, 64), Marshal.ReadInt32(d, 76) - Marshal.ReadInt32(d, 68));
+                    if (rc.IntersectsWith(alvo) && (AlvoJanela != IntPtr.Zero || rc.Location == alvo.Location))
+                    { if (primeira != IntPtr.Zero) Com.Rel(ref primeira); outX = rc.X; outY = rc.Y; return o; }
+                    if (primeira == IntPtr.Zero) { primeira = o; outX = rc.X; outY = rc.Y; } else Com.Rel(ref o);
+                }
+            }
+            finally { Marshal.FreeHGlobal(d); }
+            if (primeira == IntPtr.Zero) throw new Exception("nenhuma tela encontrada");
+            return primeira; // não achou (tela em outra placa?): usa a primeira
+        }
+
+        // onde a janela está agora (relativo a essa tela). Mudou de tamanho ou de tela: monta de novo.
+        bool AtualizarRegiao(bool primeiraVez)
+        {
+            if (AlvoJanela == IntPtr.Zero) return true;
+            if (!Janelas.IsWindow(AlvoJanela)) { Falha("a janela escolhida foi fechada"); rodando = false; return false; }
+            if (Janelas.Minimizada(AlvoJanela)) { Aviso = "a janela está minimizada"; return false; }
+            Janelas.RECT r; if (!Janelas.Retangulo(AlvoJanela, out r)) return false;
+            int x0 = Math.Max(0, r.L - outX), y0 = Math.Max(0, r.T - outY), x1 = Math.Min(telaW, r.R - outX), y1 = Math.Min(telaH, r.B - outY);
+            int w = (x1 - x0) & ~1, h = (y1 - y0) & ~1;
+            if (w < 64 || h < 64) { Aviso = "a janela saiu dessa tela"; if (!primeiraVez) { Remontar = true; rodando = false; } return false; }
+            if (primeiraVez) { regW = w; regH = h; }
+            else if (Math.Abs(w - regW) > 2 || Math.Abs(h - regH) > 2) { Remontar = true; rodando = false; return false; } // mudou de tamanho
+            regX = Math.Min(x0, telaW - regW); regY = Math.Min(y0, telaH - regH);
+            Aviso = "";
+            return true;
+        }
+
+        // copia da tela capturada só o pedaço que vai (a janela), ou tudo
+        void CopiarDaTela(IntPtr destino, IntPtr tela)
+        {
+            if (AlvoJanela == IntPtr.Zero && regW == (telaW & ~1) && regH == (telaH & ~1) && regW == telaW && regH == telaH) { Com.F<D.Copy>(ctxCap, 47)(ctxCap, destino, tela); return; }
+            var box = Marshal.AllocHGlobal(24);
+            try
+            {
+                int[] bx = { regX, regY, 0, regX + regW, regY + regH, 1 }; Marshal.Copy(bx, 0, box, 6);
+                Com.F<D.CopyRegion>(ctxCap, 46)(ctxCap, destino, 0, 0, 0, 0, tela, 0, box);
+            }
+            finally { Marshal.FreeHGlobal(box); }
         }
 
         void CriarAnel()
@@ -268,7 +338,7 @@ namespace TelaAoVivoAudio
                 var d = Marshal.AllocHGlobal(44);
                 try
                 {
-                    int[] v = { telaW, telaH, 1, 1, 87 /*B8G8R8A8*/, 1, 0, 0, 0x28 /*SHADER_RESOURCE|RENDER_TARGET*/, 0, 0x2 /*SHARED*/ };
+                    int[] v = { regW, regH, 1, 1, 87 /*B8G8R8A8*/, 1, 0, 0, 0x28 /*SHADER_RESOURCE|RENDER_TARGET*/, 0, 0x2 /*SHARED*/ };
                     Marshal.Copy(v, 0, d, 11);
                     Com.Ok(Com.F<D.CreateTex>(devCap, 5)(devCap, d, IntPtr.Zero, out texCap[i]), "textura compartilhada");
                 }
@@ -353,8 +423,8 @@ namespace TelaAoVivoAudio
         void MontarCompressao()
         {
             int fps = Math.Max(10, Math.Min(240, Fps));
-            int alt = Altura > 0 ? Math.Min(Altura, telaH) : telaH;
-            int larg = (int)Math.Round(telaW * (double)alt / telaH);
+            int alt = Altura > 0 ? Math.Min(Altura, regH) : regH;
+            int larg = (int)Math.Round(regW * (double)alt / regH);
             larg &= ~1; alt &= ~1;
             Largura = larg; AlturaSaida = alt;
 
@@ -378,7 +448,7 @@ namespace TelaAoVivoAudio
             Com.Ok(Com.F<D.ProcMsg>(vp, 23)(vp, 2 /*SET_D3D_MANAGER*/, mgr), "VP d3d");
             IntPtr vattr; // sem "conversão de taxa": um quadro entra, um quadro sai (senão ele inventa cópias)
             if (Com.F<D.Ptr>(vp, 8)(vp, out vattr) >= 0 && vattr != IntPtr.Zero) { Guid k = G.DisableFrc; Com.F<D.SetU32>(vattr, 21)(vattr, ref k, 1); Com.Rel(ref vattr); }
-            var ti = TipoVideo(G.ARGB32, telaW, telaH, fps); Cor709(ti, false);
+            var ti = TipoVideo(G.ARGB32, regW, regH, fps); Cor709(ti, false);
             var to = TipoVideo(G.NV12, larg, alt, fps); Cor709(to, true);
             try
             {
@@ -525,7 +595,7 @@ namespace TelaAoVivoAudio
             var info = Marshal.AllocHGlobal(16);
             try { Com.Ok(Com.F<D.StreamInfo>(t, 7)(t, 0, info), "encoder info"); encDaSamples = (Marshal.ReadInt32(info, 0) & 0x300) != 0; encBufTam = (uint)Marshal.ReadInt32(info, 4); }
             finally { Marshal.FreeHGlobal(info); }
-            Tamanhos = "tela " + telaW + "x" + telaH + " · enc entrada " + TamTipo(t, 17) + " saída " + TamTipo(t, 18) + (vp != IntPtr.Zero ? " · vp entrada " + TamTipo(vp, 17) + " saída " + TamTipo(vp, 18) : " · sem conversor");
+            Tamanhos = "tela " + telaW + "x" + telaH + " · pedaço " + regW + "x" + regH + " · enc entrada " + TamTipo(t, 17) + " saída " + TamTipo(t, 18) + (vp != IntPtr.Zero ? " · vp entrada " + TamTipo(vp, 17) + " saída " + TamTipo(vp, 18) : " · sem conversor");
             encGen = Com.QI(t, G.IMFMediaEventGenerator);
             if (encGen == IntPtr.Zero) throw new Exception("encoder sem eventos (não é assíncrono)");
             Com.Ok(Com.F<D.ProcMsg>(t, 23)(t, 0x10000000, IntPtr.Zero), "BEGIN_STREAMING");
@@ -712,7 +782,8 @@ namespace TelaAoVivoAudio
         {
             if (!curVisivel || curForma.Length == 0 || curW <= 0) return;
             int alt = curTipo == 1 ? curH / 2 : curH;   // monocromático: metade é a máscara AND, metade a XOR
-            int x0 = Math.Max(0, curX), y0 = Math.Max(0, curY), x1 = Math.Min(telaW, curX + curW), y1 = Math.Min(telaH, curY + alt);
+            int cx = curX - regX, cy = curY - regY;      // posição do cursor dentro do pedaço que vai
+            int x0 = Math.Max(0, cx), y0 = Math.Max(0, cy), x1 = Math.Min(regW, cx + curW), y1 = Math.Min(regH, cy + alt);
             if (x1 <= x0 || y1 <= y0) return;
             int w = x1 - x0, h = y1 - y0, lado = Math.Max(w, h);
             if (curTex == IntPtr.Zero || curTexLado < lado)
@@ -738,10 +809,10 @@ namespace TelaAoVivoAudio
                 for (int yy = 0; yy < h; yy++)
                 {
                     IntPtr lp = px + yy * pitch; Marshal.Copy(lp, linha, 0, w * 4);
-                    int sy = y0 + yy - curY;
+                    int sy = y0 + yy - cy;
                     for (int xx = 0; xx < w; xx++)
                     {
-                        int sx = x0 + xx - curX, o = xx * 4;
+                        int sx = x0 + xx - cx, o = xx * 4;
                         if (curTipo == 2) // colorido com transparência
                         {
                             int k = sy * curPitch + sx * 4; int al = curForma[k + 3];
@@ -778,7 +849,7 @@ namespace TelaAoVivoAudio
             if (texLimpa == IntPtr.Zero)
             {
                 var d = Marshal.AllocHGlobal(44);
-                try { int[] v = { telaW, telaH, 1, 1, 87, 1, 0, 0, 0, 0, 0 }; Marshal.Copy(v, 0, d, 11); Com.F<D.CreateTex>(devCap, 5)(devCap, d, IntPtr.Zero, out texLimpa); }
+                try { int[] v = { regW, regH, 1, 1, 87, 1, 0, 0, 0, 0, 0 }; Marshal.Copy(v, 0, d, 11); Com.F<D.CreateTex>(devCap, 5)(devCap, d, IntPtr.Zero, out texLimpa); }
                 finally { Marshal.FreeHGlobal(d); }
             }
             try
@@ -789,8 +860,10 @@ namespace TelaAoVivoAudio
                     IntPtr res;
                     int hr = Com.F<D.Acquire>(dup, 8)(dup, (uint)Math.Max(1, intervalo / 2), info, out res);
                     double agora = relogio.Elapsed.TotalMilliseconds;
-                    if (hr == DXGI_ACCESS_LOST) { Thread.Sleep(50); CriarCaptura(); continue; } // trocou resolução, UAC, tela cheia...
+                    if (hr == DXGI_ACCESS_LOST) { Thread.Sleep(50); int w0 = regW, h0 = regH; CriarCaptura(); if (regW != w0 || regH != h0) { Remontar = true; rodando = false; break; } continue; } // trocou resolução, UAC, tela cheia...
                     bool devido = agora >= proximo - 1.5, novo = false, mudou = false;
+                    bool visivel = AlvoJanela == IntPtr.Zero || AtualizarRegiao(false);
+                    if (!rodando) { if (hr >= 0) { Com.Rel(ref res); Com.F<D.Int0>(dup, 14)(dup); } break; }
                     IntPtr tex = IntPtr.Zero;
                     if (hr >= 0)
                     {
@@ -799,11 +872,11 @@ namespace TelaAoVivoAudio
                         mudou = imagem || mouse;
                         tex = Com.QI(res, G.ID3D11Texture2D);
                         // ainda não é hora (monitor de 144/240 Hz entrega mais quadros): guarda a imagem pra não perder a mudança
-                        if (imagem && !devido && tex != IntPtr.Zero && texLimpa != IntPtr.Zero) { Com.F<D.Copy>(ctxCap, 47)(ctxCap, texLimpa, tex); limpaSuja = true; }
+                        if (imagem && !devido && visivel && tex != IntPtr.Zero && texLimpa != IntPtr.Zero) { CopiarDaTela(texLimpa, tex); limpaSuja = true; }
                     }
                     else if (hr != DXGI_TIMEOUT) throw new Exception("AcquireNextFrame 0x" + hr.ToString("x8"));
 
-                    bool precisa = devido && (mudou || limpaSuja || (pedirChave && ultimoAnel >= 0));
+                    bool precisa = devido && visivel && (mudou || limpaSuja || (pedirChave && ultimoAnel >= 0));
                     if (precisa)
                     {
                         int i = (anelIdx + 1) % ANEL;
@@ -812,7 +885,7 @@ namespace TelaAoVivoAudio
                             IntPtr fonte = tex != IntPtr.Zero ? tex : texLimpa;
                             if (fonte != IntPtr.Zero)
                             {
-                                Com.F<D.Copy>(ctxCap, 47)(ctxCap, texCap[i], fonte);
+                                if (fonte == tex) CopiarDaTela(texCap[i], tex); else Com.F<D.Copy>(ctxCap, 47)(ctxCap, texCap[i], fonte);
                                 if (tex != IntPtr.Zero && texLimpa != IntPtr.Zero && fonte == tex) limpaSuja = false;
                                 if (fonte == texLimpa) limpaSuja = false;
                                 DesenharCursor(texCap[i]);
