@@ -1211,6 +1211,12 @@ html.com-fundo .bloco{background:none;-webkit-backdrop-filter:none;backdrop-filt
         </div>
       </div>
 
+      <div id="aviso-acel" class="aviso-captura hidden" role="note">
+        <b>Ligue a aceleração gráfica do navegador pra melhor desempenho.</b>
+        <span>Ela está desligada: sem ela, quem assiste vê a sua tela travando (o vídeo é comprimido no processador, e não na placa de vídeo). Com ela ligada, sai liso na resolução e nos fps que você escolher.</span>
+        <span id="aviso-acel-passos"></span>
+        <div class="aviso-captura-bts"><button type="button" class="btn" id="bt-acel-copiar"><svg class="i"><use href="#i-link"/></svg><span>Copiar o endereço da configuração</span></button></div>
+      </div>
       <div id="status-tx" class="status">Escolha a tela e o áudio, depois comece.</div>
       <div id="aviso-captura" class="aviso-captura hidden" role="alert">
         <b>A captura da tela parou.</b>
@@ -1467,6 +1473,8 @@ function chip(txt, cls = '', ico = '') {
 // extra: na oferta (quem transmite), a taxa alvo em kbps; na resposta (quem assiste), o SDP da oferta.
 // As dicas x-google-*-bitrate só valem pra quem envia quando estão no SDP QUE ELE RECEBE (a resposta),
 // então quem assiste copia as da oferta pra resposta.
+// perfil do H.264: High comprime melhor; mas se só o Baseline sai pela placa, vai o Baseline
+const ordemPerfil = () => ENC.modo === 'base' ? { '42': 0, '4d': 1, '64': 2 } : { '64': 0, '4d': 1, '42': 2 };
 function ajustarSDP(sdp, codec = 'H264', extra) {
   let linhas = sdp.split('\r\n');
   const opus = (sdp.match(/a=rtpmap:(\d+) opus\/48000/i) || [])[1];
@@ -1478,7 +1486,7 @@ function ajustarSDP(sdp, codec = 'H264', extra) {
     const pm1 = h264.filter(pt => /packetization-mode=1/.test(fmtp(pt)));
     preferidos = pm1.length ? pm1 : h264;
     // perfil High (64) > Main (4d) > Baseline (42): o High comprime melhor (menos pixelado na troca de cena, mesma taxa)
-    const perfil = pt => { const m = fmtp(pt).match(/profile-level-id=([0-9a-f]{2})/i); return m ? ({ '64': 0, '4d': 1 }[m[1].toLowerCase()] ?? 2) : 3; };
+    const perfil = pt => { const m = fmtp(pt).match(/profile-level-id=([0-9a-f]{2})/i); return m ? (ordemPerfil()[m[1].toLowerCase()] ?? 2) : 3; };
     preferidos = [...preferidos].sort((a, b) => perfil(a) - perfil(b));
   } else if (codec) {
     preferidos = pts(codec);
@@ -1535,6 +1543,29 @@ async function formatosHardware(tipo) {
   return ok;
 }
 const formatosEnc = formatosHardware('enc'); // promessa: quem transmite
+// sugestão de ligar a aceleração gráfica (só aparece se ela estiver desligada), com o caminho certo de cada navegador
+function mostrarAvisoAcel() {
+  if (!PLACA.semAcel || TOQUE) return;
+  const ua = navigator.userAgent;
+  const nav = /OPR\/|Opera/.test(ua) ? { nome: 'Opera', end: 'opera://settings/system', cam: 'Configurações › Navegador › Sistema › "Usar aceleração de hardware quando disponível"' }
+            : /Edg\//.test(ua) ? { nome: 'Edge', end: 'edge://settings/system', cam: 'Configurações › Sistema e desempenho › "Usar aceleração gráfica quando disponível"' }
+            : /Brave/.test(ua) || navigator.brave ? { nome: 'Brave', end: 'brave://settings/system', cam: 'Configurações › Sistema › "Usar aceleração gráfica quando disponível"' }
+            : { nome: 'Chrome', end: 'chrome://settings/system', cam: 'Configurações › Sistema › "Usar aceleração gráfica quando disponível"' };
+  $('#aviso-acel-passos').textContent = `No ${nav.nome}: ${nav.cam}. Ligue, clique em "Reiniciar" e volte aqui. Atalho: copie o endereço abaixo e cole na barra de endereços.`;
+  $('#bt-acel-copiar').onclick = () => copiar(nav.end, $('#bt-acel-copiar'), 'Copiar o endereço da configuração');
+  $('#aviso-acel').classList.remove('hidden');
+}
+// a placa de vídeo que o navegador está usando. "SwiftShader"/"Basic Render" = aceleração gráfica desligada.
+const PLACA = (() => {
+  let bruto = '';
+  try { const gl = document.createElement('canvas').getContext('webgl'); const ext = gl && gl.getExtension('WEBGL_debug_renderer_info');
+        bruto = gl ? String(gl.getParameter(ext ? ext.UNMASKED_RENDERER_WEBGL : gl.RENDERER)) : ''; } catch {}
+  const semAcel = !bruto || /swiftshader|basic render|llvmpipe|software/i.test(bruto);
+  const m = bruto.match(/ANGLE \([^,]+,\s*([^,]+?)(?:\s*\(0x[0-9a-f]+\))?\s*(?:Direct3D|D3D|OpenGL|Vulkan|,|\)|$)/i);
+  const nome = semAcel ? '' : (m ? m[1] : bruto).replace(/\s+/g, ' ').trim().slice(0, 60);
+  return { nome, semAcel };
+})();
+setTimeout(mostrarAvisoAcel, 0); // depois do script inteiro carregar
 const formatosDec = formatosHardware('dec'); // promessa: quem assiste
 
 const statsAnteriores = new WeakMap();
@@ -1661,6 +1692,47 @@ const pedidos = new Map();  // qualidade que cada pessoa pediu (celular pede men
 const esperandoPedido = new Map(); // quem abriu o canal e ainda não mandou o pedido (com o formato que decodifica)
 let formatosEncLista = [];
 formatosEnc.then(l => { formatosEncLista = l; });
+// Antes de transmitir, testa de verdade quem comprime o vídeo (2 s, com a própria tela, numa conexão local):
+//  'high' = H.264 High pela placa (o melhor); 'base' = só o H.264 Baseline sai pela placa (algumas AMD/Intel);
+//  'cpu'  = este navegador só comprime pelo processador (mesmo assim aguenta 1080p 60 fps).
+const ENC = { modo: '', impl: '' };
+async function encoderCom(track, filtro) {
+  const cs = (RTCRtpSender.getCapabilities('video') || { codecs: [] }).codecs.filter(filtro);
+  if (!cs.length) return '';
+  const a = new RTCPeerConnection(), b = new RTCPeerConnection(), t = track.clone();
+  try {
+    a.onicecandidate = e => e.candidate && b.addIceCandidate(e.candidate).catch(() => {});
+    b.onicecandidate = e => e.candidate && a.addIceCandidate(e.candidate).catch(() => {});
+    const tr = a.addTransceiver(t, { direction: 'sendonly', sendEncodings: [{ maxBitrate: 8e6, maxFramerate: 60 }] });
+    tr.setCodecPreferences(cs);
+    await a.setLocalDescription(); await b.setRemoteDescription(a.localDescription);
+    await b.setLocalDescription(); await a.setRemoteDescription(b.localDescription);
+    let impl = '', visto = 0;
+    for (let i = 0; i < 25; i++) {
+      await new Promise(r => setTimeout(r, 120));
+      const st = await a.getStats();
+      st.forEach(x => { if (x.type === 'outbound-rtp' && x.kind === 'video' && x.framesEncoded > 0 && x.encoderImplementation) impl = x.encoderImplementation; });
+      if (impl && ++visto >= 3) break; // espera um pouco: se a placa falhar, o navegador troca pro processador logo no começo
+    }
+    return impl;
+  } catch { return ''; } finally { try { a.close(); b.close(); t.stop(); } catch {} }
+}
+async function testarEncoder(track) {
+  if (ENC.modo || CELULAR_TX || !window.RTCRtpSender || !RTCRtpSender.getCapabilities) return;
+  const chave = 'enc:' + (PLACA.nome || 'x') + ':' + (navigator.userAgent.match(/(Chrome|Edg|OPR|Firefox)\/(\d+)/) || [''])[0];
+  try { const c = JSON.parse(sessionStorage.getItem(chave) || 'null'); if (c && c.modo) { Object.assign(ENC, c); return; } } catch {}
+  const pelaPlaca = impl => !!impl && (tipoEncoder(impl) || [])[1] !== 'ruim';
+  const h264 = perfil => c => c.mimeType === 'video/H264' && /packetization-mode=1/.test(c.sdpFmtpLine || '') && new RegExp('profile-level-id=' + perfil, 'i').test(c.sdpFmtpLine || '');
+  let impl = await encoderCom(track, h264('64'));
+  if (pelaPlaca(impl)) ENC.modo = 'high';
+  else {
+    const base = await encoderCom(track, h264('42e0'));
+    if (pelaPlaca(base)) { ENC.modo = 'base'; impl = base; }
+    else { ENC.modo = impl || base ? 'cpu' : 'high'; impl = impl || base; } // sem placa: H.264 no processador (aguenta 60 fps)
+  }
+  ENC.impl = impl;
+  try { sessionStorage.setItem(chave, JSON.stringify(ENC)); } catch {}
+}
 function formatoPara(id) {
   const ped = pedidos.get(id);
   const dec = ped && ped.decod;
@@ -2452,6 +2524,7 @@ async function comecar() {
   }
 
   if (micLigado() && !mix.srcMic) await ligarMic();
+  if (!ENC.modo) { statusTx('Testando a sua placa de vídeo (2 segundos)...'); await testarEncoder(vt); }
   streamTx = new MediaStream([vt, audioSaida()]);
   const pv = $('#preview');
   pv.muted = true;
@@ -2570,7 +2643,7 @@ async function sfuPublicar() {
     // H.264: todo aparelho decodifica (no servidor, todo mundo recebe o mesmo vídeo)
     try {
       const cs = RTCRtpSender.getCapabilities('video').codecs;
-      const perfil = c => { const m = (c.sdpFmtpLine || '').match(/profile-level-id=([0-9a-f]{2})/i); return m ? ({ '64': 0, '4d': 1 }[m[1].toLowerCase()] ?? 2) : 3; };
+      const perfil = c => { const m = (c.sdpFmtpLine || '').match(/profile-level-id=([0-9a-f]{2})/i); return m ? (ordemPerfil()[m[1].toLowerCase()] ?? 2) : 3; };
       const h = cs.filter(c => /h264/i.test(c.mimeType) && /packetization-mode=1/.test(c.sdpFmtpLine || '')).sort((a, b) => perfil(a) - perfil(b));
       if (h.length) tv.setCodecPreferences([...h, ...cs.filter(c => !h.includes(c))]);
     } catch {}
@@ -2809,7 +2882,30 @@ async function recapturar() {
   statusTx('De volta no ar. Quem estava assistindo já está vendo a tela nova.', 'ok');
   if (grupo.ativo) setTimeout(() => { if (grupo.ativo && streamTx && !$('#tx').classList.contains('hidden')) { mostrar('grupo'); renderGrupo(); } }, 1200);
 }
+// avisa quem transmite quando o fps cai por causa do PC dele (uma vez por transmissão; a captura baixa de novo após 10 min)
+const avisoFpsTx = { soft: false, baixa: 0, hora: 0 };
+function avisarQuemTransmite(txt) {
+  if (grupo.ativo) msgSistema(txt); else statusTx(txt, 'aviso');
+}
+function conferirFpsTx(st, alvo) {
+  const soft = st.encoder && (tipoEncoder(st.encoder) || [])[1] === 'ruim';
+  if (!avisoFpsTx.soft && soft && PLACA.semAcel) {
+    avisoFpsTx.soft = true;
+    avisarQuemTransmite('Seu navegador está comprimindo a tela no processador, sem usar a placa de vídeo' + (PLACA.nome ? ` (${PLACA.nome})` : '') +
+      ', e por isso o fps cai. ' + (PLACA.semAcel ? 'A aceleração gráfica do navegador está DESLIGADA. ' : '') +
+      'Ligue em Configurações do navegador › Sistema › "Usar aceleração gráfica quando disponível", feche e abra o navegador. ' +
+      'No Opera GX, desligue também o limitador de CPU no GX Control. Com a placa, sai na resolução e nos 60 fps que você escolheu.');
+  }
+  // tela mexendo (taxa alta) e mesmo assim a captura saindo bem abaixo do pedido: é o PC/jogo, não tela parada
+  if (st.fpsCaptura != null && st.fpsCaptura < alvo * 0.6 && st.mbps > 3) avisoFpsTx.baixa++; else avisoFpsTx.baixa = 0;
+  if (avisoFpsTx.baixa >= 8 && Date.now() - avisoFpsTx.hora > 10 * 60e3) {
+    avisoFpsTx.hora = Date.now(); avisoFpsTx.baixa = 0;
+    avisarQuemTransmite(`Sua tela está saindo só ${st.fpsCaptura} fps (você escolheu ${alvo}). Quase sempre é o jogo usando a placa de vídeo toda e o Windows não consegue capturar a tempo: ` +
+      `limite o fps do jogo (ex.: ${alvo === 60 ? 60 : alvo}, ou uns 10% abaixo do que ele roda) e deixe o jogo em "Janela sem bordas".`);
+  }
+}
 function pararTx() {
+  avisoFpsTx.soft = false; avisoFpsTx.baixa = 0; avisoFpsTx.hora = 0;
   capturaCaiu = 0; clearTimeout(capturaTimer); capturaOpcoes = null;
   $('#aviso-captura').classList.add('hidden');
   if (salaTx) { salaTx = null; if (grupo.ativo) avisarSala(null); }
@@ -4345,7 +4441,7 @@ setInterval(async () => {
           const conn = conexoes.get(id);
           if (conn && conn.open) try {
             conn.send({ tipo: 'info', capW: vs ? vs.width : 0, capH: vs ? vs.height : 0, w: s.w, h: s.h, limite: s.limite,
-                        qualidade: qualAtual ? qualAtual.nome : '', kbps: qualAtual ? kbpsDe(qualAtual) : 0, dica: radio('dica'), encoder: (tipoEncoder(s.encoder) || [''])[0], codec: s.codec,
+                        qualidade: qualAtual ? qualAtual.nome : '', kbps: qualAtual ? kbpsDe(qualAtual) : 0, dica: radio('dica'), encoder: (tipoEncoder(s.encoder) || [''])[0], codec: s.codec, placa: PLACA.nome, semAcel: PLACA.semAcel, sup: vs ? vs.displaySurface || '' : '',
                         fps: s.fps, fpsCaptura: s.fpsCaptura, fpsAlvo: qualAtual ? qualAtual.fps : 0,
                         giro: CELULAR_TX ? +(radio('giro') || 0) : null });
           } catch {}
@@ -4363,7 +4459,7 @@ setInterval(async () => {
         const conn = conexoes.get(id);
         if (conn && conn.open) try {
           conn.send({ tipo: 'info', capW: vs ? vs.width : 0, capH: vs ? vs.height : 0, w: s.w, h: s.h, limite: s.limite,
-                      qualidade: qualAtual ? qualAtual.nome : '', kbps: qualAtual ? kbpsDe(qualAtual) : 0, dica: radio('dica'), encoder: (tipoEncoder(s.encoder) || [''])[0], codec: s.codec,
+                      qualidade: qualAtual ? qualAtual.nome : '', kbps: qualAtual ? kbpsDe(qualAtual) : 0, dica: radio('dica'), encoder: (tipoEncoder(s.encoder) || [''])[0], codec: s.codec, placa: PLACA.nome, semAcel: PLACA.semAcel, sup: vs ? vs.displaySurface || '' : '',
                       fps: s.fps, fpsCaptura: s.fpsCaptura, fpsAlvo: qualAtual ? qualAtual.fps : 0,
                       giro: CELULAR_TX ? +(radio('giro') || 0) : null });
         } catch {}
@@ -4373,6 +4469,7 @@ setInterval(async () => {
         {
           if (vs && st.w && st.w < vs.width) m.append(chip(`enviando ${st.w}×${st.h}`, 'ruim'));
           const alvo = qualAtual ? qualAtual.fps : 60;
+          conferirFpsTx(st, alvo);
           m.append(chip(`${st.fps} fps`, st.fps < alvo * 0.8 ? 'ruim' : ''), chip(`${st.mbps.toFixed(1)} Mbps`));
           // captura baixa = o PC/jogo não deixou o Windows pegar a tela a tempo (tela parada também manda menos, é normal)
           if (st.fpsCaptura != null && st.fpsCaptura < alvo * 0.8) {
@@ -4384,7 +4481,7 @@ setInterval(async () => {
           if (st.rota) m.append(chip(st.rota));
           const enc = tipoEncoder(st.encoder);
           if (enc) m.append(chip(enc[0], enc[1]));
-          if (st.codec) m.append(chip(st.codec, /vp8/i.test(st.codec) ? 'ruim' : /h265|av1/i.test(st.codec) ? 'bom' : ''));
+          if (st.codec) m.append(chip(st.codec, /h265|av1/i.test(st.codec) ? 'bom' : ''));
           if (st.limite === 'bandwidth') m.append(chip('limitado pelo upload', 'ruim'));
           if (st.limite === 'cpu') m.append(chip('limitado pelo processador', 'ruim'));
         }
@@ -4398,9 +4495,11 @@ setInterval(async () => {
         let porque = '';
         if (it && it.capW && st.w && st.w < it.capW) {
           porque = it.limite === 'bandwidth' ? 'reduzido: a internet (upload) de quem transmite não deu conta'
-                 : it.limite === 'cpu' ? 'reduzido: o PC de quem transmite não deu conta'
+                 : it.limite === 'cpu' ? 'reduzido pra manter o fps: o processador de quem transmite está no limite'
                  : 'reduzido pelo Chrome de quem transmite';
         }
+        else if (it && it.limite === 'cpu') porque = 'o processador de quem transmite está no limite'
+          + (it.encoder && /CPU/.test(it.encoder) ? ' (o navegador dele comprime sem a placa de vídeo)' : '');
         ajustarFolga(st);
         ajustarQualidadeRx(st);
         await medirSomRx(callRx.peerConnection);
@@ -4426,12 +4525,12 @@ setInterval(async () => {
         $('#stats-rx-box').textContent =
           `Modo        ${textoModo(!!callRx.__sfu)}\n` +
           `Resolução   ${st.w}×${st.h}\n` +
-          (it && it.capW ? `Tela dele   ${it.capW}×${it.capH}\n` : '') +
+          (it && it.capW ? `Tela dele   ${it.capW}×${it.capH}${it.sup === 'monitor' ? ' · tela inteira (em jogo, compartilhar a JANELA do jogo costuma dar mais fps)' : it.sup === 'window' ? ' · janela' : it.sup === 'browser' ? ' · aba' : ''}\n` : '') +
           (porque ? `Por quê      ${porque.replace('reduzido: ', '')}\n` : '') +
           (it && it.qualidade ? `Qualidade   ${it.qualidade}\n` : '') +
-          (st.codec ? `Formato     ${st.codec}${/vp8/i.test(st.codec) ? ' (antigo, sem placa de vídeo: pesa no PC dele)' : /h265|av1/i.test(st.codec) ? ' (moderno: mais imagem com menos internet)' : ''}\n` : '') +
+          (st.codec ? `Formato     ${st.codec}${/vp8/i.test(st.codec) ? ' (antigo)' : /h265|av1/i.test(st.codec) ? ' (moderno: mais imagem com menos internet)' : ''}\n` : '') +
           `FPS         ${st.fps}${it && it.fpsAlvo ? ` de ${it.fpsAlvo}` : ''}` + (it && it.fpsCaptura != null && it.fpsAlvo && it.fpsCaptura < it.fpsAlvo * 0.8
-            ? ` · a tela dele está gerando ${it.fpsCaptura} fps (normal em vídeo de 24/30 fps ou tela parada)` : '') + `\n` +
+            ? ` · a tela dele está gerando ${it.fpsCaptura} fps` + (it.limite === 'cpu' ? ' (o processador dele está no limite)' : st.mbps > 3 ? ' (o PC dele não está dando conta de capturar: jogo pesando a placa de vídeo)' : ' (normal em vídeo de 24/30 fps ou tela parada)') : '') + `\n` +
           (fpsCaiu(st, it) ? `FPS caindo  por causa d${fpsCaiu(st, it)}\n` : '') +
           `Taxa        ${st.mbps.toFixed(2)} Mbps\n` +
           `Ping        ${st.ping != null ? st.ping + ' ms' : '?'} (${st.rota || '?'})\n` +
@@ -4446,6 +4545,7 @@ setInterval(async () => {
           `Som         ${somRx.texto}\n` +
           `Descartados ${st.descartados} quadros\nDecoder     ${st.decoder || '?'}` +
           (it && it.encoder ? `\nEncoder dele ${it.encoder}` : '') +
+          (it && (it.placa || it.semAcel) ? `\nPlaca dele  ${it.semAcel ? 'nenhuma: a aceleração gráfica do navegador dele está DESLIGADA' : it.placa + (/CPU/.test(it.encoder || '') ? ' · mas o navegador dele não está usando ela pra comprimir o vídeo' : '')}` : '') +
           (it && it.dica === 'detail' ? `\nOtimizado   pra nitidez (texto): em vídeo/jogo, ele deve escolher "Movimento"` : '') +
           (it && st.mbps < 4 && (/software|CPU/i.test(it.encoder || '') || /leve/.test(it.qualidade || ''))
             ? `\nTroca cena  borra um instante: pouca taxa${/software|CPU/i.test(it.encoder || '') ? ' + encoder no processador' : ''}. Pra melhorar, ele escolhe Personalizado e sobe a taxa (ex.: 720p, 30 fps, 5 Mbps)${/software|CPU/i.test(it.encoder || '') ? ', e ativa "aceleração de hardware" nas configurações do navegador' : ''}` : '');
