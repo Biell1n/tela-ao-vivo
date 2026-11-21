@@ -713,9 +713,54 @@ html.com-fundo .bloco{background:none;-webkit-backdrop-filter:none;backdrop-filt
 @keyframes msgEntra{from{opacity:0;transform:translateY(6px)}}
 @media (prefers-reduced-motion:reduce){.chat-msgs li{animation:none}}
 
-/* aviso de versão nova do programa: o que mudou */
-.novidades{margin:2px 0 4px;padding-left:18px;display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--sub);line-height:1.45}
-.novidades:empty{display:none}
+/* aviso de versão nova do programa */
+.novo-prog{position:relative;margin:0 0 18px;padding:18px 20px 18px;border-radius:var(--r-l);overflow:hidden;
+  background:radial-gradient(420px 160px at 0% 0%,rgba(255,210,63,.10),transparent 70%),linear-gradient(180deg,var(--sup-2),var(--sup));
+  border:1px solid rgba(255,210,63,.22);box-shadow:var(--sombra);animation:novoProg .45s var(--ease) both}
+@keyframes novoProg{from{opacity:0;transform:translateY(-6px)}}
+.novo-prog-fechar{position:absolute;top:10px;right:10px;width:32px;height:32px;border-radius:9px;display:grid;place-items:center;
+  background:transparent;border:0;color:var(--fraco);cursor:pointer;transition:background .2s var(--ease),color .2s}
+.novo-prog-fechar:hover{background:var(--sup-3);color:var(--texto)}
+.novo-prog-fechar .i{width:16px;height:16px}
+.novo-prog-cab{display:flex;align-items:center;gap:13px;padding-right:34px}
+.novo-prog-icone{flex:0 0 auto;width:42px;height:42px;border-radius:12px;display:grid;place-items:center;
+  background:var(--acento-suave);border:1px solid rgba(255,210,63,.3);color:var(--acento)}
+.novo-prog-icone .i{width:20px;height:20px}
+.novo-prog-tits{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.novo-prog-etq{font:600 10.5px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--acento)}
+.novo-prog-tits h3{margin:0;font-size:16.5px;font-weight:650;letter-spacing:-.01em;color:var(--texto)}
+.novo-prog-versao{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:999px;
+  background:var(--bg-2);border:1px solid var(--linha-2);font:500 12px/1 var(--mono);color:var(--fraco)}
+.novo-prog-versao .i{width:12px;height:12px;color:var(--fraco)}
+.novo-prog-versao b{color:var(--acento);font-weight:600}
+.novo-prog-txt{margin:12px 0 0;font-size:13.5px;line-height:1.5;color:var(--sub)}
+.novo-prog-lista{margin:14px 0 0;padding:13px 14px;border-radius:var(--r-m);background:rgba(0,0,0,.18);border:1px solid var(--linha)}
+.novo-prog-rot{display:block;margin:0 0 9px;font:600 10.5px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--fraco)}
+.novo-prog-lista ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px}
+.novo-prog-lista li{position:relative;padding-left:24px;font-size:13.5px;line-height:1.45;color:var(--texto)}
+.novo-prog-lista li::before{content:"";position:absolute;left:0;top:2px;width:16px;height:16px;border-radius:5px;background:rgba(63,216,132,.14);
+  -webkit-mask:none;box-shadow:inset 0 0 0 1px rgba(63,216,132,.35)}
+.novo-prog-lista li::after{content:"";position:absolute;left:5.5px;top:5px;width:4px;height:7px;border:solid var(--ok);border-width:0 1.8px 1.8px 0;transform:rotate(42deg)}
+.novo-prog-mais{margin:10px 0 0}
+.novo-prog-mais summary{cursor:pointer;font-size:13px;color:var(--sub);list-style:none;display:inline-flex;align-items:center;gap:6px}
+.novo-prog-mais summary::-webkit-details-marker{display:none}
+.novo-prog-mais summary::before{content:"+";display:inline-grid;place-items:center;width:16px;height:16px;border-radius:5px;background:var(--sup-3);font:600 12px/1 var(--mono);color:var(--sub)}
+.novo-prog-mais[open] summary::before{content:"−"}
+.novo-prog-mais summary:hover{color:var(--texto)}
+.novo-prog-mais ul{margin-top:9px}
+.novo-prog-mais li{color:var(--sub)}
+.novo-prog-bts{display:flex;flex-wrap:wrap;gap:10px;margin:16px 0 0}
+.novo-prog-depois{background:transparent;border-color:transparent;color:var(--sub)}
+.novo-prog-depois:hover{background:var(--sup-3);color:var(--texto)}
+@media (max-width:560px){
+  .novo-prog{padding:16px}
+  .novo-prog-cab{flex-wrap:wrap;row-gap:10px}
+  .novo-prog-tits{flex:1 1 calc(100% - 60px)}
+  .novo-prog-etq{letter-spacing:.1em}
+  .novo-prog-versao{order:3;margin-left:55px}
+  .novo-prog-bts .btn{flex:1 1 auto}
+}
+@media (prefers-reduced-motion:reduce){.novo-prog{animation:none}}
 /* reações com a carinha do ícone de quem mandou */
 .reacao.com-carinha img{width:72px;height:72px;display:block}
 .chat-reagir button.com-carinha,.tile-reagir button.com-carinha{padding:0;overflow:visible}
@@ -1006,13 +1051,27 @@ html.com-fundo .bloco{background:none;-webkit-backdrop-filter:none;backdrop-filt
 
   <div class="estudio">
     <div class="config">
-      <div id="aviso-programa" class="aviso-captura hidden" role="status">
-        <b id="aviso-programa-tit">Tem versão nova do Tela ao Vivo Áudio</b>
-        <span id="aviso-programa-txt"></span>
-        <ul id="aviso-programa-novidades" class="novidades"></ul>
-        <div class="aviso-captura-bts"><button type="button" class="btn" id="bt-programa-atualizar"><svg class="i"><use href="#i-baixar"/></svg><span>Atualizar agora</span></button>
-          <button type="button" class="btn" id="bt-programa-depois"><span>Agora não</span></button></div>
-      </div>
+      <section id="aviso-programa" class="novo-prog hidden" role="status" aria-labelledby="aviso-programa-tit">
+        <button type="button" class="novo-prog-fechar" id="bt-programa-fechar" aria-label="Agora não"><svg class="i"><use href="#i-x"/></svg></button>
+        <div class="novo-prog-cab">
+          <span class="novo-prog-icone"><svg class="i"><use href="#i-baixar"/></svg></span>
+          <div class="novo-prog-tits">
+            <span class="novo-prog-etq">Atualização disponível</span>
+            <h3 id="aviso-programa-tit">Tela ao Vivo Áudio</h3>
+          </div>
+          <span class="novo-prog-versao" aria-label="versão"><span id="aviso-programa-de">1.2.0</span><svg class="i"><use href="#i-seta"/></svg><b id="aviso-programa-para">1.3.3</b></span>
+        </div>
+        <p id="aviso-programa-txt" class="novo-prog-txt"></p>
+        <div class="novo-prog-lista">
+          <span class="novo-prog-rot">O que mudou</span>
+          <ul id="aviso-programa-novidades"></ul>
+          <details id="aviso-programa-mais" class="novo-prog-mais hidden"><summary></summary><ul id="aviso-programa-antigas"></ul></details>
+        </div>
+        <div class="novo-prog-bts">
+          <button type="button" class="btn primario" id="bt-programa-atualizar"><svg class="i"><use href="#i-baixar"/></svg><span>Atualizar agora</span></button>
+          <button type="button" class="btn novo-prog-depois" id="bt-programa-depois"><span>Agora não</span></button>
+        </div>
+      </section>
       <fieldset class="bloco" id="bloco-fonte">
         <legend><span class="passo passo-1">Passo 1</span><span class="tit">O que mostrar</span></legend>
         <div class="fontes" role="radiogroup" aria-label="O que mostrar">
@@ -1031,6 +1090,7 @@ html.com-fundo .bloco{background:none;-webkit-backdrop-filter:none;backdrop-filt
         <div id="bloco-cam" class="bloco-cam">
           <label class="cam-liga" id="op-cam-junto"><input type="checkbox" id="cam-junto"><span><b>Câmera por cima da tela</b><span class="etq rec">ESTILO OBS</span>
             <small>Sua câmera num cantinho da transmissão. Depois de começar, arraste ela na prévia pra posicionar.</small></span></label>
+          <p id="nota-cam-prog" class="dica hidden">A câmera por cima da tela ainda não funciona "Pelo programa". Se quiser a câmera junto, escolha Tela inteira, Janela ou Aba.</p>
           <div id="cam-opcoes" class="cam-opcoes hidden">
             <label class="rotulo-campo" for="sel-cam">Câmera</label>
             <select id="sel-cam"><option value="">Carregando...</option></select>
@@ -1807,18 +1867,26 @@ function avisoPrograma(versao, seAtualiza, estado) {
     box.classList.add('hidden'); return;
   }
   box.classList.remove('hidden');
-  $('#aviso-programa-tit').textContent = `Tem versão nova do Tela ao Vivo Áudio (${versao} → ${versaoProgramaNova})`;
-  // o que mudou em cada versão entre a dela e a nova (a mais nova primeiro)
-  const ul = $('#aviso-programa-novidades');
-  const itens = Object.keys(novidadesPrograma).filter(v => versaoMenor(versao, v) && !versaoMenor(versaoProgramaNova, v))
-    .sort((a, b) => versaoMenor(a, b) ? 1 : -1).flatMap(v => novidadesPrograma[v] || []);
-  ul.replaceChildren(...itens.map(t => { const li = document.createElement('li'); li.textContent = t; return li; }));
-  $('#bt-programa-depois').onclick = () => { guardar.set('pularVersao', versaoProgramaNova); box.classList.add('hidden'); };
+  $('#aviso-programa-de').textContent = versao;
+  $('#aviso-programa-para').textContent = versaoProgramaNova;
+  // o que mudou: a versão mais nova aberta; as anteriores (até a dela) ficam recolhidas em "e mais N melhorias"
+  const versoes = Object.keys(novidadesPrograma).filter(v => versaoMenor(versao, v) && !versaoMenor(versaoProgramaNova, v))
+    .sort((a, b) => versaoMenor(a, b) ? 1 : -1);
+  const li = t => { const e = document.createElement('li'); e.textContent = t; return e; };
+  $('#aviso-programa-novidades').replaceChildren(...(novidadesPrograma[versoes[0]] || []).map(li));
+  const antigas = versoes.slice(1).flatMap(v => novidadesPrograma[v] || []);
+  const mais = $('#aviso-programa-mais');
+  mais.classList.toggle('hidden', !antigas.length);
+  mais.querySelector('summary').textContent = `e mais ${antigas.length} ${antigas.length === 1 ? 'melhoria' : 'melhorias'} das versões anteriores`;
+  $('#aviso-programa-antigas').replaceChildren(...antigas.map(li));
+  $('.novo-prog-lista').classList.toggle('hidden', !versoes.length);
+  const depois = () => { guardar.set('pularVersao', versaoProgramaNova); box.classList.add('hidden'); };
+  $('#bt-programa-depois').onclick = depois; $('#bt-programa-fechar').onclick = depois;
   const bt = $('#bt-programa-atualizar');
   if (seAtualiza) {
     $('#aviso-programa-txt').textContent = atualizandoDesde && Date.now() - atualizandoDesde < 60000
       ? (estado || 'Atualizando... o programa fecha e abre sozinho em alguns segundos.')
-      : (estado && /Não deu/.test(estado) ? estado : 'Se quiser atualizar, o programa baixa, troca e abre sozinho em alguns segundos. Se não, tudo continua funcionando com a sua versão.');
+      : (estado && /Não deu/.test(estado) ? estado : 'Leva só alguns segundos: o programa baixa, troca e abre sozinho. Se preferir esperar, tudo continua funcionando com a sua versão.');
     bt.querySelector('span').textContent = 'Atualizar agora';
     bt.onclick = async () => {
       atualizandoDesde = Date.now();
@@ -1829,7 +1897,7 @@ function avisoPrograma(versao, seAtualiza, estado) {
     };
   } else {
     // versão antiga, que não sabe se atualizar: baixa de novo (última vez manual)
-    $('#aviso-programa-txt').textContent = 'Se quiser atualizar: baixe a nova, feche o programa antigo (ícone perto do relógio › Sair) e abra o novo. Daqui pra frente ele se atualiza sozinho. Se não, tudo continua funcionando com a sua versão.';
+    $('#aviso-programa-txt').textContent = 'Baixe a nova, feche o programa antigo (ícone perto do relógio › Sair) e abra o novo. Esta é a última vez: daqui pra frente ele se atualiza sozinho. Se preferir esperar, tudo continua funcionando com a sua versão.';
     bt.querySelector('span').textContent = 'Baixar a versão nova';
     bt.onclick = () => { const a = document.createElement('a'); a.href = 'TelaAoVivoAudio.exe'; a.download = 'TelaAoVivoAudio.exe'; document.body.append(a); a.click(); a.remove(); };
   }
@@ -2693,10 +2761,11 @@ function cantoCam(c) {
 }
 function mostrarOpcoesCamera() {
   const fonte = radio('fonte');
-  const soCamera = fonte === 'camera';
-  const junto = !soCamera && $('#cam-junto').checked;
-  // celular e navegador sem a montagem: só "câmera" como fonte
-  $('#op-cam-junto').classList.toggle('hidden', soCamera || CELULAR_TX || !PODE_COMPOR);
+  const soCamera = fonte === 'camera', prog = fonte === 'programa';
+  const junto = !soCamera && !prog && $('#cam-junto').checked;
+  // celular e navegador sem a montagem: só "câmera" como fonte. Pelo programa: ainda não dá (o navegador não mexe na imagem)
+  $('#op-cam-junto').classList.toggle('hidden', soCamera || prog || CELULAR_TX || !PODE_COMPOR);
+  $('#nota-cam-prog').classList.toggle('hidden', !prog || CELULAR_TX || !PODE_COMPOR);
   $('#cam-opcoes').classList.toggle('hidden', !(soCamera || junto));
   $('#cam-layout').classList.toggle('hidden', soCamera);
   if ((soCamera || junto) && !camerasListadas && !$('#tx').classList.contains('hidden')) listarCameras();
