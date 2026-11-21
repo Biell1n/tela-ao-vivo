@@ -73,6 +73,10 @@ namespace TelaAoVivoAudio
         [UnmanagedFunctionPointer(CallingConvention.StdCall)] public delegate int OpenShared(IntPtr s, IntPtr handle, ref Guid iid, out IntPtr o);
         [UnmanagedFunctionPointer(CallingConvention.StdCall)] public delegate int AcquireSync(IntPtr s, ulong key, uint ms);
         [UnmanagedFunctionPointer(CallingConvention.StdCall)] public delegate int CreateQuery(IntPtr s, IntPtr desc, out IntPtr q);
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)] public delegate int PointerShape(IntPtr s, uint size, IntPtr buf, out uint req, IntPtr info);
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)] public delegate void CopyRegion(IntPtr s, IntPtr dst, uint dstSub, uint x, uint y, uint z, IntPtr src, uint srcSub, IntPtr box);
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)] public delegate int MapCtx(IntPtr s, IntPtr res, uint sub, int type, uint flags, IntPtr mapped);
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)] public delegate void UnmapCtx(IntPtr s, IntPtr res, uint sub);
         [UnmanagedFunctionPointer(CallingConvention.StdCall)] public delegate int GetData(IntPtr s, IntPtr q, IntPtr data, uint size, uint flags);
         [UnmanagedFunctionPointer(CallingConvention.StdCall)] public delegate int ReleaseSync(IntPtr s, ulong key);
     }
@@ -679,50 +683,146 @@ namespace TelaAoVivoAudio
         }
 
         // ------------------------------------------------------------------ captura (no ritmo do fps escolhido)
+        // ---- cursor: o Windows entrega a tela SEM o mouse (posição e desenho vêm à parte). A gente desenha ele por cima
+        // só no pedacinho em volta (cópia pequena -> processador -> volta), no dispositivo da captura (que fica folgado).
+        int curX, curY, curW, curH, curPitch, curTipo; bool curVisivel; byte[] curForma = new byte[0];
+        IntPtr curTex; int curTexLado;                    // imagem de leitura/escrita do pedacinho
+        IntPtr texLimpa; bool limpaSuja;                  // último quadro sem cursor (pra redesenhar quando só o mouse mexe)
+
+        void LerCursor(IntPtr info)
+        {
+            if (Marshal.ReadInt64(info, 8) != 0) // o mouse mexeu
+            {
+                curX = Marshal.ReadInt32(info, 28); curY = Marshal.ReadInt32(info, 32); curVisivel = Marshal.ReadInt32(info, 36) != 0;
+            }
+            uint tam = (uint)Marshal.ReadInt32(info, 44);
+            if (tam == 0) return;                   // o desenho do cursor não mudou
+            var buf = Marshal.AllocHGlobal((int)tam); var si = Marshal.AllocHGlobal(32);
+            try
+            {
+                uint req;
+                if (Com.F<D.PointerShape>(dup, 11)(dup, tam, buf, out req, si) < 0) return;
+                curTipo = Marshal.ReadInt32(si, 0); curW = Marshal.ReadInt32(si, 4); curH = Marshal.ReadInt32(si, 8); curPitch = Marshal.ReadInt32(si, 12);
+                curForma = new byte[req]; Marshal.Copy(buf, curForma, 0, (int)req);
+            }
+            finally { Marshal.FreeHGlobal(buf); Marshal.FreeHGlobal(si); }
+        }
+
+        void DesenharCursor(IntPtr destino)
+        {
+            if (!curVisivel || curForma.Length == 0 || curW <= 0) return;
+            int alt = curTipo == 1 ? curH / 2 : curH;   // monocromático: metade é a máscara AND, metade a XOR
+            int x0 = Math.Max(0, curX), y0 = Math.Max(0, curY), x1 = Math.Min(telaW, curX + curW), y1 = Math.Min(telaH, curY + alt);
+            if (x1 <= x0 || y1 <= y0) return;
+            int w = x1 - x0, h = y1 - y0, lado = Math.Max(w, h);
+            if (curTex == IntPtr.Zero || curTexLado < lado)
+            {
+                Com.Rel(ref curTex); curTexLado = Math.Max(64, lado);
+                var d = Marshal.AllocHGlobal(44);
+                try
+                {
+                    int[] v = { curTexLado, curTexLado, 1, 1, 87, 1, 0, 3 /*STAGING*/, 0, 0x30000 /*CPU READ|WRITE*/, 0 };
+                    Marshal.Copy(v, 0, d, 11);
+                    if (Com.F<D.CreateTex>(devCap, 5)(devCap, d, IntPtr.Zero, out curTex) < 0) { curTex = IntPtr.Zero; return; }
+                }
+                finally { Marshal.FreeHGlobal(d); }
+            }
+            var box = Marshal.AllocHGlobal(24); var map = Marshal.AllocHGlobal(16);
+            try
+            {
+                int[] bx = { x0, y0, 0, x1, y1, 1 }; Marshal.Copy(bx, 0, box, 6);
+                Com.F<D.CopyRegion>(ctxCap, 46)(ctxCap, curTex, 0, 0, 0, 0, destino, 0, box);
+                if (Com.F<D.MapCtx>(ctxCap, 14)(ctxCap, curTex, 0, 3 /*READ_WRITE*/, 0, map) < 0) return;
+                IntPtr px = Marshal.ReadIntPtr(map, 0); int pitch = Marshal.ReadInt32(map, 8);
+                var linha = new byte[w * 4];
+                for (int yy = 0; yy < h; yy++)
+                {
+                    IntPtr lp = px + yy * pitch; Marshal.Copy(lp, linha, 0, w * 4);
+                    int sy = y0 + yy - curY;
+                    for (int xx = 0; xx < w; xx++)
+                    {
+                        int sx = x0 + xx - curX, o = xx * 4;
+                        if (curTipo == 2) // colorido com transparência
+                        {
+                            int k = sy * curPitch + sx * 4; int al = curForma[k + 3];
+                            if (al == 0) continue;
+                            for (int c = 0; c < 3; c++) linha[o + c] = (byte)((curForma[k + c] * al + linha[o + c] * (255 - al)) / 255);
+                        }
+                        else if (curTipo == 4) // colorido com máscara: alfa 0 = troca a cor, 0xFF = inverte (XOR)
+                        {
+                            int k = sy * curPitch + sx * 4;
+                            if (curForma[k + 3] == 0) { linha[o] = curForma[k]; linha[o + 1] = curForma[k + 1]; linha[o + 2] = curForma[k + 2]; }
+                            else { linha[o] ^= curForma[k]; linha[o + 1] ^= curForma[k + 1]; linha[o + 2] ^= curForma[k + 2]; }
+                        }
+                        else // monocromático: AND e depois XOR, 1 bit por pixel
+                        {
+                            int bit = 0x80 >> (sx & 7);
+                            bool e = (curForma[sy * curPitch + (sx >> 3)] & bit) != 0, x = (curForma[(sy + alt) * curPitch + (sx >> 3)] & bit) != 0;
+                            for (int c = 0; c < 3; c++) { int v = e ? linha[o + c] : 0; if (x) v ^= 0xFF; linha[o + c] = (byte)v; }
+                        }
+                    }
+                    Marshal.Copy(linha, 0, lp, w * 4);
+                }
+                Com.F<D.UnmapCtx>(ctxCap, 15)(ctxCap, curTex, 0);
+                int[] bx2 = { 0, 0, 0, w, h, 1 }; Marshal.Copy(bx2, 0, box, 6);
+                Com.F<D.CopyRegion>(ctxCap, 46)(ctxCap, destino, 0, (uint)x0, (uint)y0, 0, curTex, 0, box);
+            }
+            finally { Marshal.FreeHGlobal(box); Marshal.FreeHGlobal(map); }
+        }
+
+        // ------------------------------------------------------------------ captura (no ritmo do fps escolhido)
         void Capturar()
         {
             var info = Marshal.AllocHGlobal(64);
-            var bufs = Marshal.AllocHGlobal(32);
             double proximo = 0;
+            if (texLimpa == IntPtr.Zero)
+            {
+                var d = Marshal.AllocHGlobal(44);
+                try { int[] v = { telaW, telaH, 1, 1, 87, 1, 0, 0, 0, 0, 0 }; Marshal.Copy(v, 0, d, 11); Com.F<D.CreateTex>(devCap, 5)(devCap, d, IntPtr.Zero, out texLimpa); }
+                finally { Marshal.FreeHGlobal(d); }
+            }
             try
             {
                 while (rodando)
                 {
                     double intervalo = 1000.0 / Math.Max(10, Math.Min(240, Fps));
                     IntPtr res;
-                    int hr = Com.F<D.Acquire>(dup, 8)(dup, (uint)Math.Max(1, intervalo), info, out res);
+                    int hr = Com.F<D.Acquire>(dup, 8)(dup, (uint)Math.Max(1, intervalo / 2), info, out res);
                     double agora = relogio.Elapsed.TotalMilliseconds;
                     if (hr == DXGI_ACCESS_LOST) { Thread.Sleep(50); CriarCaptura(); continue; } // trocou resolução, UAC, tela cheia...
-                    bool novo = false;
+                    bool devido = agora >= proximo - 1.5, novo = false, mudou = false;
+                    IntPtr tex = IntPtr.Zero;
                     if (hr >= 0)
                     {
-                        // só copia no ritmo pedido (monitor de 144/240 Hz entrega mais quadros que o necessário)
-                        if (Marshal.ReadInt64(info, 0) != 0 && agora >= proximo - 1.5)
-                        {
-                            IntPtr tex = Com.QI(res, G.ID3D11Texture2D);
-                            if (tex != IntPtr.Zero)
-                            {
-                                int i = (anelIdx + 1) % ANEL;
-                                // a imagem ainda está com a conversão (ela está atrasada): pula este quadro
-                                if (Volatile.Read(ref emUso[i]) == 0)
-                                {
-                                    Com.F<D.Copy>(ctxCap, 47)(ctxCap, texCap[i], tex);
-                                    EsperarCopia();
-                                    anelIdx = ultimoAnel = i; novo = true;
-                                }
-                                Com.Rel(ref tex);
-                            }
-                        }
-                        Com.Rel(ref res);
-                        Com.F<D.Int0>(dup, 14)(dup); // ReleaseFrame
+                        bool imagem = Marshal.ReadInt64(info, 0) != 0, mouse = Marshal.ReadInt64(info, 8) != 0;
+                        LerCursor(info);
+                        mudou = imagem || mouse;
+                        tex = Com.QI(res, G.ID3D11Texture2D);
+                        // ainda não é hora (monitor de 144/240 Hz entrega mais quadros): guarda a imagem pra não perder a mudança
+                        if (imagem && !devido && tex != IntPtr.Zero && texLimpa != IntPtr.Zero) { Com.F<D.Copy>(ctxCap, 47)(ctxCap, texLimpa, tex); limpaSuja = true; }
                     }
                     else if (hr != DXGI_TIMEOUT) throw new Exception("AcquireNextFrame 0x" + hr.ToString("x8"));
-                    // tela parada não manda nada (o WebRTC aguenta); mas um pedido de quadro-chave reenvia a última imagem
-                    if (!novo && pedirChave && agora >= proximo && ultimoAnel >= 0)
+
+                    bool precisa = devido && (mudou || limpaSuja || (pedirChave && ultimoAnel >= 0));
+                    if (precisa)
                     {
-                        // tela parada e alguém pediu quadro completo: reenvia a última imagem (se ela estiver livre)
-                        if (Volatile.Read(ref emUso[ultimoAnel]) == 0) { anelIdx = ultimoAnel; novo = true; }
+                        int i = (anelIdx + 1) % ANEL;
+                        if (Volatile.Read(ref emUso[i]) == 0) // a imagem ainda está com a conversão: pula este quadro
+                        {
+                            IntPtr fonte = tex != IntPtr.Zero ? tex : texLimpa;
+                            if (fonte != IntPtr.Zero)
+                            {
+                                Com.F<D.Copy>(ctxCap, 47)(ctxCap, texCap[i], fonte);
+                                if (tex != IntPtr.Zero && texLimpa != IntPtr.Zero && fonte == tex) limpaSuja = false;
+                                if (fonte == texLimpa) limpaSuja = false;
+                                DesenharCursor(texCap[i]);
+                                EsperarCopia();
+                                anelIdx = ultimoAnel = i; novo = true;
+                            }
+                        }
                     }
+                    if (tex != IntPtr.Zero) Com.Rel(ref tex);
+                    if (hr >= 0) { Com.Rel(ref res); Com.F<D.Int0>(dup, 14)(dup); } // ReleaseFrame
                     if (!novo) { Estatistica(); continue; }
                     proximo = Math.Max(proximo + intervalo, agora + intervalo * 0.5);
                     Interlocked.Increment(ref contCap);
@@ -731,7 +831,7 @@ namespace TelaAoVivoAudio
                     Estatistica();
                 }
             }
-            finally { Marshal.FreeHGlobal(info); Marshal.FreeHGlobal(bufs); }
+            finally { Marshal.FreeHGlobal(info); }
         }
 
         void Converter(IntPtr bufs, long tempo100ns, IntPtr imagem)
@@ -834,7 +934,7 @@ namespace TelaAoVivoAudio
             for (int i = 0; i < poolNv12.Length; i++) Com.Rel(ref poolNv12[i]);
             for (int i = 0; i < poolBgra.Length; i++) Com.Rel(ref poolBgra[i]);
             for (int i = 0; i < ANEL; i++) { Com.Rel(ref texEnc[i]); Com.Rel(ref texCap[i]); emUso[i] = 0; }
-            Com.Rel(ref consulta);
+            Com.Rel(ref consulta); Com.Rel(ref curTex); Com.Rel(ref texLimpa); curTexLado = 0; limpaSuja = false;
             long[] lixo; while (filaConv.TryTake(out lixo)) { }
             Com.Rel(ref copia); Com.Rel(ref dup); Com.Rel(ref mgr); Com.Rel(ref ctx); Com.Rel(ref dev); Com.Rel(ref ctxCap); Com.Rel(ref devCap);
             precisaEntrada = 0;

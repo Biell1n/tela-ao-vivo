@@ -1,4 +1,8 @@
 {
+  "1.3.3": [
+    "O cursor do mouse agora aparece na captura \"Pelo programa\".",
+    "Quem transmite pelo programa vê a própria imagem na prévia (antes aparecia só um aviso)."
+  ],
   "1.3.2": [
     "Corrige a atualização automática: depois de atualizar, o programa já volta funcionando, sem precisar fechar e abrir de novo."
   ],

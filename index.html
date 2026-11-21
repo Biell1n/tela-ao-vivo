@@ -1755,7 +1755,7 @@ async function testarEncoder(track) {
 // troca cada quadro comprimido pelo quadro pronto do programa (RTCRtpScriptTransform). O navegador não captura
 // nem comprime de verdade: quem assiste recebe o H.264 do programa.
 const PV = { ativo: false, ws: null, gen: null, escritor: null, worker: null, oc: null, n: 0, estado: null, w: 0, h: 0,
-             taxa: 0, ids: 0, timer: 0, versao: '', visto: 0, ox: null, ruidos: [], ruido: true, url: '', gens: [], ultimoWorker: null };
+             taxa: 0, ids: 0, timer: 0, versao: '', visto: 0, ox: null, ruidos: [], ruido: true, url: '', gens: [], dec: null, decChave: false };
 // Regra de ouro: NUNCA descartar quadro na troca. Cada quadro descartado aqui faz o compressor do navegador ir
 // travando até parar de vez (com uma pessoa nova entrando, quem já estava parava). Então:
 //  - quem acabou de entrar só recebe quadros a partir do próximo quadro completo (nada pra descartar);
@@ -1890,11 +1890,32 @@ function pvMensagem(d) {
   if (PV.ruido && PV.ruidos.length) PV.ox.putImageData(PV.ruidos[PV.n % PV.ruidos.length], 0, 0);
   let vf; try { vf = new VideoFrame(PV.oc, { timestamp: us }); } catch { return; }
   for (const g of PV.gens) {
+    if (g.principal && PV.dec) continue; // a da prévia recebe a imagem de verdade (abaixo)
     if (!g.pronto) { if (!chave) continue; g.pronto = true; } // envio novo começa num quadro completo
-    if (g.worker) g.worker.postMessage({ tipo: 'quadro', chave, dados: g.worker === PV.ultimoWorker ? dados : dados.slice(0) });
+    if (g.worker) g.worker.postMessage({ tipo: 'quadro', chave, dados: dados.slice(0) });
     try { g.escritor.write(vf.clone()).catch(() => {}); } catch {}
   }
   vf.close();
+  pvPrevia(chave, us, dados);
+}
+// Prévia de verdade: descomprime o vídeo do programa (na placa, é leve) e põe na faixa da prévia e da própria tela no grupo.
+// Quem assiste não passa por aqui (recebe direto do programa).
+function pvPrevia(chave, us, dados) {
+  if (!('VideoDecoder' in window)) return;
+  if (!PV.dec) {
+    try {
+      PV.dec = new VideoDecoder({
+        output: f => { const g = PV.gens.find(x => x.principal); if (g) g.escritor.write(f).catch(() => {}); else f.close(); },
+        error: () => { try { PV.dec.close(); } catch {} PV.dec = null; PV.decChave = false; pvEnviar({ tipo: 'chave' }); },
+      });
+      PV.dec.configure({ codec: 'avc1.640033', optimizeForLatency: true, hardwareAcceleration: 'prefer-hardware' });
+      PV.decChave = false;
+    } catch { PV.dec = null; return; }
+  }
+  if (!PV.decChave) { if (!chave) return; PV.decChave = true; }
+  // atrasou (o PC está ocupado): pula pra o próximo quadro completo, a prévia não precisa de todos
+  if (PV.dec.decodeQueueSize > 6) { try { PV.dec.reset(); PV.dec.configure({ codec: 'avc1.640033', optimizeForLatency: true, hardwareAcceleration: 'prefer-hardware' }); } catch {} PV.decChave = false; return; }
+  try { PV.dec.decode(new EncodedVideoChunk({ type: chave ? 'key' : 'delta', timestamp: us, data: dados })); } catch { PV.decChave = false; }
 }
 async function pvIniciar() {
   if (!pvSuportado()) throw new Error('este navegador não tem o que precisa (use Chrome ou Edge atualizado no PC)');
@@ -1923,6 +1944,7 @@ function pvParar() {
   PV.ativo = false; clearTimeout(PV.timer);
   const ws = PV.ws; PV.ws = null;
   try { ws && ws.close(); } catch {}
+  try { PV.dec && PV.dec.close(); } catch {} PV.dec = null;
   for (const g of PV.gens.splice(0)) { try { g.escritor.close().catch(() => {}); } catch {} try { g.gen.stop(); } catch {} if (g.worker) try { g.worker.terminate(); } catch {} }
   PV.escritor = null; PV.gen = null; PV.estado = null; PV.n = 0;
 }
@@ -1941,7 +1963,7 @@ function pvCaiu() {
 function pvNovaFaixa(principal) {
   const gen = new MediaStreamTrackGenerator({ kind: 'video' });
   try { gen.contentHint = 'motion'; } catch {}
-  PV.gens.push({ gen, escritor: gen.writable.getWriter(), pronto: !!principal, worker: null });
+  PV.gens.push({ gen, escritor: gen.writable.getWriter(), pronto: !!principal, worker: null, principal: !!principal });
   if (!principal) pvEnviar({ tipo: 'chave' }); // alguém novo: já pede o quadro completo pra ele começar logo
   return gen;
 }
