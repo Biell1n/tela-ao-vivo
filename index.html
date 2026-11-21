@@ -2163,6 +2163,7 @@ function progDesenharLista() {
   let nota = '';
   if (prog.erro) nota = 'O Windows recusou capturar um dos apps (' + prog.erro + '). Tente fechar e abrir o programa.';
   else if (tudo && prog.versao && prog.versao < '1.1') nota = 'Seu programa é antigo e não tem "Tudo do PC". Baixe de novo (link abaixo), feche o antigo e abra o novo.';
+  else if (prog.versao && prog.versao < '1.2') nota = 'Tem versão nova do programa: ela mostra pra quem assiste o uso da sua placa de vídeo e do processador (pra achar o que derruba o fps). Baixe de novo (link abaixo), feche o antigo e abra o novo.';
   else if (tudo) nota = 'Vai tudo que tocar no PC, inclusive a call do Discord. Use fone pra não dar eco.';
   else if (excluir && !tudo && !prog.discordAberto) nota = 'O Discord está fechado agora. Quando abrir, ele já fica de fora sozinho.';
   else if (excluir) nota = 'Vai tudo que tocar no PC, menos o Discord. Discord aberto pelo navegador (discord.com) não dá pra separar: use o app.';

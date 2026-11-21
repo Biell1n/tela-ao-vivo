@@ -253,13 +253,13 @@ namespace TelaAoVivoAudio
 
         void EnviarTexto(Cliente c, string s) { c.Enviar(Quadro(1, Encoding.UTF8.GetBytes(s))); }
 
-        // a cada 2 s, com o site conectado: uso do processador e da placa de vídeo (pra estatística de quem assiste)
+        // a cada 3 s, com o site conectado: uso do processador e da placa de vídeo (pra estatística de quem assiste)
         void LacoDesempenho()
         {
             var d = new Desempenho();
             while (!parar)
             {
-                Thread.Sleep(2000);
+                Thread.Sleep(3000);
                 if (Clientes == 0) continue;
                 d.Medir();
                 if (d.Cpu < 0 && d.Gpu < 0) continue;

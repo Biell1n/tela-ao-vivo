@@ -4,18 +4,19 @@
 //          capturar a tela a tempo.
 //  - enc = o motor de compressão de vídeo da placa (NVENC/AMF/QuickSync). Acima de 0 = alguém está comprimindo
 //          vídeo pela placa (o navegador, quando a aceleração está funcionando).
+// Leve de propósito (não pode tirar desempenho do jogo): UMA leitura da categoria inteira por vez, a cada 3 s,
+// numa thread de prioridade baixa.
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 
 namespace TelaAoVivoAudio
 {
     class Desempenho
     {
         PerformanceCounter cpu;
-        readonly Dictionary<string, PerformanceCounter> motores = new Dictionary<string, PerformanceCounter>();
         PerformanceCounterCategory categoria;
+        Dictionary<string, CounterSample> antes = new Dictionary<string, CounterSample>();
         public int Cpu = -1, Gpu = -1, Enc = -1;
 
         public void Medir()
@@ -29,32 +30,34 @@ namespace TelaAoVivoAudio
             try
             {
                 if (categoria == null) categoria = new PerformanceCounterCategory("GPU Engine");
-                var nomes = categoria.GetInstanceNames().Where(n => n.EndsWith("engtype_3D") || n.EndsWith("engtype_VideoEncode")).ToArray();
-                var vivos = new HashSet<string>(nomes);
-                foreach (var velho in motores.Keys.Where(k => !vivos.Contains(k)).ToList()) { motores[velho].Dispose(); motores.Remove(velho); }
+                var dados = categoria.ReadCategory()["Utilization Percentage"];
+                var agora = new Dictionary<string, CounterSample>();
                 var soma3d = new Dictionary<string, float>(); var somaEnc = new Dictionary<string, float>();
-                foreach (var n in nomes)
+                foreach (InstanceData inst in dados.Values)
                 {
-                    PerformanceCounter pc;
-                    if (!motores.TryGetValue(n, out pc))
-                    {
-                        pc = new PerformanceCounter("GPU Engine", "Utilization Percentage", n, true);
-                        motores[n] = pc; pc.NextValue(); continue; // a 1ª leitura é sempre 0
-                    }
-                    float v;
-                    try { v = pc.NextValue(); } catch { continue; }
+                    string n = inst.InstanceName;
+                    bool e3d = n.EndsWith("engtype_3D"), enc = n.EndsWith("engtype_VideoEncode");
+                    if (!e3d && !enc) continue;
+                    agora[n] = inst.Sample;
+                    CounterSample velho;
+                    if (!antes.TryGetValue(n, out velho)) continue; // processo novo: conta na próxima
+                    float v = CounterSample.Calculate(velho, inst.Sample);
                     // "pid_123_luid_0x0_0xABCD_phys_0_eng_0_engtype_3D": soma por placa (luid) e por motor (eng)
-                    int a = n.IndexOf("luid_"), b = n.IndexOf("_phys_");
-                    int e = n.IndexOf("_eng_"), f = n.IndexOf("_engtype_");
+                    int a = n.IndexOf("luid_"), b = n.IndexOf("_phys_"), e = n.IndexOf("_eng_"), f = n.IndexOf("_engtype_");
                     if (a < 0 || b < 0 || e < 0 || f < 0) continue;
                     string chave = n.Substring(a, b - a) + n.Substring(e, f - e);
-                    var alvo = n.EndsWith("engtype_3D") ? soma3d : somaEnc;
+                    var alvo = e3d ? soma3d : somaEnc;
                     float s; alvo.TryGetValue(chave, out s); alvo[chave] = s + v;
                 }
-                Gpu = soma3d.Count > 0 ? (int)Math.Round(Math.Min(100, soma3d.Values.Max())) : 0;
-                Enc = somaEnc.Count > 0 ? (int)Math.Round(Math.Min(100, somaEnc.Values.Max())) : 0;
+                bool primeira = antes.Count == 0;
+                antes = agora;
+                if (primeira) return;
+                Gpu = (int)Math.Round(Math.Min(100, Maior(soma3d)));
+                Enc = (int)Math.Round(Math.Min(100, Maior(somaEnc)));
             }
             catch { Gpu = -1; Enc = -1; }
         }
+
+        static float Maior(Dictionary<string, float> d) { float m = 0; foreach (var v in d.Values) if (v > m) m = v; return m; }
     }
 }
