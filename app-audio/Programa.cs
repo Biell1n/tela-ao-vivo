@@ -10,14 +10,14 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("Tela ao Vivo Áudio")]
 [assembly: AssemblyProduct("Tela ao Vivo Áudio")]
 [assembly: AssemblyDescription("Manda pro site Tela ao Vivo o som do PC sem o Discord, ou só dos apps escolhidos.")]
-[assembly: AssemblyVersion("1.3.1.0")]
-[assembly: AssemblyFileVersion("1.3.1.0")]
+[assembly: AssemblyVersion("1.3.2.0")]
+[assembly: AssemblyFileVersion("1.3.2.0")]
 
 namespace TelaAoVivoAudio
 {
     static class Programa
     {
-        public const string Versao = "1.3.1";
+        public const string Versao = "1.3.2";
         public const string Site = "https://tela-ao-vivo.vercel.app/";
         public static bool WindowsSuporta;
         public static bool NaBandeja;
@@ -35,6 +35,17 @@ namespace TelaAoVivoAudio
         {
             Atualizador.DepoisDeAtualizar(args); // se veio de uma atualização: espera o antigo fechar
             NaBandeja = args.Contains("--bandeja");
+            // veio de uma atualização: se reabre uma vez "limpo". O 1.3.0 abria a versão nova herdando a porta
+            // do antigo (e aí o som/vídeo não conectavam até fechar e abrir de novo).
+            if (args.Contains("--esperar") && !args.Contains("--limpo"))
+            {
+                try
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Application.ExecutablePath, "--limpo --esperar " + System.Diagnostics.Process.GetCurrentProcess().Id + (NaBandeja ? " --bandeja" : "")) { UseShellExecute = true });
+                    return;
+                }
+                catch { }
+            }
             bool novo;
             using (var unico = new Mutex(true, "TelaAoVivoAudio-1", out novo))
             {

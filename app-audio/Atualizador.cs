@@ -85,7 +85,9 @@ namespace TelaAoVivoAudio
                 novo = null;
                 Estado = "Atualizado pra " + versao + ". Reabrindo...";
                 bool bandeja = Programa.NaBandeja;
-                Process.Start(new ProcessStartInfo(exe, "--esperar " + Process.GetCurrentProcess().Id + (bandeja ? " --bandeja" : "")) { UseShellExecute = false });
+                // fecha as conexões ANTES (senão o novo herda a porta presa) e abre o novo "limpo" (sem herdar nada)
+                try { motor.Parar(); } catch { }
+                Process.Start(new ProcessStartInfo(exe, "--esperar " + Process.GetCurrentProcess().Id + (bandeja ? " --bandeja" : "")) { UseShellExecute = true });
                 Programa.Sair();
             }
             catch (Exception e)
