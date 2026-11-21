@@ -9,5 +9,5 @@ FW='C:\Windows\Microsoft.NET\Framework64\v4.0.30319'
   -win32icon:icone.ico -win32manifest:app.manifest -out:../TelaAoVivoAudio.exe \
   -r:"$FW\\mscorlib.dll" -r:"$FW\\System.dll" -r:"$FW\\System.Core.dll" -r:"$FW\\System.Drawing.dll" \
   -r:"$FW\\System.Windows.Forms.dll" -r:"$FW\\System.Web.Extensions.dll" \
-  Programa.cs Audio.cs Motor.cs Janela.cs
+  Programa.cs Audio.cs Motor.cs Janela.cs Desempenho.cs
 ls -la ../TelaAoVivoAudio.exe

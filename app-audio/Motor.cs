@@ -80,6 +80,7 @@ namespace TelaAoVivoAudio
             s.SetApartmentState(ApartmentState.MTA);
             s.Start();
             new Thread(LacoMixer) { IsBackground = true, Name = "mixer", Priority = ThreadPriority.AboveNormal }.Start();
+            new Thread(LacoDesempenho) { IsBackground = true, Name = "desempenho", Priority = ThreadPriority.BelowNormal }.Start();
         }
 
         public void Parar()
@@ -251,6 +252,21 @@ namespace TelaAoVivoAudio
         }
 
         void EnviarTexto(Cliente c, string s) { c.Enviar(Quadro(1, Encoding.UTF8.GetBytes(s))); }
+
+        // a cada 2 s, com o site conectado: uso do processador e da placa de vídeo (pra estatística de quem assiste)
+        void LacoDesempenho()
+        {
+            var d = new Desempenho();
+            while (!parar)
+            {
+                Thread.Sleep(2000);
+                if (Clientes == 0) continue;
+                d.Medir();
+                if (d.Cpu < 0 && d.Gpu < 0) continue;
+                var txt = json.Serialize(new Dictionary<string, object> { { "tipo", "desempenho" }, { "cpu", d.Cpu }, { "gpu", d.Gpu }, { "enc", d.Enc } });
+                lock (clientes) foreach (var c in clientes) EnviarTexto(c, txt);
+            }
+        }
 
         void Escrever(Cliente c)
         {

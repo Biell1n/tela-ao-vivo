@@ -2092,6 +2092,7 @@ function progProcurar() {
     if (typeof e.data !== 'string') { if (prog.no) prog.no.port.postMessage(e.data, [e.data]); return; }
     let m; try { m = JSON.parse(e.data); } catch { return; }
     if (m.tipo === 'ola') { prog.versao = m.versao || ''; progDesenharLista(); return; }
+    if (m.tipo === 'desempenho') { prog.desempenho = { cpu: +m.cpu, gpu: +m.gpu, enc: +m.enc, t: Date.now() }; return; }
     if (m.tipo !== 'apps') return;
     for (const a of m.lista) if (a.icone) prog.icones[a.exe] = a.icone;
     prog.apps = m.lista.filter(a => !ESCONDER_APPS.test(a.exe));
@@ -2884,6 +2885,8 @@ async function recapturar() {
 }
 // avisa quem transmite quando o fps cai por causa do PC dele (uma vez por transmissão; a captura baixa de novo após 10 min)
 const avisoFpsTx = { soft: false, baixa: 0, hora: 0 };
+// uso do PC de quem transmite (vem do programa Tela ao Vivo Áudio; some se ele fechar)
+const desempenhoPC = () => prog.desempenho && Date.now() - prog.desempenho.t < 7000 ? prog.desempenho : null;
 function avisarQuemTransmite(txt) {
   if (grupo.ativo) msgSistema(txt); else statusTx(txt, 'aviso');
 }
@@ -4441,7 +4444,7 @@ setInterval(async () => {
           const conn = conexoes.get(id);
           if (conn && conn.open) try {
             conn.send({ tipo: 'info', capW: vs ? vs.width : 0, capH: vs ? vs.height : 0, w: s.w, h: s.h, limite: s.limite,
-                        qualidade: qualAtual ? qualAtual.nome : '', kbps: qualAtual ? kbpsDe(qualAtual) : 0, dica: radio('dica'), encoder: (tipoEncoder(s.encoder) || [''])[0], codec: s.codec, placa: PLACA.nome, semAcel: PLACA.semAcel, sup: vs ? vs.displaySurface || '' : '',
+                        qualidade: qualAtual ? qualAtual.nome : '', kbps: qualAtual ? kbpsDe(qualAtual) : 0, dica: radio('dica'), encoder: (tipoEncoder(s.encoder) || [''])[0], codec: s.codec, placa: PLACA.nome, semAcel: PLACA.semAcel, sup: vs ? vs.displaySurface || '' : '', pc: desempenhoPC(),
                         fps: s.fps, fpsCaptura: s.fpsCaptura, fpsAlvo: qualAtual ? qualAtual.fps : 0,
                         giro: CELULAR_TX ? +(radio('giro') || 0) : null });
           } catch {}
@@ -4459,7 +4462,7 @@ setInterval(async () => {
         const conn = conexoes.get(id);
         if (conn && conn.open) try {
           conn.send({ tipo: 'info', capW: vs ? vs.width : 0, capH: vs ? vs.height : 0, w: s.w, h: s.h, limite: s.limite,
-                      qualidade: qualAtual ? qualAtual.nome : '', kbps: qualAtual ? kbpsDe(qualAtual) : 0, dica: radio('dica'), encoder: (tipoEncoder(s.encoder) || [''])[0], codec: s.codec, placa: PLACA.nome, semAcel: PLACA.semAcel, sup: vs ? vs.displaySurface || '' : '',
+                      qualidade: qualAtual ? qualAtual.nome : '', kbps: qualAtual ? kbpsDe(qualAtual) : 0, dica: radio('dica'), encoder: (tipoEncoder(s.encoder) || [''])[0], codec: s.codec, placa: PLACA.nome, semAcel: PLACA.semAcel, sup: vs ? vs.displaySurface || '' : '', pc: desempenhoPC(),
                       fps: s.fps, fpsCaptura: s.fpsCaptura, fpsAlvo: qualAtual ? qualAtual.fps : 0,
                       giro: CELULAR_TX ? +(radio('giro') || 0) : null });
         } catch {}
@@ -4477,6 +4480,9 @@ setInterval(async () => {
             c.title = 'O Windows entregou menos quadros da tela. Se for tela parada é normal; em jogo, veja as dicas de fps.';
             m.append(c);
           }
+          const pc = desempenhoPC();
+          if (pc && pc.gpu >= 0) { const c = chip(`placa ${pc.gpu}%`, pc.gpu >= 95 ? 'ruim' : ''); c.title = 'Uso da placa de vídeo (motor 3D, o que o jogo usa). Perto de 100%, o Windows não consegue capturar a tela a tempo e o fps cai: limite o fps do jogo uns 10% abaixo do que ele roda.'; m.append(c); }
+          if (pc && pc.cpu >= 0) m.append(chip(`CPU ${pc.cpu}%`, pc.cpu >= 95 ? 'ruim' : ''));
           if (st.ping != null) m.append(chip(`${st.ping} ms`, st.ping > 120 ? 'ruim' : ''));
           if (st.rota) m.append(chip(st.rota));
           const enc = tipoEncoder(st.encoder);
@@ -4545,6 +4551,7 @@ setInterval(async () => {
           `Som         ${somRx.texto}\n` +
           `Descartados ${st.descartados} quadros\nDecoder     ${st.decoder || '?'}` +
           (it && it.encoder ? `\nEncoder dele ${it.encoder}` : '') +
+          (it && it.pc ? `\nPC dele     processador ${it.pc.cpu}% · placa ${it.pc.gpu}%${it.pc.gpu >= 95 ? ' (NO LIMITE: o jogo usa a placa toda e o Windows não consegue capturar a tela a tempo)' : ''}${it.pc.enc > 0 ? ` · compressão na placa ${it.pc.enc}%` : ''}${it.pc.cpu >= 95 ? ' · processador no limite' : ''}` : '') +
           (it && (it.placa || it.semAcel) ? `\nPlaca dele  ${it.semAcel ? 'nenhuma: a aceleração gráfica do navegador dele está DESLIGADA' : it.placa + (/CPU/.test(it.encoder || '') ? ' · mas o navegador dele não está usando ela pra comprimir o vídeo' : '')}` : '') +
           (it && it.dica === 'detail' ? `\nOtimizado   pra nitidez (texto): em vídeo/jogo, ele deve escolher "Movimento"` : '') +
           (it && st.mbps < 4 && (/software|CPU/i.test(it.encoder || '') || /leve/.test(it.qualidade || ''))

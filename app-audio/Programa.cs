@@ -17,7 +17,7 @@ namespace TelaAoVivoAudio
 {
     static class Programa
     {
-        public const string Versao = "1.1.0";
+        public const string Versao = "1.2.0";
         public const string Site = "https://tela-ao-vivo.vercel.app/";
         public static bool WindowsSuporta;
 
