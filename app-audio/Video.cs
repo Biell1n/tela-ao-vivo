@@ -123,6 +123,7 @@ namespace TelaAoVivoAudio
         public static readonly Guid GopSize = new Guid("95f31b26-95a4-41aa-9303-246a7fc6eef1");
         public static readonly Guid BFrames = new Guid("8d390aac-dc5c-4200-b57f-814d04babab2");
         public static readonly Guid ForceKey = new Guid("398c1b98-8353-475a-9ef2-8f265d260345");
+        public static readonly Guid MaxKeySpacing = new Guid("c16eb52b-73a1-476f-8d62-839d6a020652"); // MF_MT_MAX_KEYFRAME_SPACING
     }
 
     class Video
@@ -170,7 +171,7 @@ namespace TelaAoVivoAudio
         public volatile int Capturados, Enviados;   // por segundo (pra estatística)
         public volatile int VpFlags;
         public int nPede, nSaida, nEntrega, nRecusa, nEventoOutro, nVpOk, nVpFalha, nVpRecusa, nVpIncompleto; public volatile string UltimoHr = "", UltimoVp = "";
-        public string Dbg { get { return "pede " + nPede + " saída " + nSaida + " entregas " + nEntrega + " recusas " + nRecusa + " outros " + nEventoOutro + " hr " + UltimoHr + " | vp ok " + nVpOk + " falha " + nVpFalha + " recusa " + nVpRecusa + " incompleto " + nVpIncompleto + " " + UltimoVp + " | " + Tamanhos + " | caminho " + Caminho + " | aceita " + EntradasAceitas + " | " + Tempos + " | prioridade " + ClasseAtual + " | etapa " + Etapa; } }
+        public string Dbg { get { return "pede " + nPede + " saída " + nSaida + " entregas " + nEntrega + " recusas " + nRecusa + " outros " + nEventoOutro + " hr " + UltimoHr + " | vp ok " + nVpOk + " falha " + nVpFalha + " recusa " + nVpRecusa + " incompleto " + nVpIncompleto + " " + UltimoVp + " | " + Tamanhos + " | caminho " + Caminho + " | aceita " + EntradasAceitas + " | " + Tempos + " | prioridade " + ClasseAtual + " | gop " + Gop + " | etapa " + Etapa; } }
 
         Thread laco; volatile bool rodando; volatile bool pedirChave; volatile int novaTaxa;
         IntPtr dev, ctx, mgr; uint token;
@@ -549,6 +550,10 @@ namespace TelaAoVivoAudio
             try { Guid k = G.AsyncUnlock; Com.Ok(Com.F<D.SetU32>(attrs, 21)(attrs, ref k, 1), "ASYNC_UNLOCK"); }
             finally { Com.Rel(ref attrs); }
             Com.Ok(Com.F<D.ProcMsg>(t, 23)(t, 2 /*SET_D3D_MANAGER*/, mgr), "encoder d3d");
+            // opções do compressor ANTES do tipo de saída: algumas placas só respeitam o intervalo de quadro-chave assim
+            // (sem isso a NVIDIA soltava um quadro completo por segundo: pisca e pesa na rede)
+            codec = Com.QI(t, G.ICodecAPI);
+            if (codec != IntPtr.Zero) OpcoesEncoder(fps);
             // saída H.264: High; se não aceitar, Main; depois Baseline
             int hr = -1;
             foreach (uint perfil in new uint[] { 100, 77, 66 })
@@ -558,6 +563,7 @@ namespace TelaAoVivoAudio
                 {
                     Guid k = G.AvgBitrate; Com.F<D.SetU32>(to, 21)(to, ref k, (uint)Kbps * 1000);
                     k = G.Profile; Com.F<D.SetU32>(to, 21)(to, ref k, perfil);
+                    k = G.MaxKeySpacing; Com.F<D.SetU32>(to, 21)(to, ref k, (uint)(fps * 8));
                     Cor709(to, true);
                     hr = Com.F<D.SetType>(t, 16)(t, 0, to, 0);
                 }
@@ -596,15 +602,8 @@ namespace TelaAoVivoAudio
             try { Com.Ok(Com.F<D.SetType>(t, 15)(t, 0, ti, 0), argb ? "tipo de entrada BGRA" : "tipo de entrada NV12"); }
             finally { Com.Rel(ref ti); }
 
-            codec = Com.QI(t, G.ICodecAPI);
-            if (codec != IntPtr.Zero)
-            {
-                SetBool(G.LowLatency, true);
-                SetU32(G.BFrames, 0);
-                SetU32(G.RateControl, 0); // CBR: taxa estável (o WebRTC gosta)
-                SetU32(G.MeanBitRate, (uint)Kbps * 1000);
-                SetU32(G.GopSize, (uint)(fps * 8)); // quadro-chave a cada 8 s, e na hora quando alguém pede
-            }
+            if (codec == IntPtr.Zero) codec = Com.QI(t, G.ICodecAPI);
+            if (codec != IntPtr.Zero) { OpcoesEncoder(fps); Gop = "pediu " + (fps * 8) + " (resp " + gopHr.ToString("x") + ") lido " + LerU32(G.GopSize); }
             // SPS/PPS (vão na frente de cada quadro-chave)
             IntPtr cur;
             if (Com.F<D.CurType>(t, 18)(t, 0, out cur) >= 0)
@@ -636,10 +635,26 @@ namespace TelaAoVivoAudio
             return hr < 0 ? "?" : (tam >> 32) + "x" + (tam & 0xffffffff);
         }
 
-        void SetU32(Guid api, uint v)
+        public volatile string Gop = "";
+        int gopHr;
+        void OpcoesEncoder(int fps)
+        {
+            SetBool(G.LowLatency, true);
+            SetU32(G.BFrames, 0);
+            SetU32(G.RateControl, 0); // CBR: taxa estável (o WebRTC gosta)
+            SetU32(G.MeanBitRate, (uint)Kbps * 1000);
+            gopHr = SetU32(G.GopSize, (uint)(fps * 8)); // quadro-chave a cada 8 s, e na hora quando alguém pede
+        }
+        int SetU32(Guid api, uint v)
         {
             var var = Marshal.AllocHGlobal(24);
-            try { for (int i = 0; i < 24; i += 4) Marshal.WriteInt32(var, i, 0); Marshal.WriteInt16(var, 0, 19 /*VT_UI4*/); Marshal.WriteInt32(var, 8, (int)v); Com.F<D.CodecSet>(codec, 9)(codec, ref api, var); }
+            try { for (int i = 0; i < 24; i += 4) Marshal.WriteInt32(var, i, 0); Marshal.WriteInt16(var, 0, 19 /*VT_UI4*/); Marshal.WriteInt32(var, 8, (int)v); return Com.F<D.CodecSet>(codec, 9)(codec, ref api, var); }
+            finally { Marshal.FreeHGlobal(var); }
+        }
+        string LerU32(Guid api)
+        {
+            var var = Marshal.AllocHGlobal(24);
+            try { for (int i = 0; i < 24; i += 4) Marshal.WriteInt32(var, i, 0); int hr = Com.F<D.CodecSet>(codec, 8)(codec, ref api, var); return hr < 0 ? "erro " + hr.ToString("x") : Marshal.ReadInt32(var, 8).ToString(); }
             finally { Marshal.FreeHGlobal(var); }
         }
         void SetBool(Guid api, bool v)

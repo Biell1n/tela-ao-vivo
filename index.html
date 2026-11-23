@@ -639,12 +639,6 @@ html.com-fundo .bloco{background:none;-webkit-backdrop-filter:none;backdrop-filt
 .nl-sinal i:nth-child(1){height:4px}.nl-sinal i:nth-child(2){height:6px}.nl-sinal i:nth-child(3){height:8px}.nl-sinal i:nth-child(4){height:11px}
 .nl-sinal[data-n="1"] i:nth-child(-n+1),.nl-sinal[data-n="2"] i:nth-child(-n+2),.nl-sinal[data-n="3"] i:nth-child(-n+3),.nl-sinal[data-n="4"] i:nth-child(-n+4){background:var(--sub)}
 .op-l input:checked~.nl-spec .nl-sinal i[style],.op-l:has(input:checked) .nl-sinal[data-n="1"] i:nth-child(-n+1),.op-l:has(input:checked) .nl-sinal[data-n="2"] i:nth-child(-n+2),.op-l:has(input:checked) .nl-sinal[data-n="3"] i:nth-child(-n+3),.op-l:has(input:checked) .nl-sinal[data-n="4"] i:nth-child(-n+4){background:var(--acento)}
-.qual-avancado{margin-top:10px}
-.qual-avancado>summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--sub);padding:4px 0}
-.qual-avancado>summary::-webkit-details-marker{display:none}
-.qual-avancado>summary::before{content:"+";font:600 14px/1 var(--mono);color:var(--fraco);width:14px}
-.qual-avancado[open]>summary::before{content:"−"}
-.qual-avancado .lista-audio{margin-top:8px}
 .qual-prioridade{margin-top:16px}
 @media (max-width:520px){.nl-spec{display:none}.bloco legend .tit{font-size:19px}}
 /* página inicial: rótulo de quem faz o quê, no mesmo estilo dos passos */
@@ -1263,9 +1257,6 @@ html.com-fundo .bloco{background:none;-webkit-backdrop-filter:none;backdrop-filt
       <fieldset class="bloco">
         <legend><span class="passo passo-3">Passo 3</span><span class="tit">Qualidade</span></legend>
         <div id="niveis-tx" class="lista-audio lista-niveis" role="radiogroup" aria-label="Nível de qualidade"></div>
-        <details class="qual-avancado" id="qual-avancado">
-          <summary>Avançado: escolher resolução, fps e taxa</summary>
-          <div id="niveis-tx-av" class="lista-audio lista-niveis"></div>
         <div id="qual-custom" class="qual-custom hidden">
           <div class="qc-grade">
             <label><span class="rotulo-campo">Resolução</span><select id="qc-res"></select></label>
@@ -1274,7 +1265,6 @@ html.com-fundo .bloco{background:none;-webkit-backdrop-filter:none;backdrop-filt
           <div class="cam-linha"><span class="rotulo-campo">Taxa de dados</span><input type="range" id="qc-mbps" min="1" max="50" step="0.5" aria-label="Taxa de dados em Mbps"><span id="qc-mbps-txt" class="cam-tam-txt qc-mbps-txt">12 Mbps</span></div>
           <p class="dica qc-dica" id="qc-dica"></p>
         </div>
-        </details>
         <div class="qual-prioridade"><span class="rotulo-campo">Quando a imagem pesa, priorizar</span>
         <div class="seg" role="radiogroup" aria-label="Otimizar para">
           <label><input type="radio" name="dica" value="motion"><span>Movimento<small>jogos, vídeo</small></span></label>
@@ -1849,25 +1839,29 @@ async function testarEncoder(track) {
 // troca cada quadro comprimido pelo quadro pronto do programa (RTCRtpScriptTransform). O navegador não captura
 // nem comprime de verdade: quem assiste recebe o H.264 do programa.
 const PV = { ativo: false, ws: null, gen: null, escritor: null, worker: null, oc: null, n: 0, estado: null, w: 0, h: 0,
-             taxa: 0, ids: 0, timer: 0, versao: '', visto: 0, ox: null, ruidos: [], ruido: true, url: '', gens: [], dec: null, decChave: false };
+             taxa: 0, ids: 0, timer: 0, versao: '', visto: 0, ox: null, ruidos: [], ruido: false, ultUs: 0, usDesl: 0, url: '', gens: [], dec: null, decChave: false };
 // Regra de ouro: NUNCA descartar quadro na troca. Cada quadro descartado aqui faz o compressor do navegador ir
 // travando até parar de vez (com uma pessoa nova entrando, quem já estava parava). Então:
 //  - quem acabou de entrar só recebe quadros a partir do próximo quadro completo (nada pra descartar);
 //  - fila cresceu (o navegador pulou quadros): vai direto pro quadro completo mais novo da fila;
 //  - o quadro do programa atrasou uns milissegundos: espera ele.
 const PV_TROCA = `
-const s = { fila: [], espera: null, pediu: false, entrou: 0, mandou: 0, semFila: 0, pulos: 0, chaves: 0 };
+const s = { fila: [], espera: null, pediu: false, entrou: 0, mandou: 0, semFila: 0, pulos: 0, chaves: 0, repos: 0, desde: 9, rec: 0 };
 onmessage = e => {
   const m = e.data;
-  if (m.tipo === 'contar') { postMessage({ tipo: 'contagem', r: { entrou: s.entrou, mandou: s.mandou, semFila: s.semFila, pulos: s.pulos, chaves: s.chaves, fila: s.fila.length } }); return; }
+  if (m.tipo === 'contar') { postMessage({ tipo: 'contagem', r: { entrou: s.entrou, mandou: s.mandou, semFila: s.semFila, pulos: s.pulos, chaves: s.chaves, repos: s.repos, rec: s.rec, fila: s.fila.length } }); return; }
   if (m.tipo !== 'quadro') return;
-  s.fila.push(m);
-  if (s.fila.length > 6) {
+  s.fila.push(m); s.desde++; s.rec++;
+  if (s.espera) { const r = s.espera; s.espera = null; r(); }
+  // o navegador perdeu um quadro falso (acontece quando o PC engasga): sobra quadro do programa na fila.
+  // Em vez de pular quadro (congelada) ou pedir quadro completo (piscada), pede um quadro falso a mais pra levar o que sobrou.
+  else if (s.fila.length >= 3 && s.desde >= 2) { s.desde = 0; s.repos++; postMessage({ tipo: 'mais' }); }
+  // atrasou muito (o PC travou de verdade): aí sim vai pro quadro completo mais novo, pra não ficar com atraso
+  if (s.fila.length > 20) {
     let k = -1; for (let i = s.fila.length - 1; i > 0; i--) if (s.fila[i].chave) { k = i; break; }
     if (k > 0) { s.fila.splice(0, k); s.pulos++; }
     else if (!s.pediu) { s.pediu = true; postMessage({ tipo: 'chave' }); }
   }
-  if (s.espera) { const r = s.espera; s.espera = null; r(); }
 };
 onrtctransform = ev => {
   const t = ev.transformer;
@@ -1875,7 +1869,8 @@ onrtctransform = ev => {
     async transform(frame, ctl) {
       s.entrou++;
       if (frame.type === 'key') { s.chaves++; postMessage({ tipo: 'chave' }); } // quem assiste pediu um quadro completo
-      if (!s.fila.length) await new Promise(r => { s.espera = r; setTimeout(r, 300); });
+      // quadro falso adiantado: espera o do programa (segurar não atrapalha; descartar sim)
+      if (!s.fila.length) await new Promise(r => { s.espera = r; setTimeout(r, 2000); });
       const q = s.fila.shift();
       if (!q) { s.semFila++; return; }
       if (q.chave) s.pediu = false;
@@ -1991,12 +1986,16 @@ function pvMensagem(d) {
   // um quadro minúsculo na faixa "falsa" pra cada quadro do programa (é ele que vira o quadro de verdade no envio)
   // "chuvisco": pesa pro navegador mais ou menos o mesmo que o vídeo de verdade, então a conta de banda dele bate
   if (PV.ruido && PV.ruidos.length) PV.ox.putImageData(PV.ruidos[PV.n % PV.ruidos.length], 0, 0);
-  let vf; try { vf = new VideoFrame(PV.oc, { timestamp: us }); } catch { return; }
+  // horário sempre crescente (o programa pode recomeçar a contagem ao trocar de janela)
+  let t = us + PV.usDesl;
+  if (t < PV.ultUs + 4000) { if (PV.ultUs - t > 500000) { PV.usDesl += PV.ultUs - t + 16667; t = us + PV.usDesl; } else t = PV.ultUs + 4000; }
+  PV.ultUs = t;
+  let vf; try { vf = new VideoFrame(PV.oc, { timestamp: PV.ultUs }); } catch { return; }
   for (const g of PV.gens) {
     if (g.principal && PV.dec) continue; // a da prévia recebe a imagem de verdade (abaixo)
     if (!g.pronto) { if (!chave) continue; g.pronto = true; } // envio novo começa num quadro completo
-    if (g.worker) g.worker.postMessage({ tipo: 'quadro', chave, dados: dados.slice(0) });
-    try { g.escritor.write(vf.clone()).catch(() => {}); } catch {}
+    if (g.worker) g.worker.postMessage({ tipo: 'quadro', chave, us, dados: dados.slice(0) });
+    pvEscrever(g, vf.clone());
   }
   vf.close();
   pvPrevia(chave, us, dados);
@@ -2023,7 +2022,7 @@ function pvPrevia(chave, us, dados) {
 async function pvIniciar() {
   if (!pvSuportado()) throw new Error('este navegador não tem o que precisa (use Chrome ou Edge atualizado no PC)');
   if (!PV.url) PV.url = URL.createObjectURL(new Blob([PV_TROCA], { type: 'text/javascript' }));
-  PV.gens = [];
+  PV.gens = []; PV.ultUs = 0; PV.usDesl = 0;
   PV.gen = pvNovaFaixa(true); // a da prévia e da própria tela no grupo
   PV.oc = new OffscreenCanvas(192, 108);
   const x = PV.ox = PV.oc.getContext('2d', { willReadFrequently: true });
@@ -2074,11 +2073,34 @@ function pvSoltarFaixa(track) {
   const i = PV.gens.findIndex(g => g.gen === track);
   if (i < 0) return;
   const g = PV.gens.splice(i, 1)[0];
+  clearTimeout(g.timer); (g.pend || []).forEach(f => { try { f.close(); } catch {} }); g.pend = [];
   try { g.escritor.close().catch(() => {}); } catch {}
   try { g.gen.stop(); } catch {}
   if (g.worker) try { g.worker.terminate(); } catch {}
 }
 // cada envio de vídeo (servidor ou ligação direta) troca os quadros pelos do programa
+// quadro falso a mais pra um envio (o navegador perdeu um): horário logo depois do último, pra não sair da ordem
+function pvRepor(g) {
+  if (!PV.ativo || !g.pronto || !PV.oc) return;
+  PV.ultUs += 4000;
+  let vf; try { vf = new VideoFrame(PV.oc, { timestamp: PV.ultUs }); } catch { return; }
+  pvEscrever(g, vf);
+}
+// entrega os quadros falsos espaçados: dois colados (o PC engasgou e chegaram juntos) e o navegador descarta o primeiro
+function pvEscrever(g, vf) {
+  (g.pend = g.pend || []).push(vf);
+  if (g.pend.length > 30) { try { g.pend.shift().close(); } catch {} }
+  if (!g.timer) pvEscoar(g);
+}
+function pvEscoar(g) {
+  g.timer = 0;
+  const agora = performance.now(), falta = (g.ultEsc || 0) + 5 - agora;
+  if (falta > 0) { g.timer = setTimeout(() => pvEscoar(g), falta); return; }
+  const vf = g.pend.shift(); if (!vf) return;
+  g.ultEsc = agora;
+  try { g.escritor.write(vf).catch(() => {}); } catch { try { vf.close(); } catch {} }
+  if (g.pend.length) g.timer = setTimeout(() => pvEscoar(g), 5);
+}
 function pvAnexar(sender) {
   if (!PV.ativo || !sender || !sender.track || sender.track.kind !== 'video') return;
   // um trocador por envio: um envio lento não segura os outros
@@ -2088,6 +2110,7 @@ function pvAnexar(sender) {
   w.onmessage = e => {
     const d = e.data || {};
     if (d.tipo === 'chave') pvEnviar({ tipo: 'chave' });
+    else if (d.tipo === 'mais') pvRepor(g);
     else if (d.tipo === 'contagem') (PV.contagem = PV.contagem || {})[id] = d.r;
     else if (d.tipo === 'fim') { try { w.terminate(); } catch {} if (g.worker === w) g.worker = null; }
   };
@@ -3175,7 +3198,7 @@ async function sfuParametros() {
     const p = snd.getParameters(); if (!p.encodings || !p.encodings.length) continue;
     if (snd.track.kind === 'video') {
       p.encodings[0].maxBitrate = kbpsDe(qualAtual) * 1000;
-      p.encodings[0].maxFramerate = qualAtual.fps;
+      p.encodings[0].maxFramerate = PV.ativo ? PV.teto || Math.max(240, qualAtual.fps * 2) : qualAtual.fps; // pelo programa: o fps vem do programa; um teto baixo aqui corta quadro que chega um pouco antes da hora
       const vt = snd.track.getSettings(), tela = vt.width && vt.height ? Math.min(vt.width, vt.height) : qualAtual.h;
       p.encodings[0].scaleResolutionDownBy = qualAtual.h && tela > qualAtual.h ? tela / qualAtual.h : 1;
       if (p.encodings[1]) { // a cópia 1080p só fica ligada enquanto a principal for maior que 1080p
@@ -3185,7 +3208,7 @@ async function sfuParametros() {
         p.encodings[1].maxFramerate = qualAtual.fps;
         p.encodings[1].scaleResolutionDownBy = Math.max(1, tela / 1080);
       }
-      p.degradationPreference = 'maintain-resolution';
+      p.degradationPreference = PV.ativo ? 'maintain-framerate' : 'maintain-resolution'; // pelo programa: a imagem falsa encolhe, os quadros não caem
     } else p.encodings[0].maxBitrate = 160000;
     p.encodings[0].priority = 'high'; p.encodings[0].networkPriority = 'high';
     try { await snd.setParameters(p); } catch (e) { console.warn('sfu setParameters', e); }
@@ -3301,13 +3324,13 @@ async function aplicarParametros(pc, id) {
       p.encodings[0].networkPriority = 'high';
       // compressão no processador e já tem outra compressão rodando (servidor ou outra direta): essa vai leve (720p 30)
       const leve = encSoftware && (SFU.pc || [...chamadas.keys()].some(o => o !== id));
-      p.encodings[0].maxFramerate = Math.min(ped && ped.fps ? Math.min(qualAtual.fps, ped.fps) : qualAtual.fps, leve ? 30 : Infinity);
+      p.encodings[0].maxFramerate = PV.ativo ? PV.teto || Math.max(240, qualAtual.fps * 2) : Math.min(ped && ped.fps ? Math.min(qualAtual.fps, ped.fps) : qualAtual.fps, leve ? 30 : Infinity);
       // teto: o nível escolhido por quem transmite e o que a pessoa pediu (o que for menor). Vale até no iPhone, que ignora o limite na captura
       const tetoAltura = Math.min(qualAtual && qualAtual.h ? qualAtual.h : alturaTela, ped && ped.altura ? ped.altura : Infinity, leve ? 720 : Infinity);
       p.encodings[0].scaleResolutionDownBy = alturaTela > tetoAltura ? alturaTela / tetoAltura : 1;
       // segura a resolução escolhida: se a rede apertar, perde uns quadros em vez de borrar.
       // Baixar de verdade a qualidade é decisão do player de quem assiste (AUTO), e só se a rede ficar ruim por um tempo.
-      p.degradationPreference = 'maintain-resolution';
+      p.degradationPreference = PV.ativo ? 'maintain-framerate' : 'maintain-resolution'; // pelo programa: a imagem falsa encolhe, os quadros não caem
     } else {
       p.encodings[0].maxBitrate = 160000;
       p.encodings[0].priority = 'high';
@@ -5998,7 +6021,7 @@ if (EMBED) {
     box.insertAdjacentHTML('beforeend', `<label class="op-l"><input type="radio" name="qnivel" value="${k}"><span class="radio"></span>
       <span class="nl-txt"><b>${q.rot}</b>${k === 'moderado' ? '<span class="etq rec">RECOMENDADO</span>' : ''}<small>${PRA[k]}</small></span>
       <span class="nl-spec"><span>${rotRes(q.h)} · ${q.fps} fps</span><span class="nl-mbps">${sinal(q.kbps)}${fmtMbps(q.kbps)} Mbps</span></span></label>`);
-  $('#niveis-tx-av').insertAdjacentHTML('beforeend', '<label class="op-l"><input type="radio" name="qnivel" value="custom"><span class="radio"></span><span class="nl-txt"><b>Personalizado</b><small id="qc-resumo">Você escolhe. Acima de 20 Mbps não passa pelo servidor de repasse: vai uma cópia direto pra cada pessoa.</small></span></label>');
+  box.insertAdjacentHTML('beforeend', '<label class="op-l"><input type="radio" name="qnivel" value="custom"><span class="radio"></span><span class="nl-txt"><b>Personalizado</b><small id="qc-resumo">Você escolhe. Acima de 20 Mbps não passa pelo servidor de repasse: vai uma cópia direto pra cada pessoa.</small></span></label>');
   RES_TX.forEach(([h, , rot]) => $('#qc-res').add(new Option(rot, h)));
   FPS_TX.forEach(f => $('#qc-fps').add(new Option(f + ' fps', f)));
   let n = guardar.get('qualNivel');
@@ -6024,7 +6047,6 @@ function mostrarCustom() {
   $('#qc-mbps-txt').textContent = fmtMbps(c.mbps * 1000) + ' Mbps';
   $('#qc-resumo').textContent = `${rotRes(c.h)} · ${c.fps} fps · ${fmtMbps(c.mbps * 1000)} Mbps` +
     (c.mbps > SFU_MAX_MBPS ? ' · acima de 20 Mbps não usa o servidor de repasse (vai uma cópia direto pra cada pessoa)' : '');
-  if (radio('qnivel') === 'custom') $('#qual-avancado').open = true;
   dicaQualidade();
 }
 document.querySelectorAll('input[name="qnivel"]').forEach(i => i.onchange = () => { guardar.set('qualNivel', radio('qnivel')); mostrarCustom(); trocarQualidade(); });
