@@ -2226,6 +2226,26 @@ async function pegarAudio(dev) {
   try { t.contentHint = voz ? 'speech' : 'music'; } catch {}
   return t;
 }
+function textoSomTx(t, progv) {
+  const de = { app: 'pelo programa' + (t.prog === 'tudo' ? ' (Tudo do PC)' : t.prog === 'excluir' ? ' (tudo menos o Discord)' : t.prog === 'incluir' ? ` (${t.apps || 0} app${t.apps === 1 ? '' : 's'} marcado${t.apps === 1 ? '' : 's'})` : ''),
+               captura: 'do próprio compartilhamento', device: 'cabo virtual / aparelho', none: 'nenhum (escolheu sem som)' }[t.modo] || t.modo;
+  let porque = '';
+  if (t.nivel != null && t.nivel < 0.002 && t.modo !== 'none' && !t.mic) {
+    porque = t.modo === 'app' && t.progOk === false ? ' · MUDO: o programa dele não está aberto'
+      : t.modo === 'app' && t.prog === 'tudo' && progv && versaoMenor(progv, '1.1') ? ' · MUDO: o programa dele é antigo e não tem "Tudo do PC" (ele precisa baixar o novo)'
+      : t.modo === 'app' && t.prog === 'incluir' && !t.apps ? ' · MUDO: nenhum app marcado no Passo 2'
+      : t.modo === 'captura' ? ' · MUDO: no seletor do navegador, ele não marcou "compartilhar áudio"'
+      : ' · MUDO na origem (nada tocando no PC dele, ou o app escolhido está em silêncio)';
+  }
+  return de + (t.mic ? ' + microfone' : '') + porque;
+}
+// o som que sai daqui, pra quem assiste saber se chega mudo da origem (e por quê)
+const somTx = { pico: 0, quando: 0 };
+function infoSom() {
+  const modo = radio('audio');
+  return { modo, prog: modo === 'app' ? prog.modo : '', progOk: modo === 'app' ? !!prog.conectado : null, apps: modo === 'app' && prog.modo === 'incluir' ? prog.marcados.size : null,
+           mic: micLigado() && !!mix.srcMic, nivel: Date.now() - somTx.quando < 4000 ? Math.round(somTx.pico * 1000) / 1000 : null };
+}
 function medir(track) {
   cancelAnimationFrame(rafNivel);
   try { fonteNivel && fonteNivel.disconnect(); } catch {}
@@ -2245,6 +2265,7 @@ function medir(track) {
     an.getFloatTimeDomainData(buf);
     let pico = 0;
     for (const x of buf) { const a = Math.abs(x); if (a > pico) pico = a; }
+    somTx.pico = Math.max(pico, somTx.pico * 0.99); somTx.quando = Date.now();
     barra.style.transform = `scaleX(${Math.min(1, pico * 1.4)})`;
     if (++quadro % 8 === 0) txt.textContent = pico < 0.002 ? 'sem sinal' : (20 * Math.log10(pico)).toFixed(0) + ' dB';
     rafNivel = requestAnimationFrame(loop);
@@ -3712,7 +3733,7 @@ function girarRx() {
 // ---------- super resolução (beta): aumenta a imagem pela placa de vídeo, no estilo do FSR 1 da AMD
 // 1º passo (EASU): amplia seguindo a direção das bordas (sem serrilhado nem borrão).
 // 2º passo (RCAS): nitidez com limite, pra não criar contorno branco nos personagens.
-const SR = { modo: +(guardar.get('superRes') || 0) > 0 ? 1 : 0, alvo: [-1, 0, 1080, 1440, 2160].includes(+(guardar.get('superResAlvo') ?? -1)) ? +(guardar.get('superResAlvo') ?? -1) : -1,
+const SR = { modo: !PLACA.semAcel && +(guardar.get('superRes') || 0) > 0 ? 1 : 0, alvo: [-1, 0, 1080, 1440, 2160].includes(+(guardar.get('superResAlvo') ?? -1)) ? +(guardar.get('superResAlvo') ?? -1) : -1,
   motor: guardar.get('superResMotor2') === 'ia' ? 'ia' : 'fsr', // 'fsr' = Geral (rede FSRCNNX, com a rápida antiga de reserva); 'ia' = Desenho (Anime4K)
   forte: guardar.get('superResForte') === '1' || guardar.get('superRes') === '2', gl: null, cv: null, ok: true, progD: null, texN: null, fbo2: null, nw: 0, nh: 0,
   progE: null, progR: null, texV: null, texM: null, fbo: null, mw: 0, mh: 0, laco: 0, gen: 0, ativo: false, info: '' };
@@ -4143,6 +4164,7 @@ function srQuadro() {
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
   };
+  const t0 = performance.now();
   try {
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, SR.texV);
@@ -4155,7 +4177,7 @@ function srQuadro() {
       if (txt) {
         if (!SR.ativo) { SR.ativo = true; cv.classList.remove('hidden'); }
         SR.info = txt;
-        srAgendar();
+        if (!srPesou(t0)) srAgendar();
         return;
       }
     }
@@ -4208,7 +4230,18 @@ function srQuadro() {
     console.warn('super resolução falhou', e);
     SR.ok = false; srParar(); return;
   }
-  srAgendar();
+  if (!srPesou(t0)) srAgendar();
+}
+// o PC não dá conta (ex.: navegador sem aceleração, que desenha no processador): desliga em vez de travar a imagem
+function srPesou(t0) {
+  const ms = performance.now() - t0;
+  SR.ms = SR.nMs ? SR.ms * 0.9 + ms * 0.1 : ms; SR.nMs = (SR.nMs || 0) + 1;
+  if (SR.nMs < 60 || SR.ms < 20) return false;
+  const quanto = Math.round(SR.ms);
+  definirSuperRes(0, true);
+  avisoRx(PLACA.semAcel ? 'Super resolução desligada: a aceleração de hardware do navegador está desligada, então ela travava a imagem. Ligue a aceleração e tente de novo.'
+    : `Super resolução desligada: este PC não deu conta (${quanto} ms por quadro) e ela travava a imagem.`);
+  return true;
 }
 function srAgendar() {
   if (SR.laco || !SR.modo || !SR.ok) return;
@@ -4218,7 +4251,7 @@ function srAgendar() {
   if (video.requestVideoFrameCallback && !video.paused) video.requestVideoFrameCallback(vai);
   else setTimeout(() => requestAnimationFrame(vai), 100);
 }
-function srReiniciar() { SR.gen++; SR.laco = 0; srLigar(); }
+function srReiniciar() { SR.gen++; SR.laco = 0; SR.nMs = 0; srLigar(); }
 function srLigar() {
   if (!SR.modo) { srParar(); iaParar(); return; }
   if (srGPU() && IA.estado !== 'erro') { srParar(); IA.gen++; IA.laco = 0; iaLigar(); return; }
@@ -4427,6 +4460,7 @@ function alternarForteSR() {
   avisoRx(SR.forte ? 'Mais nitidez: ligada.' : 'Mais nitidez: desligada.');
 }
 function definirSuperRes(m, quieto) {
+  if (m && PLACA.semAcel) { mostrarAvisoAcel(); avisoRx('A super resolução precisa da aceleração de hardware do navegador ligada (sem ela, roda no processador e trava a imagem). Ligue em Configurações › Sistema › "Usar aceleração gráfica" e reinicie o navegador.'); m = 0; quieto = true; }
   SR.modo = m;
   guardar.set('superRes', String(m));
   if (m && !SR.ok && !SR.gl) SR.ok = true;
@@ -4972,7 +5006,7 @@ setInterval(async () => {
             conn.send({ tipo: 'info', capW: vs ? vs.width : 0, capH: vs ? vs.height : 0, w: s.w, h: s.h, limite: s.limite,
                         qualidade: qualAtual ? qualAtual.nome : '', kbps: qualAtual ? kbpsDe(qualAtual) : 0, dica: radio('dica'), encoder: (tipoEncoder(s.encoder) || [''])[0], codec: s.codec, placa: PLACA.nome, semAcel: PLACA.semAcel, sup: vs ? vs.displaySurface || '' : '', pc: desempenhoPC(), progv: PV.versao || prog.versao || '',
                         fps: s.fps, fpsCaptura: s.fpsCaptura, fpsAlvo: qualAtual ? qualAtual.fps : 0,
-                        giro: CELULAR_TX ? +(radio('giro') || 0) : null });
+                        giro: CELULAR_TX ? +(radio('giro') || 0) : null, som: infoSom() });
           } catch {}
         }
       };
@@ -4990,7 +5024,7 @@ setInterval(async () => {
           conn.send({ tipo: 'info', capW: vs ? vs.width : 0, capH: vs ? vs.height : 0, w: s.w, h: s.h, limite: s.limite,
                       qualidade: qualAtual ? qualAtual.nome : '', kbps: qualAtual ? kbpsDe(qualAtual) : 0, dica: radio('dica'), encoder: (tipoEncoder(s.encoder) || [''])[0], codec: s.codec, placa: PLACA.nome, semAcel: PLACA.semAcel, sup: vs ? vs.displaySurface || '' : '', pc: desempenhoPC(), progv: PV.versao || prog.versao || '',
                       fps: s.fps, fpsCaptura: s.fpsCaptura, fpsAlvo: qualAtual ? qualAtual.fps : 0,
-                      giro: CELULAR_TX ? +(radio('giro') || 0) : null });
+                      giro: CELULAR_TX ? +(radio('giro') || 0) : null, som: infoSom() });
         } catch {}
       }
       if (PV.ativo && todas.length) {
@@ -5079,6 +5113,7 @@ setInterval(async () => {
           (SR.modo ? `Super res.  ${SR.info || (SR.motor === 'ia' ? 'ligada' : 'parada: a imagem já chega do tamanho da sua tela (pra melhorar vídeo esticado, use o tipo Desenho ou escolha 2K/4K)')}
 ` : '') +
           `Som         ${somRx.texto}\n` +
+          (it && it.som ? `Som dele    ${textoSomTx(it.som, it.progv)}\n` : '') +
           `Descartados ${st.descartados} quadros\nDecoder     ${st.decoder || '?'}` +
           (it && it.encoder ? `\nEncoder dele ${it.encoder}` : '') +
           (it && it.pc ? `\nPC dele     processador ${it.pc.cpu}% · placa ${it.pc.gpu}%${it.pc.gpu >= 95 ? ' (NO LIMITE: o jogo usa a placa toda e o Windows não consegue capturar a tela a tempo)' : ''}${it.pc.enc > 0 ? ` · compressão na placa ${it.pc.enc}%` : ''}${it.pc.cpu >= 95 ? ' · processador no limite' : ''}` : '') +
