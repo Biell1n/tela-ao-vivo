@@ -1115,6 +1115,9 @@ html.com-fundo .bloco{background:none;-webkit-backdrop-filter:none;backdrop-filt
           <label><input type="radio" name="prioridade" value="fluida" checked><span>Fluidez<small>pra quem assiste</small></span></label>
           <label><input type="radio" name="prioridade" value="jogo"><span>Desempenho<small>do jogo</small></span></label>
         </div></div>
+        <div id="bloco-hdr" class="qual-prioridade hidden"><label class="rotulo-campo" for="sel-hdr">Correção de HDR <span id="hdr-detectado" class="etq rec hidden">HDR LIGADO</span></label>
+          <select id="sel-hdr"><option value="-1">Automática (liga se o HDR estiver ligado)</option><option value="0">Desligada</option><option value="1">Leve</option><option value="2">Média</option><option value="3">Forte</option></select>
+          <p id="dica-hdr" class="dica"></p></div>
         <div id="bloco-cam" class="bloco-cam">
           <label class="cam-liga" id="op-cam-junto"><input type="checkbox" id="cam-junto"><span><b>Câmera por cima da tela</b><span class="etq rec">ESTILO OBS</span>
             <small>Sua câmera num cantinho da transmissão. Depois de começar, arraste ela na prévia pra posicionar.</small></span></label>
@@ -1699,7 +1702,7 @@ async function lerStats(pc, tipo) {
   return {
     fps: Math.round(v.framesPerSecond || 0), w: v.frameWidth || 0, h: v.frameHeight || 0, mbps,
     ping: par && par.currentRoundTripTime != null ? Math.round(par.currentRoundTripTime * 1000) : null,
-    rota, relay: !!rel, alvo: v.targetBitrate || 0, perdaLa: remoto0 && remoto0.fractionLost != null ? remoto0.fractionLost : null,
+    rota, relay: !!rel, alvo: v.targetBitrate || 0, banda: par && par.availableOutgoingBitrate || 0, perdaLa: remoto0 && remoto0.fractionLost != null ? remoto0.fractionLost : null,
     encoder: v.encoderImplementation || '', decoder: v.decoderImplementation || '',
     limite: v.qualityLimitationReason || 'none',
     perdidos: v.packetsLost || 0, descartados: v.framesDropped || 0,
@@ -1971,7 +1974,15 @@ function pvMostrarOpcao() {
 // o que falta pra transmitir pelo programa (nada = pronto)
 let pvEscolheuAgora = false;
 function pvFalta() {
-  if (!pvSuportado()) return { curto: 'Só no Chrome ou Edge do PC', longo: 'Este navegador não tem o que o modo pelo programa precisa. Abra o site no Chrome ou no Edge (atualizado) pra usar.' };
+  if (!pvSuportado()) {
+    // Firefox e derivados (Waterfox, LibreWolf...): falta o gerador de faixa de vídeo, que é o que leva a imagem do programa
+    // pra transmissão. Dá pra imitar com um canvas, mas ele para quando a aba fica escondida (atrás do jogo), então não serve.
+    const fx = /firefox|waterfox|librewolf/i.test(navigator.userAgent);
+    const nome = /waterfox/i.test(navigator.userAgent) ? 'Waterfox' : /librewolf/i.test(navigator.userAgent) ? 'LibreWolf' : 'Firefox';
+    return fx
+      ? { curto: `Não funciona no ${nome}: use Edge, Chrome ou Opera`, longo: `O ${nome} ainda não tem a peça que leva a imagem do programa pra transmissão. Abra este site no Edge (já vem no Windows), no Chrome ou no Opera pra usar o modo pelo programa. Aqui no ${nome} dá pra transmitir normal com Tela inteira ou Janela.` }
+      : { curto: 'Só no Chrome, Edge ou Opera do PC', longo: 'Este navegador não tem o que o modo pelo programa precisa. Abra o site no Chrome, no Edge ou no Opera (atualizado) pra usar.' };
+  }
   if (!PV.versao) return { curto: 'Precisa do programa Tela ao Vivo Áudio aberto', longo: 'Baixe o Tela ao Vivo Áudio (botão "Baixar programa de áudio", lá em cima), abra e deixe aberto. Ele aparece aqui sozinho em alguns segundos.' };
   if (versaoMenor(PV.versao, '1.3')) return { curto: 'Seu programa é antigo: baixe o novo', longo: `Seu Tela ao Vivo Áudio é o ${PV.versao}, que ainda não transmite a tela. Baixe o novo (botão "Baixar programa de áudio", lá em cima), feche o antigo (ícone perto do relógio › Sair) e abra o novo. Daí pra frente ele se atualiza sozinho.` };
   return null;
@@ -2115,7 +2126,12 @@ function pvControlarTaxa(todas) {
   if (apertou) { c.ruim++; c.bom = 0; } else { c.bom++; c.ruim = 0; }
   if (c.ruim >= 2) { c.taxa = Math.max(piso, c.taxa * 0.8); c.ruim = 0; }
   else if (c.bom >= 4 && c.taxa < teto) { c.taxa = Math.min(teto, c.taxa * 1.15); c.bom = 0; }
-  if (Math.abs(c.taxa - PV.taxa) > PV.taxa * 0.05) { PV.taxa = c.taxa; pvEnviar({ tipo: 'taxa', kbps: Math.round(c.taxa / 1000) }); }
+  // e nunca acima da banda que o navegador acha que tem: ela começa baixa a cada pessoa nova (~6 Mbps, o Chrome ignora
+  // a dica de começo) e sobe ~15% por segundo. Mandando mais que isso, o navegador segurava o excesso numa fila de até
+  // 1,3 s nos primeiros ~15 s (quadro repetido, descartado e atraso). Acompanhando, a taxa cheia chega em ~10 s sem fila.
+  const banda = Math.min(...todas.map(t => t.banda || Infinity));
+  const taxa = Math.max(piso, Math.min(c.taxa, isFinite(banda) && banda > 0 ? banda * 0.85 : Infinity));
+  if (Math.abs(taxa - PV.taxa) > PV.taxa * 0.05) { PV.taxa = taxa; pvEnviar({ tipo: 'taxa', kbps: Math.round(taxa / 1000) }); }
 }
 // quadro falso a mais pra um envio (o navegador perdeu um): horário logo depois do último, pra não sair da ordem
 function pvRepor(g) {
@@ -2531,6 +2547,7 @@ function prepararCelular() {
 // escolheu "Aba": o natural é mandar o som da própria aba (o Chrome entrega certinho)
 function trocouFonte(ev) {
   atualizarFonte();
+  try { mostrarOpcaoHDR(); } catch {}
   if (ev && radio('fonte') === 'programa') { pvEscolheuAgora = true; guardar.set('temPrograma', '1'); pvFalhas = 0; pvProcurar(); }
   $('#bloco-prioridade').classList.toggle('hidden', radio('fonte') !== 'programa');
   // cabo virtual com Aba: o natural é o som da própria aba. Com o programa, a escolha da pessoa continua valendo.
@@ -2846,10 +2863,78 @@ async function abrirCamera(w, h, fps) {
   return t;
 }
 
+const PODE_COMPOR = 'MediaStreamTrackProcessor' in window && 'MediaStreamTrackGenerator' in window && 'VideoFrame' in window && 'OffscreenCanvas' in window;
+// ---------- correção de HDR: com o HDR do Windows ligado, a captura da tela chega com o brilho alto demais
+// (o Windows entrega a imagem clara e lavada). Aqui cada quadro passa por um ajuste: baixa o brilho e devolve o
+// contraste e a cor. Quem transmite ajusta
+// olhando a prévia: o que aparece nela é o que todo mundo recebe.
+const HDR_NIVEIS = { 0: null, 1: 'brightness(0.88) contrast(1.06) saturate(1.05)', 2: 'brightness(0.78) contrast(1.12) saturate(1.1)', 3: 'brightness(0.66) contrast(1.2) saturate(1.16)' };
+const HDR_MQ = matchMedia('(dynamic-range: high)');
+const HDR = { escolha: [-1, 0, 1, 2, 3].includes(+(guardar.get('hdrNivel') ?? -1)) ? +(guardar.get('hdrNivel') ?? -1) : -1, corr: null };
+const hdrLigado = () => HDR_MQ.matches;
+const hdrNivel = () => HDR.escolha === -1 ? (hdrLigado() ? 2 : 0) : HDR.escolha;
+const PODE_HDR = PODE_COMPOR;
+// cada quadro da tela é redesenhado com filtro (brilho, contraste e cor), na placa de vídeo, igual à câmera por cima
+function corrigirHDR(telaTrack) {
+  const gen = new MediaStreamTrackGenerator({ kind: 'video' });
+  const escritor = gen.writable.getWriter();
+  let cv = null, ctx = null, parado = false;
+  const corr = { track: gen, parar() { parado = true; try { telaTrack.stop(); } catch {} try { gen.stop(); } catch {} }, quadros: 0, erro: '' };
+  (async () => {
+    const leitor = new MediaStreamTrackProcessor({ track: telaTrack }).readable.getReader();
+    while (!parado) {
+      let r; try { r = await leitor.read(); } catch { break; }
+      if (r.done) break;
+      const f = r.value, filtro = HDR_NIVEIS[hdrNivel()];
+      try {
+        if (!filtro) { escritor.write(f).catch(() => {}); continue; } // desligada: passa direto, sem custo
+        const W = f.displayWidth, H = f.displayHeight;
+        if (!cv || cv.width !== W || cv.height !== H) { cv = new OffscreenCanvas(W, H); ctx = cv.getContext('2d', { alpha: false }); }
+        ctx.filter = filtro;
+        ctx.drawImage(f, 0, 0, W, H);
+        const ts = f.timestamp; f.close();
+        escritor.write(new VideoFrame(cv, { timestamp: ts })).catch(() => {}); // sem esperar: o próximo quadro já pode vir
+        corr.quadros++;
+      } catch (e) { if (!corr.erro) { corr.erro = String(e && e.message || e); console.warn('correção de HDR', e); } try { f.close(); } catch {} }
+    }
+    try { gen.stop(); } catch {}
+  })();
+  telaTrack.addEventListener('ended', () => { try { gen.stop(); } catch {} });
+  return corr;
+}
+function mostrarOpcaoHDR() {
+  const f = radio('fonte');
+  const vale = PODE_HDR && !CELULAR_TX && (f === 'monitor' || f === 'window');
+  $('#bloco-hdr').classList.toggle('hidden', !vale);
+  $('#hdr-detectado').classList.toggle('hidden', !hdrLigado());
+  $('#sel-hdr').value = String(HDR.escolha);
+  const n = hdrNivel();
+  $('#dica-hdr').textContent = hdrLigado()
+    ? (n ? 'Seu HDR está ligado: sem isso, quem assiste vê tudo com o brilho alto demais. Depois de começar, olhe a prévia e troque o nível até o brilho ficar igual ao da sua tela. Dá pra trocar com a transmissão rolando.'
+         : 'Seu HDR está ligado e a correção está desligada: quem assiste deve ver o brilho alto demais.')
+    : (n ? 'A correção está ligada mesmo sem HDR detectado: se a imagem ficar escura demais na prévia, escolha Automática.'
+         : 'Se o seu HDR estiver ligado e quem assiste vir o brilho alto demais, escolha um nível aqui.');
+}
+$('#sel-hdr').onchange = () => {
+  HDR.escolha = +$('#sel-hdr').value; guardar.set('hdrNivel', String(HDR.escolha));
+  mostrarOpcaoHDR();
+  if (streamTx && !HDR.corr && hdrNivel()) statusTx('A correção de HDR entra na próxima vez que você começar (ou escolher a tela de novo).', 'aviso');
+};
+try { HDR_MQ.addEventListener('change', mostrarOpcaoHDR); } catch {}
+mostrarOpcaoHDR();
+// liga o corretor na captura da tela (se precisar), sem perder o "parou de capturar"
+function talvezCorrigirHDR(vt) {
+  if (!PODE_HDR || !hdrNivel()) return vt;
+  let c = null; try { c = corrigirHDR(vt); } catch (e) { console.warn('correção de HDR', e); }
+  if (!c) return vt;
+  if (HDR.corr) HDR.corr.parar();
+  HDR.corr = c;
+  return c.track;
+}
+
 // Junta tela + câmera num vídeo só. Usa os "Insertable Streams" do Chrome: os quadros chegam e são
 // desenhados conforme a tela/câmera mandam (sem timer), então continua rodando com a aba escondida,
 // enquanto você joga. Cada quadro novo da tela OU da câmera gera um quadro novo da transmissão.
-const PODE_COMPOR = 'MediaStreamTrackProcessor' in window && 'MediaStreamTrackGenerator' in window && 'VideoFrame' in window && 'OffscreenCanvas' in window;
 function comporTelaECamera(telaTrack, camTrack, fps) {
   const gen = new MediaStreamTrackGenerator({ kind: 'video' });
   const escritor = gen.writable.getWriter();
@@ -3055,6 +3140,7 @@ async function comecar() {
   try { vt.contentHint = fonte === 'camera' || fonte === 'programa' ? 'motion' : dica; } catch {}
   vt.addEventListener('ended', capturaAcabou);
   capturaOpcoes = fonte === 'programa' ? null : opcoes;
+  if (fonte === 'monitor' || fonte === 'window') { vt = talvezCorrigirHDR(vt); try { vt.contentHint = dica; } catch {} }
 
   // estilo OBS: junta a tela com a câmera por cima
   if (fonte !== 'camera' && fonte !== 'programa' && $('#cam-junto').checked && PODE_COMPOR && !CELULAR_TX) {
@@ -3381,7 +3467,7 @@ async function aplicarParametros(pc, id) {
     if (!p.encodings || !p.encodings.length) continue;
     if (s.track.kind === 'video') {
       // o que a pessoa pediu (ex.: celular em 720p) manda mais que a qualidade escolhida, se for menor
-      const kbps = ped && ped.kbps ? Math.min(kbpsDe(qualAtual), ped.kbps) : kbpsDe(qualAtual);
+      const kbps = ped && ped.kbps && !PV.ativo ? Math.min(kbpsDe(qualAtual), ped.kbps) : kbpsDe(qualAtual);
       p.encodings[0].maxBitrate = kbps * 1000;
       p.encodings[0].priority = 'high';
       p.encodings[0].networkPriority = 'high';
@@ -3439,9 +3525,10 @@ async function recapturar() {
   let tela;
   try { tela = await navigator.mediaDevices.getDisplayMedia(capturaOpcoes); }
   catch (e) { statusTx(e.name === 'NotAllowedError' ? 'Você cancelou. A sala continua aberta: escolha a tela de novo quando quiser.' : 'Não deu pra capturar (' + e.name + ').', 'aviso'); return; }
-  const vt = tela.getVideoTracks()[0];
+  let vt = tela.getVideoTracks()[0];
   try { vt.contentHint = radio('dica'); } catch {}
   vt.addEventListener('ended', capturaAcabou);
+  if (['monitor', 'window'].includes(radio('fonte'))) { vt = talvezCorrigirHDR(vt); try { vt.contentHint = radio('dica'); } catch {} }
   const velho = streamTx.getVideoTracks()[0];
   if (velho) { streamTx.removeTrack(velho); try { velho.stop(); } catch {} }
   streamTx.addTrack(vt);
@@ -3503,6 +3590,7 @@ function pararTx() {
   desligarMic();
   desligarSomAba();
   if (composicao) { const c = composicao; composicao = null; c.parar(); }
+  if (HDR.corr) { const c = HDR.corr; HDR.corr = null; c.parar(); }
   $('#cam-caixa').classList.add('hidden');
   $('#bt-cam-onoff').classList.add('hidden');
   for (const c of chamadas.values()) try { c.close(); } catch {}
