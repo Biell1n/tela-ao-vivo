@@ -5318,7 +5318,7 @@ function conectarAoHost() {
     grupo.vistoHost = Date.now();
     if (d.tipo === 'estado' && Array.isArray(d.lista)) {
       grupo.membros = d.lista.slice(0, 500);
-      if (Array.isArray(d.banidos)) grupo.banidos = d.banidos.slice(0, 500);
+      if (Array.isArray(d.banidos)) grupo.banidos = banidosValidos(d.banidos);
       if (typeof d.donoHash === 'string') grupo.donoHash = d.donoHash;
       conferirVersaoHost(+d.versao || 0, d.host);
       renderGrupo();
@@ -5392,7 +5392,11 @@ function garantirEu() {
   eu.av = grupo.av;
   eu.nome = grupo.nome; eu.sala = salaTx; eu.dono = souDono();
 }
-const banido = (id, nome) => grupo.banidos.includes(id) || grupo.banidos.includes('nome:' + String(nome || '').toLowerCase());
+// expulsar tira a pessoa na hora; ela pode voltar abrindo o link de novo (bloquear pelo nome trancava pra sempre
+// quem tinha o mesmo nome, até a outra aba da própria pessoa). Só a conexão expulsa fica barrada por 2 minutos.
+const BAN_MS = 2 * 60e3;
+const banidosValidos = l => (Array.isArray(l) ? l : []).filter(b => b && typeof b === 'object' && typeof b.id === 'string' && +b.ate > Date.now()).slice(0, 500);
+const banido = id => banidosValidos(grupo.banidos).some(b => b.id === id);
 function conexaoDoMembro(conn) {
   conn.on('open', () => {
     if (banido(conn.peer)) { try { conn.send({ tipo: 'expulso' }); } catch {} setTimeout(() => conn.close(), 300); return; }
@@ -5404,7 +5408,7 @@ function conexaoDoMembro(conn) {
     if (m) m.visto = Date.now();
     if (d.tipo === 'entrar') {
       const nome = nomeLimpo(d.nome);
-      if (banido(conn.peer, nome)) { try { conn.send({ tipo: 'expulso' }); } catch {} setTimeout(() => conn.close(), 300); return; }
+      if (banido(conn.peer)) { try { conn.send({ tipo: 'expulso' }); } catch {} setTimeout(() => conn.close(), 300); return; }
       if (!m) { m = { id: conn.peer, nome, sala: null, dono: false }; grupo.membros.push(m); }
       m.nome = nome; m.av = avValido(d.av); m.visto = Date.now();
       if ((+d.versao || 0) > VERSAO_GRUPO) avisarSiteNovo();
@@ -5438,7 +5442,7 @@ function conexaoDoMembro(conn) {
 function difundir() {
   if (grupo.host) {
     garantirEu();
-    const msg = { tipo: 'estado', lista: grupo.membros.map(m => ({ id: m.id, nome: m.nome, av: m.av, sala: m.sala, dono: !!m.dono })), banidos: grupo.banidos, donoHash: grupo.donoHash, versao: VERSAO_GRUPO, host: grupo.meuId };
+    const msg = { tipo: 'estado', lista: grupo.membros.map(m => ({ id: m.id, nome: m.nome, av: m.av, sala: m.sala, dono: !!m.dono })), banidos: (grupo.banidos = banidosValidos(grupo.banidos)), donoHash: grupo.donoHash, versao: VERSAO_GRUPO, host: grupo.meuId };
     for (const c of grupo.conns.values()) if (c.open) try { c.send(msg); } catch {}
   }
   renderGrupo();
@@ -5454,7 +5458,7 @@ function expulsar(id) {
 function expulsarAqui(id) {
   const m = grupo.membros.find(x => x.id === id);
   if (!m || m.id === grupo.meuId) return;
-  grupo.banidos.push(id, 'nome:' + m.nome.toLowerCase());
+  grupo.banidos = banidosValidos(grupo.banidos).concat({ id, ate: Date.now() + BAN_MS });
   const c = grupo.conns.get(id);
   if (c) { try { c.send({ tipo: 'expulso' }); } catch {} setTimeout(() => { try { c.close(); } catch {} }, 300); }
   grupo.membros = grupo.membros.filter(x => x.id !== id);
@@ -5464,7 +5468,7 @@ function foiExpulso() {
   grupo.expulso = true;
   if (streamTx) pararTx(); // expulso para de compartilhar com o grupo
   sairDoGrupo();
-  alertaHome('Você foi removido do grupo pelo dono.');
+  alertaHome('Você foi removido do grupo pelo dono. Se foi engano, peça o link e entre de novo.');
 }
 function alertaHome(msg) {
   const b = $('#erro-peer');
@@ -5502,7 +5506,8 @@ function difundirChat(msg) {
 }
 function reacaoNoHost(m, d) {
   if (!EMOJIS.includes(d.emoji) || !limiteTaxa(m, 'taxaReacao', 8, 3000)) return;
-  const msg = { tipo: 'reacao', de: m.id, nome: m.nome, emoji: d.emoji, av: m.id === grupo.meuId ? grupo.av : m.av };
+  const msg = { tipo: 'reacao', de: m.id, nome: m.nome, emoji: d.emoji, av: m.id === grupo.meuId ? grupo.av : m.av,
+                sala: typeof d.sala === 'string' ? d.sala.slice(0, 40) : undefined };
   for (const c of grupo.conns.values()) if (c.open && c.peer !== m.id) try { c.send(msg); } catch {}
   receberReacao(msg);
 }
@@ -5580,20 +5585,22 @@ function toastNaTela(m) {
   while (box.children.length > 4) box.firstChild.remove();
   setTimeout(() => { el.classList.add('sai'); setTimeout(() => el.remove(), 600); }, 7000);
 }
-function reagir(emoji) {
+// sala = a live onde a pessoa reagiu (o botão da própria tela, ou a tela que ela está vendo): a reação só aparece nela
+function reagir(emoji, sala) {
   if (!grupo.ativo || !EMOJIS.includes(emoji)) return;
   if (Date.now() - chatGrupo.ultimaReacao < 120) return;
   chatGrupo.ultimaReacao = Date.now();
-  if (grupo.host) { const eu = grupo.membros.find(x => x.id === grupo.meuId) || { id: grupo.meuId, nome: grupo.nome }; reacaoNoHost(eu, { emoji }); return; }
-  if (grupo.con && grupo.con.open) try { grupo.con.send({ tipo: 'reacao', emoji }); } catch {}
-  soltarEmoji(emoji, grupo.av); // a sua aparece na hora
+  if (sala === undefined) { const t = telaDasReacoes(); sala = t && t.dataset.sala || undefined; }
+  if (grupo.host) { const eu = grupo.membros.find(x => x.id === grupo.meuId) || { id: grupo.meuId, nome: grupo.nome }; reacaoNoHost(eu, { emoji, sala }); return; }
+  if (grupo.con && grupo.con.open) try { grupo.con.send({ tipo: 'reacao', emoji, sala }); } catch {}
+  soltarEmoji(emoji, grupo.av, sala); // a sua aparece na hora
 }
 function receberReacao(d) {
   if (!d || !EMOJIS.includes(d.emoji)) return;
   if (d.de === grupo.meuId && !grupo.host) return; // a própria já apareceu
   if (d.de !== grupo.meuId && !verReacoes) return; // escolheu não ver as dos outros
   const quem = grupo.membros.find(x => x.id === d.de);
-  soltarEmoji(d.emoji, d.de === grupo.meuId ? grupo.av : avValido(d.av) ?? (quem && quem.av));
+  soltarEmoji(d.emoji, d.de === grupo.meuId ? grupo.av : avValido(d.av) ?? (quem && quem.av), typeof d.sala === 'string' ? d.sala : undefined);
 }
 // a carinha do ícone pra esse emoji (ou nada, se o ícone não tem as reações)
 function srcReacao(emoji, av) {
@@ -5621,8 +5628,11 @@ function desenharBotoesReacao() {
   if (AV_COM_REACOES.has(meuAvatar)) EMOJIS.forEach(e => { new Image().src = srcReacao(e, meuAvatar); }); // já deixa carregado
 }
 const MENOS_MOVIMENTO = matchMedia('(prefers-reduced-motion: reduce)').matches;
-function soltarEmoji(emoji, av) {
-  const t = telaDasReacoes();
+function soltarEmoji(emoji, av, sala) {
+  // reação de uma live: só na tela dessa live (se não estiver aberta aqui, não aparece em outra)
+  let t;
+  if (sala) { t = $(`#grupo-telas .tile[data-sala="${CSS.escape(sala)}"]`); if (!t) return; }
+  else t = telaDasReacoes();
   const camada = t ? t.querySelector('.reacoes-camada') : document.querySelector('.grupo-chat .reacoes-camada');
   if (!camada || document.hidden) return;
   if (camada.childElementCount > 40) return; // chuva de cliques: não acumula
@@ -5645,7 +5655,7 @@ function alternarReagirTile(t) {
   const aberto = t.querySelector('.tile-reagir');
   if (aberto) { aberto.remove(); return; }
   const box = document.createElement('div'); box.className = 'tile-reagir';
-  preencherBotoesReacao(box, (ev, e) => { ev.stopPropagation(); reagir(e); });
+  preencherBotoesReacao(box, (ev, e) => { ev.stopPropagation(); reagir(e, t.dataset.sala || undefined); });
   box.onclick = ev => ev.stopPropagation();
   t.append(box);
 }
