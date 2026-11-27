@@ -5192,11 +5192,11 @@ function criarGrupo() {
   abrirEntradaGrupo(c, true);
 }
 
-// ícones de perfil do grupo (avatares/0..16.webp); quem não escolheu ganha um aleatório
-const N_AVATARES = 17;
-const ORDEM_AVATARES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 15]; // a foto da turma no fim
+// ícones de perfil do grupo (avatares/0..21.webp); quem não escolheu ganha um aleatório
+const N_AVATARES = 22;
+const ORDEM_AVATARES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18, 19, 20, 21, 15]; // a foto da turma no fim
 // ícones que têm as 7 carinhas de reação (reacoes/<ícone>_<0..6>.webp); os outros usam o emoji normal
-const AV_COM_REACOES = new Set([6, 7, 8, 9, 10, 11, 12, 13, 14, 16]);
+const AV_COM_REACOES = new Set([6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18, 19, 20, 21]);
 const avValido = v => v == null || v === '' ? null : Number.isInteger(+v) && +v >= 0 && +v < N_AVATARES ? +v : null;
 let meuAvatar = avValido(guardar.get('avatar'));
 if (meuAvatar == null) { meuAvatar = Math.floor(Math.random() * N_AVATARES); guardar.set('avatar', String(meuAvatar)); }
