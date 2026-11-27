@@ -686,6 +686,7 @@ html.com-fundo .bloco{background:none;-webkit-backdrop-filter:none;backdrop-filt
 .av-previa img{width:100%;height:100%;object-fit:cover;display:block}
 .av-lado{flex:1;min-width:0}
 @media (max-width:560px){.av-escolha{flex-direction:column;align-items:center}.av-previa{width:112px;height:112px}}
+#op-programa.falta small{color:var(--aviso)}
 .avatares{display:grid;grid-template-columns:repeat(auto-fill,minmax(54px,1fr));gap:8px;margin:0}
 .av-zoom{position:fixed;inset:0;z-index:200;display:grid;place-items:center;background:rgba(8,10,14,.82);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);cursor:zoom-out;animation:telaEntra .25s ease-out both}
 .av-zoom img{width:min(78vmin,512px);height:min(78vmin,512px);border-radius:28px;box-shadow:0 30px 80px -20px rgba(0,0,0,.9)}
@@ -1942,7 +1943,7 @@ let pvFalhas = 0;
 async function pvProcurar() {
   if (CELULAR_TX) return;
   // só procura o programa em quem já usou ele (ou escolheu o som pelo programa): sem pedido de permissão pra quem só assiste
-  if (!guardar.get('temPrograma') && !prog.conectado && radio('audio') !== 'app') return;
+  if (!guardar.get('temPrograma') && !prog.conectado && radio('audio') !== 'app') { pvMostrarOpcao(); return; }
   if (pvFalhas > 2 && pvFalhas++ % 3) return; // programa fechado: confere com menos frequência
   try {
     const r = await fetch('http://127.0.0.1:47800/', { cache: 'no-store' });
@@ -1952,12 +1953,31 @@ async function pvProcurar() {
   } catch { pvFalhas++; PV.versao = prog.versao || ''; if (prog.versao) avisoPrograma(prog.versao, false, ''); }
   const tem = pvSuportado() && !versaoMenor(PV.versao, '1.3');
   if (tem) PV.visto = Date.now();
-  $('#op-programa').classList.toggle('hidden', !tem && !PV.ativo);
-  // escolheu "pelo programa" outra vez, mas o programa novo não está aberto: volta pra tela inteira
-  if (!tem && !PV.ativo && !streamTx && radio('fonte') === 'programa') { marcar('fonte', 'monitor'); trocouFonte(); }
+  const falta = pvMostrarOpcao();
+  // ficou guardado "pelo programa" de outra vez, mas o programa novo não está aberto: volta pra tela inteira
+  // (se a pessoa acabou de escolher, fica, e a dica explica o que falta)
+  if (!tem && !PV.ativo && !streamTx && radio('fonte') === 'programa' && !pvEscolheuAgora) { marcar('fonte', 'monitor'); trocouFonte(); }
+  if (radio('fonte') === 'programa') $('#dica-fonte').textContent = falta ? falta.longo : DICA_FONTE.programa;
   $('#bloco-prioridade').classList.toggle('hidden', radio('fonte') !== 'programa');
 }
+// a opção aparece sempre no PC (quem acabou de baixar o programa também vê); o texto diz o que falta
+function pvMostrarOpcao() {
+  const falta = pvFalta();
+  $('#op-programa').classList.remove('hidden');
+  $('#op-programa small').textContent = falta ? falta.curto : 'Igual ao Discord: mais fps';
+  $('#op-programa').classList.toggle('falta', !!falta);
+  return falta;
+}
+// o que falta pra transmitir pelo programa (nada = pronto)
+let pvEscolheuAgora = false;
+function pvFalta() {
+  if (!pvSuportado()) return { curto: 'Só no Chrome ou Edge do PC', longo: 'Este navegador não tem o que o modo pelo programa precisa. Abra o site no Chrome ou no Edge (atualizado) pra usar.' };
+  if (!PV.versao) return { curto: 'Precisa do programa Tela ao Vivo Áudio aberto', longo: 'Baixe o Tela ao Vivo Áudio (botão "Baixar programa de áudio", lá em cima), abra e deixe aberto. Ele aparece aqui sozinho em alguns segundos.' };
+  if (versaoMenor(PV.versao, '1.3')) return { curto: 'Seu programa é antigo: baixe o novo', longo: `Seu Tela ao Vivo Áudio é o ${PV.versao}, que ainda não transmite a tela. Baixe o novo (botão "Baixar programa de áudio", lá em cima), feche o antigo (ícone perto do relógio › Sair) e abra o novo. Daí pra frente ele se atualiza sozinho.` };
+  return null;
+}
 setInterval(() => { if (!$('#tx').classList.contains('hidden') && !streamTx) pvProcurar(); }, 5000);
+if (!CELULAR_TX) pvMostrarOpcao(); // já aparece antes de procurar o programa
 function pvConectar() {
   return new Promise((ok, falha) => {
     let ws;
@@ -2509,8 +2529,9 @@ function prepararCelular() {
   atualizarFonte();
 }
 // escolheu "Aba": o natural é mandar o som da própria aba (o Chrome entrega certinho)
-function trocouFonte() {
+function trocouFonte(ev) {
   atualizarFonte();
+  if (ev && radio('fonte') === 'programa') { pvEscolheuAgora = true; guardar.set('temPrograma', '1'); pvFalhas = 0; pvProcurar(); }
   $('#bloco-prioridade').classList.toggle('hidden', radio('fonte') !== 'programa');
   // cabo virtual com Aba: o natural é o som da própria aba. Com o programa, a escolha da pessoa continua valendo.
   if (radio('fonte') === 'browser' && radio('audio') === 'device') {
@@ -2996,6 +3017,9 @@ async function comecar() {
   notaAudio('');
   let tela;
   if (fonte === 'programa') {
+    if (pvFalta()) { pvFalhas = 0; await pvProcurar(); }
+    const falta = pvFalta();
+    if (falta) { statusTx(falta.longo, 'erro'); return; }
     // programa antigo (até 1.3.3) não sabe listar as janelas: vai a tela inteira, como antes
     if (PV.versao && versaoMenor(PV.versao, '1.3.4')) pvEscolha = null;
     else {
@@ -4169,9 +4193,12 @@ function srQuadro() {
   // resolução-alvo: a escolhida (1080p/2K/4K) ou a da tela; nunca menor que a tela
   let ih = Math.max(oh, srAlvo());
   ih = Math.min(ih, 2160, Math.round(oh * 2.5));
+  // já chega do tamanho da tela (1080p num monitor 1080p) ou o vídeo está numa janela menor: em vez de não fazer nada,
+  // restaura (amplia com a rede, que tira o borrão e o serrilhado da compressão, e reduz pra tela, como 200% nos jogos)
+  if (ih < vh * 1.08) ih = Math.min(2160, vh * 2, Math.round(oh * 2.5));
   let iw = Math.round(vw * ih / vh);
   if (iw > 3840 * 1.34) { iw = Math.round(3840 * 1.34); ih = Math.round(vh * iw / vw); }
-  if (ih < vh * 1.08 || oh < vh * 0.9) { srParar(); srAgendar(); return; } // já chega do tamanho (ou a tela é menor): nada a ampliar
+  if (ih < vh * 1.08) { srParar(); srAgendar(); return; } // player minúsculo: não vale a pena
   const reduz = ih > oh + 1; // ampliou acima da tela: depois reduz (fica mais liso, como resolução 200% nos jogos)
   if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
   const ox = Math.floor((W - ow) / 2), oy = Math.floor((H - oh) / 2);
@@ -4399,12 +4426,11 @@ function iaQuadro() {
   const W = Math.round(r.width * dpr), H = Math.round(r.height * dpr);
   const esc = Math.min(W / vw, H / vh);
   const ow = Math.round(vw * esc), oh = Math.round(vh * esc);
-  let alvo = srAlvo();
-  if (!alvo && vh >= oh * 0.9) alvo = 2160; // nada pra ampliar: restaura (amplia em 4K e reduz pra tela)
-  let ih = Math.min(Math.max(oh, alvo), 2160, Math.round(oh * 2.5));
+  let ih = Math.min(Math.max(oh, srAlvo()), 2160, Math.round(oh * 2.5));
+  if (ih < vh * 1.08) ih = Math.min(2160, vh * 2, Math.round(oh * 2.5)); // nada pra ampliar: restaura (amplia e reduz pra tela)
   let iw = Math.round(vw * ih / vh);
   if (iw > 5120) { iw = 5120; ih = Math.round(vh * iw / vw); }
-  if (ih < vh * 1.08 || oh < vh * 0.9) { iaParar(); SR.info = ''; iaAgendar(); return; } // já chega do tamanho (ou a tela é menor): nada a ampliar
+  if (ih < vh * 1.08) { iaParar(); SR.info = ''; iaAgendar(); return; } // player minúsculo: não vale a pena
   const dev = IA.device, cv = IA.cv;
   try {
     const chave = `${vw}x${vh}>${iw}x${ih}${SR.forte ? '+' : ''}`;
@@ -4485,7 +4511,7 @@ function definirSuperRes(m, quieto) {
   if (m && srGPU() && IA.estado === 'erro') IA.estado = 'nada';
   srReiniciar();
   if (m && !SR.ok && SR.motor !== 'ia') avisoRx('Super resolução não funciona neste navegador (precisa de WebGL2).');
-  else if (!quieto) avisoRx(m ? 'Super resolução ligada (beta). Ela aparece quando a imagem que chega é menor que a sua tela.' : 'Super resolução desligada.');
+  else if (!quieto) avisoRx(m ? 'Super resolução ligada (beta).' : 'Super resolução desligada.');
 }
 video.addEventListener('playing', () => { if (SR.modo) srReiniciar(); });
 addEventListener('resize', () => { if (SR.modo) srReiniciar(); });
