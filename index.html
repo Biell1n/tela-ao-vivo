@@ -1672,9 +1672,10 @@ const formatosDec = formatosHardware('dec'); // promessa: quem assiste
 const statsAnteriores = new WeakMap();
 async function lerStats(pc, tipo) {
   const r = await pc.getStats();
-  let v = null, par = null, fonte = null;
+  let v = null, par = null, fonte = null, remoto0 = null;
   r.forEach(s => {
     if (s.type === tipo && (s.kind === 'video' || s.mediaType === 'video')) v = s;
+    if (s.type === 'remote-inbound-rtp' && s.kind === 'video') remoto0 = s;
     if (s.type === 'media-source' && s.kind === 'video') fonte = s;
     if (s.type === 'transport' && s.selectedCandidatePairId) par = r.get(s.selectedCandidatePairId) || par;
   });
@@ -1697,7 +1698,7 @@ async function lerStats(pc, tipo) {
   return {
     fps: Math.round(v.framesPerSecond || 0), w: v.frameWidth || 0, h: v.frameHeight || 0, mbps,
     ping: par && par.currentRoundTripTime != null ? Math.round(par.currentRoundTripTime * 1000) : null,
-    rota, relay: !!rel, alvo: v.targetBitrate || 0,
+    rota, relay: !!rel, alvo: v.targetBitrate || 0, perdaLa: remoto0 && remoto0.fractionLost != null ? remoto0.fractionLost : null,
     encoder: v.encoderImplementation || '', decoder: v.decoderImplementation || '',
     limite: v.qualityLimitationReason || 'none',
     perdidos: v.packetsLost || 0, descartados: v.framesDropped || 0,
@@ -2033,7 +2034,7 @@ async function pvIniciar() {
     PV.ruidos.push(im);
   }
   x.putImageData(PV.ruidos[0], 0, 0);
-  PV.ativo = true; PV.n = 0; PV.estado = null; PV.taxa = 0;
+  PV.ativo = true; PV.n = 0; PV.estado = null; PV.taxa = 0; PV.ctl = null;
   await pvConectar();
   for (let i = 0; i < 80 && !PV.n; i++) {
     await new Promise(r => setTimeout(r, 100));
@@ -2079,6 +2080,23 @@ function pvSoltarFaixa(track) {
   if (g.worker) try { g.worker.terminate(); } catch {}
 }
 // cada envio de vídeo (servidor ou ligação direta) troca os quadros pelos do programa
+// Taxa do programa (igual ao Discord): começa e fica na escolhida, e só baixa quando a internet aperta de verdade
+// (perda de pacotes do outro lado ou o atraso subindo). Não dá pra seguir o "alvo" do navegador: ele só sobe quando
+// o envio pede mais, e como o programa obedecia esse número, os dois ficavam presos em 2-4 Mbps (imagem pixelada).
+function pvControlarTaxa(todas) {
+  const teto = qualAtual ? kbpsDe(qualAtual) * 1000 : 12e6;
+  const piso = Math.min(teto, 1.5e6);
+  if (!PV.ctl || PV.ctl.teto !== teto) PV.ctl = { taxa: teto, teto, base: Infinity, ruim: 0, bom: 0 }; // começo ou trocou a qualidade
+  const c = PV.ctl;
+  const perda = Math.max(0, ...todas.map(t => t.perdaLa || 0));
+  const ping = Math.max(0, ...todas.map(t => t.ping || 0));
+  if (ping) c.base = Math.min(c.base, ping);
+  const apertou = perda > 0.04 || (isFinite(c.base) && ping > c.base + 150);
+  if (apertou) { c.ruim++; c.bom = 0; } else { c.bom++; c.ruim = 0; }
+  if (c.ruim >= 2) { c.taxa = Math.max(piso, c.taxa * 0.8); c.ruim = 0; }
+  else if (c.bom >= 4 && c.taxa < teto) { c.taxa = Math.min(teto, c.taxa * 1.15); c.bom = 0; }
+  if (Math.abs(c.taxa - PV.taxa) > PV.taxa * 0.05) { PV.taxa = c.taxa; pvEnviar({ tipo: 'taxa', kbps: Math.round(c.taxa / 1000) }); }
+}
 // quadro falso a mais pra um envio (o navegador perdeu um): horário logo depois do último, pra não sair da ordem
 function pvRepor(g) {
   if (!PV.ativo || !g.pronto || !PV.oc) return;
@@ -5027,10 +5045,7 @@ setInterval(async () => {
                       giro: CELULAR_TX ? +(radio('giro') || 0) : null, som: infoSom() });
         } catch {}
       }
-      if (PV.ativo && todas.length) {
-        const alvo = Math.min(...todas.map(t => t.alvo || Infinity), qualAtual ? kbpsDe(qualAtual) * 1000 : Infinity);
-        if (isFinite(alvo) && alvo > 0 && Math.abs(alvo - PV.taxa) > PV.taxa * 0.12) { PV.taxa = alvo; pvEnviar({ tipo: 'taxa', kbps: Math.round(alvo / 1000) }); }
-      }
+      if (PV.ativo && todas.length) pvControlarTaxa(todas);
       if (todas[0]) {
         const st = todas[0];
         {
